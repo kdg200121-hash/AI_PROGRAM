@@ -1,0 +1,239 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 980px;
+  min-height: 640px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #172033;
+  background: #eef2f7;
+}
+
+button {
+  min-height: 36px;
+  border: 1px solid #c9d3e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #26364d;
+  font: inherit;
+}
+
+button.primary {
+  border-color: #2d5f9f;
+  background: #2d5f9f;
+  color: #fff;
+}
+
+.appShell {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 248px 1fr;
+}
+
+.sidebar {
+  background: #172033;
+  color: #e8edf5;
+  padding: 18px 14px;
+}
+
+.brand {
+  padding: 8px 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 14px;
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand span {
+  margin-top: 4px;
+  color: #aeb9ca;
+  font-size: 12px;
+}
+
+.navItem {
+  width: 100%;
+  margin-bottom: 6px;
+  border: 0;
+  text-align: left;
+  background: transparent;
+  color: #c8d1df;
+}
+
+.navItem.active {
+  background: #2d5f9f;
+  color: #fff;
+}
+
+.main {
+  display: grid;
+  grid-template-rows: 64px auto 1fr;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  background: #fff;
+  border-bottom: 1px solid #dde4ee;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.topActions {
+  display: flex;
+  gap: 8px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px 22px;
+}
+
+.metric,
+.panel {
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.metric {
+  padding: 14px;
+}
+
+.metric span {
+  display: block;
+  color: #617086;
+  font-size: 12px;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+}
+
+.contentGrid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 330px;
+  gap: 16px;
+  padding: 0 22px 22px;
+}
+
+.panel {
+  overflow: hidden;
+}
+
+.panelHeader {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.panelHeader h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf1f6;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: #617086;
+  font-weight: 600;
+  background: #fbfcfe;
+}
+
+tbody tr {
+  cursor: default;
+}
+
+.selectedRow {
+  background: #eef5ff;
+}
+
+.workflowHint {
+  margin: 188px 12px 12px;
+  padding: 16px;
+  border: 1px solid #d4e2f5;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.workflowHint h3 {
+  margin: 0 0 8px;
+  color: #1f4d82;
+  font-size: 14px;
+}
+
+.workflowHint p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.details {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.field span {
+  color: #617086;
+  font-size: 12px;
+}
+
+.field div {
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid #d9e1ec;
+  border-radius: 6px;
+  background: #f9fbfe;
+  overflow-wrap: anywhere;
+}
+
+.field .multilineValue {
+  min-height: 64px;
+  line-height: 1.45;
+}
+
+.buttonStack {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.emptyState {
+  margin: 16px;
+  color: #617086;
+}

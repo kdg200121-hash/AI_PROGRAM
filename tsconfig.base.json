@@ -7,6 +7,11 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@mcp-registry/shared": ["packages/shared/src/index.ts"],
+      "@mcp-registry/core": ["packages/core/src/index.ts"]
+    }
   }
 }
