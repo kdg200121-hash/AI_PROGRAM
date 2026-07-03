@@ -89,20 +89,8 @@ function sidebarLabel(sectionId: SidebarSectionId) {
   return sidebarSections.find((section) => section.id === sectionId)?.label ?? "새 탭";
 }
 
-function defaultSubmenuLabel(sectionId: SidebarSectionId) {
-  if (sectionId === "servers") {
-    return "서버 목록";
-  }
-
-  if (sectionId === "workflow") {
-    return "작업 흐름";
-  }
-
-  if (sectionId === "monitor") {
-    return "실행 상태";
-  }
-
-  return "도구 목록";
+function defaultSubmenuLabel(_sectionId: SidebarSectionId) {
+  return "메인페이지";
 }
 
 function tabMenuLabel(tab: AppTab) {
