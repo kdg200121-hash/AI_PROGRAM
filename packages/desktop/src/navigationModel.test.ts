@@ -6,14 +6,12 @@ describe("navigationModel", () => {
     expect(sidebarSections.map((section) => section.id)).toEqual([
       "servers",
       "workflow",
-      "monitor",
       "excel",
       "tekla"
     ]);
     expect(sidebarSections.map((section) => section.label)).toEqual([
       "MCP Servers",
       "CAD ↔ Revit",
-      "Process Monitor",
       "Excel",
       "Tekla"
     ]);

@@ -100,5 +100,9 @@ export function moveTabToEnd(tabs: AppTab[], draggedTabId: string): AppTab[] {
 }
 
 function sectionLabel(sectionId: SidebarSectionId) {
+  if (sectionId === "monitor") {
+    return "Process Monitor";
+  }
+
   return sidebarSections.find((section) => section.id === sectionId)?.label ?? "새 탭";
 }

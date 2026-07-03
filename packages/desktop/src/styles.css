@@ -97,13 +97,30 @@ button.primary {
 }
 
 .openTab.dragOverBefore {
-  border-left-color: #2d5f9f;
-  box-shadow: inset 3px 0 0 #2d5f9f;
+  border-left-color: transparent;
 }
 
 .openTab.dragOverAfter {
-  border-right-color: #2d5f9f;
-  box-shadow: inset -3px 0 0 #2d5f9f;
+  border-right-color: transparent;
+}
+
+.openTab.dragOverBefore::before,
+.openTab.dragOverAfter::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 999px;
+  background: #2d5f9f;
+}
+
+.openTab.dragOverBefore::before {
+  left: -4px;
+}
+
+.openTab.dragOverAfter::after {
+  right: -4px;
 }
 
 .openTabTitle {
@@ -323,30 +340,48 @@ button.primary {
 
 .navRow {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 28px 34px;
+  position: relative;
+  grid-template-columns: 30px minmax(0, 1fr) 28px;
   gap: 4px;
   margin-bottom: 6px;
   border: 1px solid transparent;
   border-radius: 8px;
-  overflow: hidden;
 }
 
 .navRow.dragging {
-  border-color: rgba(147, 197, 253, 0.45);
-  background: rgba(45, 95, 159, 0.24);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
-  opacity: 0.9;
+  background: #2d5f9f;
+  color: #fff;
+  opacity: 0.95;
 }
 
 .navRow.dragging .navOrderButton,
-.navRow.dragging .favoriteButton,
 .navRow.dragging .navItem {
   background: transparent;
+  color: #fff;
+}
+
+.navRow.dropBefore::before,
+.navRow.dropAfter::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  border-radius: 999px;
+  background: #8bb7f0;
+  pointer-events: none;
+}
+
+.navRow.dropBefore::before {
+  top: -5px;
+}
+
+.navRow.dropAfter::after {
+  bottom: -5px;
 }
 
 .navOrderButton,
-.navExpandButton,
-.favoriteButton {
+.navExpandButton {
   min-width: 34px;
   min-height: 36px;
   padding: 0;
@@ -398,21 +433,6 @@ button.primary {
   color: #fff;
 }
 
-.favoriteButton {
-  color: #6f7d91;
-  opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease;
-}
-
-.navRow:hover .favoriteButton,
-.favoriteButton.active {
-  opacity: 1;
-}
-
-.favoriteButton.active {
-  color: #f8c14a;
-}
-
 .favoriteGroup {
   margin-bottom: 12px;
 }
@@ -439,9 +459,9 @@ button.primary {
   color: #fff;
 }
 
+.sidebarMonitorButton,
 .sidebarSettingsButton {
   width: 100%;
-  margin-top: auto;
   min-height: 38px;
   border-color: rgba(226, 232, 240, 0.24);
   background: rgba(255, 255, 255, 0.04);
@@ -449,15 +469,32 @@ button.primary {
   text-align: left;
 }
 
+.sidebarMonitorButton {
+  margin-top: auto;
+  margin-bottom: 6px;
+}
+
+.sidebarSettingsButton {
+  margin-top: 0;
+}
+
+.sidebarMonitorButton .navFull,
 .sidebarSettingsButton .navFull {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
+.sidebarMonitorButton:hover,
 .sidebarSettingsButton:hover {
   border-color: rgba(226, 232, 240, 0.46);
   background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.sidebarMonitorButton.active {
+  border-color: #2d5f9f;
+  background: #2d5f9f;
   color: #fff;
 }
 
@@ -479,11 +516,11 @@ button.primary {
 
 .sidebarCollapsed .navOrderButton,
 .sidebarCollapsed .navExpandButton,
-.sidebarCollapsed .navSubPanel,
-.sidebarCollapsed .favoriteButton {
+.sidebarCollapsed .navSubPanel {
   display: none;
 }
 
+.sidebarCollapsed .sidebarMonitorButton,
 .sidebarCollapsed .sidebarSettingsButton {
   display: grid;
   place-items: center;
@@ -525,7 +562,6 @@ button.primary {
 .compactMode .brand,
 .compactMode .sidebarLabel,
 .compactMode .navFull,
-.compactMode .favoriteButton,
 .compactMode .navOrderButton,
 .compactMode .navExpandButton,
 .compactMode .navSubPanel {
@@ -537,6 +573,7 @@ button.primary {
 }
 
 .compactMode .navItem,
+.compactMode .sidebarMonitorButton,
 .compactMode .sidebarSettingsButton {
   display: grid;
   place-items: center;

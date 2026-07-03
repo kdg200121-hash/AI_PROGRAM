@@ -82,6 +82,10 @@ function loadSidebarOrder(): SidebarSectionId[] {
 }
 
 function sidebarLabel(sectionId: SidebarSectionId) {
+  if (sectionId === "monitor") {
+    return "Process Monitor";
+  }
+
   return sidebarSections.find((section) => section.id === sectionId)?.label ?? "새 탭";
 }
 
@@ -149,6 +153,10 @@ export function App() {
     position: TabDropPosition;
   } | null>(null);
   const [isTabEndDragOver, setIsTabEndDragOver] = useState(false);
+  const [dragOverSection, setDragOverSection] = useState<{
+    id: SidebarSectionId;
+    position: TabDropPosition;
+  } | null>(null);
 
   const activeOpenTab = openTabs.find((tab) => tab.id === activeOpenTabId) ?? openTabs[0];
   const activeTab = activeOpenTab.workspaceTabId;
@@ -298,6 +306,7 @@ export function App() {
       nextOrder.splice(position === "after" ? targetIndex + 1 : targetIndex, 0, draggedSectionId);
       return nextOrder;
     });
+    setDragOverSection(null);
   };
 
   const startSidebarDrag = (
@@ -312,6 +321,10 @@ export function App() {
   const getSidebarDropPosition = (event: DragEvent<HTMLDivElement>): TabDropPosition => {
     const bounds = event.currentTarget.getBoundingClientRect();
     return event.clientY > bounds.top + bounds.height / 2 ? "after" : "before";
+  };
+
+  const openMonitorSection = () => {
+    openSectionInCurrentTab("monitor");
   };
 
   const showSidebarContextMenu = (
@@ -515,7 +528,13 @@ export function App() {
             className={[
               "navRow",
               section.id === draggedSectionId ? "dragging" : "",
-              expandedSectionIds.includes(section.id) ? "expanded" : ""
+              expandedSectionIds.includes(section.id) ? "expanded" : "",
+              dragOverSection?.id === section.id && dragOverSection.position === "before"
+                ? "dropBefore"
+                : "",
+              dragOverSection?.id === section.id && dragOverSection.position === "after"
+                ? "dropAfter"
+                : ""
             ]
               .filter(Boolean)
               .join(" ")}
@@ -523,11 +542,16 @@ export function App() {
             onDragOver={(event) => {
               event.preventDefault();
               event.dataTransfer.dropEffect = "move";
+              setDragOverSection({ id: section.id, position: getSidebarDropPosition(event) });
+            }}
+            onDragLeave={() => {
+              setDragOverSection((current) => (current?.id === section.id ? null : current));
             }}
             onDrop={(event) => {
               event.preventDefault();
               moveSidebarSection(section.id, getSidebarDropPosition(event));
               setDraggedSectionId(null);
+              setDragOverSection(null);
             }}
           >
             <button
@@ -535,7 +559,10 @@ export function App() {
               aria-label={`${section.label} 순서 변경`}
               draggable
               onDragStart={(event) => startSidebarDrag(event, section.id)}
-              onDragEnd={() => setDraggedSectionId(null)}
+              onDragEnd={() => {
+                setDraggedSectionId(null);
+                setDragOverSection(null);
+              }}
             >
               ☰
             </button>
@@ -553,18 +580,7 @@ export function App() {
               aria-expanded={expandedSectionIds.includes(section.id)}
               onClick={() => toggleExpandedSection(section.id)}
             >
-              {expandedSectionIds.includes(section.id) ? "⌄" : "›"}
-            </button>
-            <button
-              className={
-                favoriteSectionIds.includes(section.id)
-                  ? "favoriteButton active"
-                  : "favoriteButton"
-              }
-              aria-label={`${section.label} 즐겨찾기`}
-              onClick={() => toggleFavoriteSection(section.id)}
-            >
-              ★
+              {expandedSectionIds.includes(section.id) ? "△" : "▽"}
             </button>
             {expandedSectionIds.includes(section.id) ? (
               <div className="navSubPanel">
@@ -574,6 +590,19 @@ export function App() {
             ) : null}
           </div>
         ))}
+        <button
+          className={activeSidebarSection === "monitor" ? "sidebarMonitorButton active" : "sidebarMonitorButton"}
+          onClick={openMonitorSection}
+          onContextMenu={(event) => showSidebarContextMenu(event, "monitor")}
+        >
+          <span className="navShort" aria-hidden="true">
+            ⏱
+          </span>
+          <span className="navFull">
+            <span aria-hidden="true">⏱</span>
+            <span>Process Monitor</span>
+          </span>
+        </button>
         <button
           className="sidebarSettingsButton"
           aria-label={`${registryWorkspaceTab.label} 열기`}
