@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { McpServerRecord, RegistryFile } from "@mcp-registry/shared";
 import { getConnectionSummary } from "./connectionSummary";
 import { getToolsForWorkspace } from "./mcpToolCatalog";
-import { settingsSections, type SettingsSectionId } from "./settingsDialog";
+import {
+  colorModeOptions,
+  settingsSections,
+  type ColorMode,
+  type SettingsSectionId
+} from "./settingsDialog";
 import {
   filterServersByWorkspace,
   getAdjacentWorkspaceTab,
@@ -56,6 +61,7 @@ export function App() {
   const [isRegistryDialogOpen, setIsRegistryDialogOpen] = useState(false);
   const [activeSettingsSection, setActiveSettingsSection] =
     useState<SettingsSectionId>("servers");
+  const [colorMode, setColorMode] = useState<ColorMode>("light");
 
   useEffect(() => {
     const api = window.mcpRegistry;
@@ -113,7 +119,8 @@ export function App() {
   const shellClassName = [
     "appShell",
     isCompact ? "compactMode" : "",
-    isSidebarCollapsed ? "sidebarCollapsed" : ""
+    isSidebarCollapsed ? "sidebarCollapsed" : "",
+    colorMode === "dark" ? "darkMode" : ""
   ]
     .filter(Boolean)
     .join(" ");
@@ -379,17 +386,20 @@ export function App() {
                       <h2>화면 모드</h2>
                     </div>
                     <div className="displayModeList">
-                      <button className={!isCompact ? "displayModeOption active" : "displayModeOption"}>
-                        <strong>기본 보기</strong>
-                        <span>전체 작업 화면으로 CAD, REVIT, 연결 작업을 넓게 봅니다.</span>
-                      </button>
-                      <button className={isCompact ? "displayModeOption active" : "displayModeOption"}>
-                        <strong>간소화</strong>
-                        <span>다이나모 플레이어처럼 작은 세로 창으로 줄여서 사용합니다.</span>
-                      </button>
-                      <button className="primary" onClick={toggleCompactMode}>
-                        {isCompact ? "기본 보기로 전환" : "간소화로 전환"}
-                      </button>
+                      {colorModeOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          className={
+                            colorMode === option.id
+                              ? "displayModeOption active"
+                              : "displayModeOption"
+                          }
+                          onClick={() => setColorMode(option.id)}
+                        >
+                          <strong>{option.label}</strong>
+                          <span>{option.description}</span>
+                        </button>
+                      ))}
                     </div>
                   </section>
                 )}
