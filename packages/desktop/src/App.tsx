@@ -331,6 +331,12 @@ export function App() {
     event: DragEvent<HTMLButtonElement>,
     sectionId: SidebarSectionId
   ) => {
+    const row = event.currentTarget.closest(".navRow");
+    if (row instanceof HTMLElement) {
+      const bounds = row.getBoundingClientRect();
+      event.dataTransfer.setDragImage(row, event.clientX - bounds.left, event.clientY - bounds.top);
+    }
+
     setDraggedSectionId(sectionId);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", sectionId);
