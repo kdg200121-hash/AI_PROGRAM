@@ -59,7 +59,14 @@ export function closeTab(tabs: AppTab[], tabId: string): AppTab[] {
   return tabs.filter((tab) => tab.id !== tabId);
 }
 
-export function moveTab(tabs: AppTab[], draggedTabId: string, targetTabId: string): AppTab[] {
+export type TabDropPosition = "before" | "after";
+
+export function moveTab(
+  tabs: AppTab[],
+  draggedTabId: string,
+  targetTabId: string,
+  position: TabDropPosition = "before"
+): AppTab[] {
   if (draggedTabId === targetTabId) {
     return tabs;
   }
@@ -73,7 +80,9 @@ export function moveTab(tabs: AppTab[], draggedTabId: string, targetTabId: strin
 
   const nextTabs = [...tabs];
   const [draggedTab] = nextTabs.splice(draggedIndex, 1);
-  nextTabs.splice(targetIndex, 0, draggedTab);
+  const nextTargetIndex = nextTabs.findIndex((tab) => tab.id === targetTabId);
+  const insertionIndex = position === "after" ? nextTargetIndex + 1 : nextTargetIndex;
+  nextTabs.splice(insertionIndex, 0, draggedTab);
   return nextTabs;
 }
 

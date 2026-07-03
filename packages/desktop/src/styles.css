@@ -96,9 +96,14 @@ button.primary {
   opacity: 0.55;
 }
 
-.openTab.dragOver {
+.openTab.dragOverBefore {
   border-left-color: #2d5f9f;
   box-shadow: inset 3px 0 0 #2d5f9f;
+}
+
+.openTab.dragOverAfter {
+  border-right-color: #2d5f9f;
+  box-shadow: inset -3px 0 0 #2d5f9f;
 }
 
 .openTabTitle {

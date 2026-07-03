@@ -23,6 +23,7 @@ import {
   getPinnedTabs,
   moveTab,
   togglePinnedTab,
+  type TabDropPosition,
   type AppTab
 } from "./tabModel";
 import {
@@ -125,7 +126,10 @@ export function App() {
   );
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
-  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+  const [dragOverTab, setDragOverTab] = useState<{
+    id: string;
+    position: TabDropPosition;
+  } | null>(null);
 
   const activeOpenTab = openTabs.find((tab) => tab.id === activeOpenTabId) ?? openTabs[0];
   const activeTab = activeOpenTab.workspaceTabId;
@@ -278,14 +282,19 @@ export function App() {
     });
   };
 
-  const moveOpenTab = (targetTabId: string) => {
+  const moveOpenTab = (targetTabId: string, position: TabDropPosition) => {
     if (!draggedTabId) {
       return;
     }
 
-    setOpenTabs((tabs) => moveTab(tabs, draggedTabId, targetTabId));
+    setOpenTabs((tabs) => moveTab(tabs, draggedTabId, targetTabId, position));
     setDraggedTabId(null);
-    setDragOverTabId(null);
+    setDragOverTab(null);
+  };
+
+  const getDropPosition = (event: MouseEvent<HTMLButtonElement>): TabDropPosition => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientX > bounds.left + bounds.width / 2 ? "after" : "before";
   };
 
   const shellClassName = [
@@ -307,7 +316,12 @@ export function App() {
               className={[
                 "openTab",
                 tab.id === activeOpenTabId ? "active" : "",
-                tab.id === dragOverTabId ? "dragOver" : "",
+                tab.id === dragOverTab?.id && dragOverTab.position === "before"
+                  ? "dragOverBefore"
+                  : "",
+                tab.id === dragOverTab?.id && dragOverTab.position === "after"
+                  ? "dragOverAfter"
+                  : "",
                 tab.id === draggedTabId ? "dragging" : ""
               ]
                 .filter(Boolean)
@@ -320,19 +334,24 @@ export function App() {
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", tab.id);
               }}
-              onDragEnter={() => setDragOverTabId(tab.id)}
+              onDragEnter={(event) =>
+                setDragOverTab({ id: tab.id, position: getDropPosition(event) })
+              }
               onDragOver={(event) => {
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";
+                setDragOverTab({ id: tab.id, position: getDropPosition(event) });
               }}
-              onDragLeave={() => setDragOverTabId((current) => (current === tab.id ? null : current))}
+              onDragLeave={() =>
+                setDragOverTab((current) => (current?.id === tab.id ? null : current))
+              }
               onDrop={(event) => {
                 event.preventDefault();
-                moveOpenTab(tab.id);
+                moveOpenTab(tab.id, getDropPosition(event));
               }}
               onDragEnd={() => {
                 setDraggedTabId(null);
-                setDragOverTabId(null);
+                setDragOverTab(null);
               }}
             >
               {tab.isPinned ? <span className="pinMark">●</span> : null}

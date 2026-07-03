@@ -66,4 +66,20 @@ describe("tabModel", () => {
       "tab-10"
     ]);
   });
+
+  it("moves an earlier tab before a later tab", () => {
+    const tabs = [
+      createBlankTab("tab-12"),
+      createBlankTab("tab-13"),
+      createBlankTab("tab-14"),
+      createBlankTab("tab-15")
+    ];
+
+    expect(moveTab(tabs, "tab-12", "tab-14", "before").map((tab) => tab.id)).toEqual([
+      "tab-13",
+      "tab-12",
+      "tab-14",
+      "tab-15"
+    ]);
+  });
 });
