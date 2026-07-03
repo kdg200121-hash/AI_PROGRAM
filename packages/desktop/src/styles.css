@@ -92,6 +92,15 @@ button.primary {
   color: #1f4d82;
 }
 
+.openTab.dragging {
+  opacity: 0.55;
+}
+
+.openTab.dragOver {
+  border-left-color: #2d5f9f;
+  box-shadow: inset 3px 0 0 #2d5f9f;
+}
+
 .openTabTitle {
   overflow: hidden;
   text-overflow: ellipsis;

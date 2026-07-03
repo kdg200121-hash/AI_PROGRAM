@@ -21,6 +21,7 @@ import {
   createSectionTab,
   duplicateTab,
   getPinnedTabs,
+  moveTab,
   togglePinnedTab,
   type AppTab
 } from "./tabModel";
@@ -122,6 +123,8 @@ export function App() {
     loadFavoriteSections()
   );
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
 
   const activeOpenTab = openTabs.find((tab) => tab.id === activeOpenTabId) ?? openTabs[0];
   const activeTab = activeOpenTab.workspaceTabId;
@@ -266,6 +269,16 @@ export function App() {
     });
   };
 
+  const moveOpenTab = (targetTabId: string) => {
+    if (!draggedTabId) {
+      return;
+    }
+
+    setOpenTabs((tabs) => moveTab(tabs, draggedTabId, targetTabId));
+    setDraggedTabId(null);
+    setDragOverTabId(null);
+  };
+
   const shellClassName = [
     "appShell",
     isCompact ? "compactMode" : "",
@@ -282,9 +295,36 @@ export function App() {
           {openTabs.map((tab) => (
             <button
               key={tab.id}
-              className={tab.id === activeOpenTabId ? "openTab active" : "openTab"}
+              className={[
+                "openTab",
+                tab.id === activeOpenTabId ? "active" : "",
+                tab.id === dragOverTabId ? "dragOver" : "",
+                tab.id === draggedTabId ? "dragging" : ""
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              draggable
               onClick={() => setActiveOpenTabId(tab.id)}
               onContextMenu={(event) => showTabContextMenu(event, tab.id)}
+              onDragStart={(event) => {
+                setDraggedTabId(tab.id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", tab.id);
+              }}
+              onDragEnter={() => setDragOverTabId(tab.id)}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDragLeave={() => setDragOverTabId((current) => (current === tab.id ? null : current))}
+              onDrop={(event) => {
+                event.preventDefault();
+                moveOpenTab(tab.id);
+              }}
+              onDragEnd={() => {
+                setDraggedTabId(null);
+                setDragOverTabId(null);
+              }}
             >
               {tab.isPinned ? <span className="pinMark">●</span> : null}
               <span className="openTabTitle">{tab.title}</span>

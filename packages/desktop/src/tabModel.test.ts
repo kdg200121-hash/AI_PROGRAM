@@ -5,6 +5,7 @@ import {
   createSectionTab,
   duplicateTab,
   getPinnedTabs,
+  moveTab,
   togglePinnedTab
 } from "./tabModel";
 
@@ -49,6 +50,20 @@ describe("tabModel", () => {
     expect(closeTab([onlyTab], onlyTab.id)).toEqual([onlyTab]);
     expect(closeTab([onlyTab, createBlankTab("tab-8")], onlyTab.id).map((tab) => tab.id)).toEqual([
       "tab-8"
+    ]);
+  });
+
+  it("moves a tab to a new position", () => {
+    const tabs = [
+      createBlankTab("tab-9"),
+      createBlankTab("tab-10"),
+      createBlankTab("tab-11")
+    ];
+
+    expect(moveTab(tabs, "tab-11", "tab-9").map((tab) => tab.id)).toEqual([
+      "tab-11",
+      "tab-9",
+      "tab-10"
     ]);
   });
 });
