@@ -135,11 +135,15 @@ button.primary {
 }
 
 .openTabMeta {
+  max-width: 88px;
+  overflow: hidden;
   padding: 2px 5px;
   border-radius: 4px;
   background: rgba(45, 95, 159, 0.1);
   color: #526071;
   font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pinMark {

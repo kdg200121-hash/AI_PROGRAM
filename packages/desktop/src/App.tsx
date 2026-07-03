@@ -89,8 +89,40 @@ function sidebarLabel(sectionId: SidebarSectionId) {
   return sidebarSections.find((section) => section.id === sectionId)?.label ?? "새 탭";
 }
 
-function workspaceLabel(tabId: WorkspaceTabId) {
-  return workspaceTabs.find((tab) => tab.id === tabId)?.label ?? "CAD";
+function defaultSubmenuLabel(sectionId: SidebarSectionId) {
+  if (sectionId === "servers") {
+    return "서버 목록";
+  }
+
+  if (sectionId === "workflow") {
+    return "작업 흐름";
+  }
+
+  if (sectionId === "monitor") {
+    return "실행 상태";
+  }
+
+  return "도구 목록";
+}
+
+function tabMenuLabel(tab: AppTab) {
+  if (tab.workspaceTabId === "registry") {
+    return registryWorkspaceTab.label;
+  }
+
+  return sidebarLabel(tab.sectionId);
+}
+
+function tabSubmenuLabel(tab: AppTab) {
+  if (tab.title === "새 탭") {
+    return "새 탭";
+  }
+
+  if (tab.workspaceTabId === "registry" && tab.sectionId === "servers") {
+    return "MCP 서버";
+  }
+
+  return defaultSubmenuLabel(tab.sectionId);
 }
 
 function PopoutIcon() {
@@ -502,8 +534,8 @@ export function App() {
               }}
             >
               {tab.isPinned ? <span className="pinMark">●</span> : null}
-              <span className="openTabTitle">{tab.title}</span>
-              <span className="openTabMeta">{workspaceLabel(tab.workspaceTabId)}</span>
+              <span className="openTabTitle">{tabSubmenuLabel(tab)}</span>
+              <span className="openTabMeta">{tabMenuLabel(tab)}</span>
               <span
                 className="tabCloseButton"
                 role="button"
