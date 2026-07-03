@@ -157,15 +157,6 @@ export function App() {
             <span className={`statusDot ${connectionSummary.tone}`} />
             <span>{connectionSummary.label}</span>
           </div>
-          <button
-            className="registryIconButton"
-            aria-label={`${registryWorkspaceTab.label} 열기`}
-            title={`${registryWorkspaceTab.label} 열기`}
-            onClick={() => setIsRegistryDialogOpen(true)}
-          >
-            <span aria-hidden="true">☰</span>
-            <span>Settings</span>
-          </button>
         </div>
       </nav>
 
@@ -195,6 +186,20 @@ export function App() {
         <button className="navItem">
           <span className="navShort">P</span>
           <span className="navFull">Process Monitor</span>
+        </button>
+        <button
+          className="sidebarSettingsButton"
+          aria-label={`${registryWorkspaceTab.label} 열기`}
+          title={`${registryWorkspaceTab.label} 열기`}
+          onClick={() => setIsRegistryDialogOpen(true)}
+        >
+          <span className="navShort" aria-hidden="true">
+            ☰
+          </span>
+          <span className="navFull">
+            <span aria-hidden="true">☰</span>
+            <span>Settings</span>
+          </span>
         </button>
       </aside>
 

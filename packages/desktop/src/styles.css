@@ -111,32 +111,6 @@ button.primary {
   font-weight: 600;
 }
 
-.registryIconButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-width: 92px;
-  min-height: 32px;
-  padding: 0 10px;
-  border-color: #c9d3e1;
-  background: #fff;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.registryIconButton span:first-child {
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.registryIconButton:hover {
-  border-color: #2d5f9f;
-  color: #1f4d82;
-}
-
 .connectionBadge {
   display: inline-flex;
   align-items: center;
@@ -170,6 +144,8 @@ button.primary {
 .sidebar {
   position: relative;
   grid-row: 2;
+  display: flex;
+  flex-direction: column;
   background: #172033;
   color: #e8edf5;
   padding: 18px 14px;
@@ -244,6 +220,28 @@ button.primary {
   color: #fff;
 }
 
+.sidebarSettingsButton {
+  width: 100%;
+  margin-top: auto;
+  min-height: 38px;
+  border-color: rgba(226, 232, 240, 0.24);
+  background: rgba(255, 255, 255, 0.04);
+  color: #dbe4f0;
+  text-align: left;
+}
+
+.sidebarSettingsButton .navFull {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebarSettingsButton:hover {
+  border-color: rgba(226, 232, 240, 0.46);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
 .sidebarCollapsed .brand {
   display: none;
 }
@@ -254,6 +252,12 @@ button.primary {
   min-height: 40px;
   padding: 0;
   text-align: center;
+}
+
+.sidebarCollapsed .sidebarSettingsButton {
+  display: grid;
+  place-items: center;
+  padding: 0;
 }
 
 .sidebarCollapsed .navFull {
@@ -371,7 +375,6 @@ button.primary {
 }
 
 .compactMode .compactButton,
-.compactMode .registryIconButton,
 .compactMode .connectionBadge {
   flex: 0 0 auto;
   justify-content: center;
@@ -379,17 +382,6 @@ button.primary {
 
 .compactMode .compactButton {
   padding: 0 8px;
-}
-
-.compactMode .registryIconButton {
-  min-width: 32px;
-  width: 32px;
-  gap: 0;
-  padding: 0;
-}
-
-.compactMode .registryIconButton span:last-child {
-  display: none;
 }
 
 .compactMode .connectionBadge {
@@ -867,7 +859,6 @@ tbody tr {
   color: #d5f5ef;
 }
 
-.darkMode .registryIconButton:hover,
 .darkMode .compactButton {
   color: #5eead4;
 }
