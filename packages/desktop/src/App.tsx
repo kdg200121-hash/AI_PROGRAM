@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { MouseEvent } from "react";
+import type { DragEvent, MouseEvent } from "react";
 import type { McpServerRecord, RegistryFile } from "@mcp-registry/shared";
 import { getConnectionSummary } from "./connectionSummary";
 import { getToolsForWorkspace } from "./mcpToolCatalog";
@@ -35,6 +35,7 @@ import {
 
 const pinnedTabsStorageKey = "mcp-registry:pinned-tabs";
 const favoriteSectionsStorageKey = "mcp-registry:favorite-sections";
+const sidebarOrderStorageKey = "mcp-registry:sidebar-order";
 let tabCounter = 0;
 
 type ContextMenuState =
@@ -62,6 +63,20 @@ function loadFavoriteSections(): SidebarSectionId[] {
     return raw ? (JSON.parse(raw) as SidebarSectionId[]) : [];
   } catch {
     return [];
+  }
+}
+
+function loadSidebarOrder(): SidebarSectionId[] {
+  try {
+    const raw = window.localStorage.getItem(sidebarOrderStorageKey);
+    const savedOrder = raw ? (JSON.parse(raw) as SidebarSectionId[]) : [];
+    const validIds = sidebarSections.map((section) => section.id);
+    return [
+      ...savedOrder.filter((id) => validIds.includes(id)),
+      ...validIds.filter((id) => !savedOrder.includes(id))
+    ];
+  } catch {
+    return sidebarSections.map((section) => section.id);
   }
 }
 
@@ -123,6 +138,8 @@ export function App() {
   const [favoriteSectionIds, setFavoriteSectionIds] = useState<SidebarSectionId[]>(() =>
     loadFavoriteSections()
   );
+  const [sidebarOrder, setSidebarOrder] = useState<SidebarSectionId[]>(() => loadSidebarOrder());
+  const [draggedSectionId, setDraggedSectionId] = useState<SidebarSectionId | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTab, setDragOverTab] = useState<{
@@ -141,6 +158,10 @@ export function App() {
   useEffect(() => {
     window.localStorage.setItem(favoriteSectionsStorageKey, JSON.stringify(favoriteSectionIds));
   }, [favoriteSectionIds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(sidebarOrderStorageKey, JSON.stringify(sidebarOrder));
+  }, [sidebarOrder]);
 
   useEffect(() => {
     const closeContextMenu = () => setContextMenu(null);
@@ -190,6 +211,13 @@ export function App() {
   const runningCount = registry.servers.filter((server) => server.status === "running").length;
   const connectionSummary = getConnectionSummary(registry.servers);
   const workspaceTools = getToolsForWorkspace(activeTab);
+  const orderedSidebarSections = useMemo(
+    () =>
+      sidebarOrder
+        .map((id) => sidebarSections.find((section) => section.id === id))
+        .filter((section): section is (typeof sidebarSections)[number] => Boolean(section)),
+    [sidebarOrder]
+  );
 
   const toggleCompactMode = () => {
     const nextValue = !isCompact;
@@ -248,6 +276,33 @@ export function App() {
     setFavoriteSectionIds((ids) =>
       ids.includes(sectionId) ? ids.filter((id) => id !== sectionId) : [...ids, sectionId]
     );
+  };
+
+  const moveSidebarSection = (targetSectionId: SidebarSectionId, position: TabDropPosition) => {
+    if (!draggedSectionId || draggedSectionId === targetSectionId) {
+      return;
+    }
+
+    setSidebarOrder((order) => {
+      const nextOrder = order.filter((id) => id !== draggedSectionId);
+      const targetIndex = nextOrder.indexOf(targetSectionId);
+      nextOrder.splice(position === "after" ? targetIndex + 1 : targetIndex, 0, draggedSectionId);
+      return nextOrder;
+    });
+  };
+
+  const startSidebarDrag = (
+    event: DragEvent<HTMLButtonElement>,
+    sectionId: SidebarSectionId
+  ) => {
+    setDraggedSectionId(sectionId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", sectionId);
+  };
+
+  const getSidebarDropPosition = (event: DragEvent<HTMLDivElement>): TabDropPosition => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientY > bounds.top + bounds.height / 2 ? "after" : "before";
   };
 
   const showSidebarContextMenu = (
@@ -416,8 +471,20 @@ export function App() {
           </div>
         ) : null}
         <span className="sidebarLabel navFull">메뉴</span>
-        {sidebarSections.map((section) => (
-          <div className="navRow" key={section.id}>
+        {orderedSidebarSections.map((section) => (
+          <div
+            className={section.id === draggedSectionId ? "navRow dragging" : "navRow"}
+            key={section.id}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              moveSidebarSection(section.id, getSidebarDropPosition(event));
+              setDraggedSectionId(null);
+            }}
+          >
             <button
               className={section.id === activeSidebarSection ? "navItem active" : "navItem"}
               onClick={() => openSectionInCurrentTab(section.id)}
@@ -425,6 +492,15 @@ export function App() {
             >
               <span className="navShort">{section.shortLabel}</span>
               <span className="navFull">{section.label}</span>
+            </button>
+            <button
+              className="navOrderButton"
+              aria-label={`${section.label} 순서 변경`}
+              draggable
+              onDragStart={(event) => startSidebarDrag(event, section.id)}
+              onDragEnd={() => setDraggedSectionId(null)}
+            >
+              ☰
             </button>
             <button
               className={
@@ -446,10 +522,10 @@ export function App() {
           onClick={() => setIsRegistryDialogOpen(true)}
         >
           <span className="navShort" aria-hidden="true">
-            ☰
+            ⚙
           </span>
           <span className="navFull">
-            <span aria-hidden="true">☰</span>
+            <span aria-hidden="true">⚙</span>
             <span>Settings</span>
           </span>
         </button>
@@ -485,6 +561,20 @@ export function App() {
 
         {activeSidebarSection === "monitor" ? (
           <MonitorView runningCount={runningCount} totalCount={registry.servers.length} />
+        ) : null}
+
+        {activeSidebarSection === "excel" ? (
+          <IntegrationView
+            title="Excel MCP 도구"
+            items={["시트 데이터 읽기", "표 범위 정리", "CAD/Revit 작업표 내보내기"]}
+          />
+        ) : null}
+
+        {activeSidebarSection === "tekla" ? (
+          <IntegrationView
+            title="Tekla MCP 도구"
+            items={["모델 객체 읽기", "부재 정보 매핑", "Revit/CAD 연계 준비"]}
+          />
         ) : null}
       </main>
 
@@ -846,6 +936,26 @@ function MonitorView({ runningCount, totalCount }: { runningCount: number; total
   );
 }
 
+function IntegrationView({ title, items }: { title: string; items: string[] }) {
+  return (
+    <section className="sectionView">
+      <div className="panel integrationPanel">
+        <div className="panelHeader">
+          <h2>{title}</h2>
+        </div>
+        <div className="toolList">
+          {items.map((item) => (
+            <div className="toolItem" key={item}>
+              <strong>{item}</strong>
+              <span>이 기능은 이후 MCP 연결 단계에서 실제 명령과 연결합니다.</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function topbarTitle(tabId: WorkspaceTabId, sectionId: SidebarSectionId) {
   if (sectionId === "workflow") {
     return "CAD ↔ Revit 작업 흐름";
@@ -853,6 +963,14 @@ function topbarTitle(tabId: WorkspaceTabId, sectionId: SidebarSectionId) {
 
   if (sectionId === "monitor") {
     return "Process Monitor";
+  }
+
+  if (sectionId === "excel") {
+    return "Excel MCP 도구";
+  }
+
+  if (sectionId === "tekla") {
+    return "Tekla MCP 도구";
   }
 
   const titles: Record<WorkspaceTabId, string> = {
@@ -871,6 +989,14 @@ function topbarSubtitle(tabId: WorkspaceTabId, sectionId: SidebarSectionId) {
 
   if (sectionId === "monitor") {
     return "MCP Bridge 실행 상태와 작업 로그를 확인합니다.";
+  }
+
+  if (sectionId === "excel") {
+    return "Excel 표와 시트 데이터를 CAD/Revit 작업에 연결할 준비 영역입니다.";
+  }
+
+  if (sectionId === "tekla") {
+    return "Tekla 모델 정보를 CAD/Revit 작업 흐름과 연결할 준비 영역입니다.";
   }
 
   const subtitles: Record<WorkspaceTabId, string> = {

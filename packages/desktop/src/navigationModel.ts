@@ -1,4 +1,4 @@
-export type SidebarSectionId = "servers" | "workflow" | "monitor";
+export type SidebarSectionId = "servers" | "workflow" | "monitor" | "excel" | "tekla";
 
 export interface SidebarSection {
   id: SidebarSectionId;
@@ -19,7 +19,9 @@ export interface WorkflowStep {
 export const sidebarSections: SidebarSection[] = [
   { id: "servers", label: "MCP Servers", shortLabel: "M" },
   { id: "workflow", label: "CAD ↔ Revit", shortLabel: "C" },
-  { id: "monitor", label: "Process Monitor", shortLabel: "P" }
+  { id: "monitor", label: "Process Monitor", shortLabel: "P" },
+  { id: "excel", label: "Excel", shortLabel: "E" },
+  { id: "tekla", label: "Tekla", shortLabel: "T" }
 ];
 
 export const overviewCards: OverviewCard[] = [
