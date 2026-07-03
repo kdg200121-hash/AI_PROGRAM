@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { McpServerRecord, RegistryFile } from "@mcp-registry/shared";
 import { getConnectionSummary } from "./connectionSummary";
 import { getToolsForWorkspace } from "./mcpToolCatalog";
+import { settingsSections, type SettingsSectionId } from "./settingsDialog";
 import {
   filterServersByWorkspace,
   getAdjacentWorkspaceTab,
@@ -53,6 +54,8 @@ export function App() {
   const [isCompact, setIsCompact] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRegistryDialogOpen, setIsRegistryDialogOpen] = useState(false);
+  const [activeSettingsSection, setActiveSettingsSection] =
+    useState<SettingsSectionId>("servers");
 
   useEffect(() => {
     const api = window.mcpRegistry;
@@ -85,6 +88,10 @@ export function App() {
   const selected = useMemo<McpServerRecord | undefined>(
     () => visibleServers.find((server) => server.id === selectedId),
     [selectedId, visibleServers]
+  );
+  const selectedRegistryServer = useMemo<McpServerRecord | undefined>(
+    () => registry.servers.find((server) => server.id === selectedId) ?? registry.servers[0],
+    [registry.servers, selectedId]
   );
 
   const cadCount = registry.servers.filter((server) => server.target === "cad").length;
@@ -136,14 +143,6 @@ export function App() {
           ›
         </button>
         <div className="topUtility">
-          <button
-            className="registryIconButton"
-            aria-label={`${registryWorkspaceTab.label} 열기`}
-            title={`${registryWorkspaceTab.label} 열기`}
-            onClick={() => setIsRegistryDialogOpen(true)}
-          >
-            ⚙
-          </button>
           <button className="compactButton" onClick={toggleCompactMode}>
             {isCompact ? "기본 보기" : "간소화"}
           </button>
@@ -151,6 +150,14 @@ export function App() {
             <span className={`statusDot ${connectionSummary.tone}`} />
             <span>{connectionSummary.label}</span>
           </div>
+          <button
+            className="registryIconButton"
+            aria-label={`${registryWorkspaceTab.label} 열기`}
+            title={`${registryWorkspaceTab.label} 열기`}
+            onClick={() => setIsRegistryDialogOpen(true)}
+          >
+            ☰
+          </button>
         </div>
       </nav>
 
@@ -160,7 +167,7 @@ export function App() {
           aria-label={isSidebarCollapsed ? "메뉴 펼치기" : "메뉴 접기"}
           onClick={() => setIsSidebarCollapsed((value) => !value)}
         >
-          {isSidebarCollapsed ? "»" : "«"}
+          {isSidebarCollapsed ? ">>" : "<<"}
         </button>
         <div className="brand">
           <strong>MCP Registry</strong>
@@ -277,28 +284,113 @@ export function App() {
 
       {isRegistryDialogOpen ? (
         <div className="dialogBackdrop" role="presentation">
-          <section className="registryDialog" role="dialog" aria-modal="true" aria-labelledby="registryDialogTitle">
+          <section
+            className="registryDialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registryDialogTitle"
+          >
             <div className="dialogHeader">
               <div>
-                <h2 id="registryDialogTitle">MCP Registry</h2>
-                <span>등록된 MCP 연결과 Registry 전용 툴을 확인합니다.</span>
+                <h2 id="registryDialogTitle">MCP Registry 설정</h2>
+                <span>전체 창의 연결 관리 기능을 작은 설정 창에서 확인합니다.</span>
               </div>
               <button className="dialogCloseButton" onClick={() => setIsRegistryDialogOpen(false)}>
                 닫기
               </button>
             </div>
-            <div className="dialogSummary">
-              <Metric label="등록 서버" value={registry.servers.length} />
-              <Metric label="CAD" value={cadCount} />
-              <Metric label="Revit" value={revitCount} />
-            </div>
-            <div className="toolList dialogToolList">
-              {getToolsForWorkspace(registryWorkspaceTab.id).map((tool) => (
-                <div className="toolItem" key={tool.name}>
-                  <strong>{tool.name}</strong>
-                  <span>{tool.description}</span>
-                </div>
-              ))}
+            <div className="dialogBody">
+              <nav className="dialogNav" aria-label="설정 메뉴">
+                {settingsSections.map((section) => (
+                  <button
+                    key={section.id}
+                    className={
+                      section.id === activeSettingsSection
+                        ? "dialogNavItem active"
+                        : "dialogNavItem"
+                    }
+                    onClick={() => setActiveSettingsSection(section.id)}
+                  >
+                    {section.label}
+                  </button>
+                ))}
+              </nav>
+
+              <div className="dialogContent">
+                {activeSettingsSection === "servers" ? (
+                  <>
+                    <div className="dialogSummary">
+                      <Metric label="등록 서버" value={registry.servers.length} />
+                      <Metric label="CAD" value={cadCount} />
+                      <Metric label="Revit" value={revitCount} />
+                    </div>
+                    <div className="dialogServerGrid">
+                      <section className="dialogPanel">
+                        <div className="panelHeader">
+                          <h2>서버 목록</h2>
+                        </div>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>이름</th>
+                              <th>대상</th>
+                              <th>상태</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {registry.servers.map((server) => (
+                              <tr
+                                key={server.id}
+                                className={server.id === selectedRegistryServer?.id ? "selectedRow" : ""}
+                                onClick={() => setSelectedId(server.id)}
+                              >
+                                <td>{server.name}</td>
+                                <td>{server.target === "cad" ? "CAD" : "Revit"}</td>
+                                <td>{statusLabel(server.status)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </section>
+                      <aside className="dialogPanel">
+                        <div className="panelHeader">
+                          <h2>선택 서버 상세</h2>
+                        </div>
+                        {selectedRegistryServer ? (
+                          <div className="details">
+                            <Field label="서버 이름" value={selectedRegistryServer.name} />
+                            <Field label="연결 URL" value={selectedRegistryServer.url} />
+                            <Field label="실행 명령" value={selectedRegistryServer.launchCommand} />
+                            <Field label="작업 폴더" value={selectedRegistryServer.workingDirectory} />
+                            <Field label="메모" value={selectedRegistryServer.notes} multiline />
+                          </div>
+                        ) : (
+                          <p className="emptyState">서버를 선택하세요.</p>
+                        )}
+                      </aside>
+                    </div>
+                  </>
+                ) : (
+                  <section className="dialogPanel displayModePanel">
+                    <div className="panelHeader">
+                      <h2>화면 모드</h2>
+                    </div>
+                    <div className="displayModeList">
+                      <button className={!isCompact ? "displayModeOption active" : "displayModeOption"}>
+                        <strong>기본 보기</strong>
+                        <span>전체 작업 화면으로 CAD, REVIT, 연결 작업을 넓게 봅니다.</span>
+                      </button>
+                      <button className={isCompact ? "displayModeOption active" : "displayModeOption"}>
+                        <strong>간소화</strong>
+                        <span>다이나모 플레이어처럼 작은 세로 창으로 줄여서 사용합니다.</span>
+                      </button>
+                      <button className="primary" onClick={toggleCompactMode}>
+                        {isCompact ? "기본 보기로 전환" : "간소화로 전환"}
+                      </button>
+                    </div>
+                  </section>
+                )}
+              </div>
             </div>
           </section>
         </div>

@@ -111,11 +111,17 @@ button.primary {
   min-width: 34px;
   min-height: 32px;
   padding: 0;
-  border-color: #2d5f9f;
-  background: #eef5ff;
-  color: #1f4d82;
-  font-size: 17px;
+  border-color: #c9d3e1;
+  background: #fff;
+  color: #334155;
+  font-size: 16px;
+  font-weight: 500;
   line-height: 1;
+}
+
+.registryIconButton:hover {
+  border-color: #2d5f9f;
+  color: #1f4d82;
 }
 
 .connectionBadge {
@@ -162,13 +168,14 @@ button.primary {
   position: absolute;
   top: 10px;
   right: 10px;
-  min-width: 32px;
-  min-height: 32px;
-  border: 0;
-  background: transparent;
-  color: #d7dee9;
-  font-size: 30px;
-  font-weight: 800;
+  min-width: 42px;
+  min-height: 30px;
+  border: 1px solid rgba(226, 232, 240, 0.48);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  font-size: 16px;
+  font-weight: 400;
   line-height: 1;
 }
 
@@ -584,8 +591,8 @@ tbody tr {
 }
 
 .registryDialog {
-  width: min(680px, 100%);
-  max-height: min(620px, calc(100vh - 44px));
+  width: min(980px, 100%);
+  max-height: min(720px, calc(100vh - 44px));
   overflow: auto;
   border: 1px solid #d7dee9;
   border-radius: 8px;
@@ -618,11 +625,62 @@ tbody tr {
   min-width: 72px;
 }
 
+.dialogBody {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  min-height: 480px;
+}
+
+.dialogNav {
+  padding: 14px 10px;
+  border-right: 1px solid #edf1f6;
+  background: #f8fafc;
+}
+
+.dialogNavItem {
+  width: 100%;
+  margin-bottom: 6px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: #475569;
+  font-weight: 600;
+}
+
+.dialogNavItem.active {
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
+.dialogContent {
+  min-width: 0;
+  padding: 14px;
+  overflow: auto;
+}
+
 .dialogSummary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  padding: 14px 18px 0;
+  padding: 0 0 14px;
+}
+
+.dialogServerGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 12px;
+}
+
+.dialogPanel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.dialogPanel .details {
+  padding: 14px;
 }
 
 .dialogToolList {
@@ -630,8 +688,60 @@ tbody tr {
   padding: 14px 18px 18px;
 }
 
+.displayModePanel {
+  max-width: 560px;
+}
+
+.displayModeList {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.displayModeOption {
+  display: grid;
+  gap: 5px;
+  min-height: 70px;
+  padding: 12px;
+  text-align: left;
+}
+
+.displayModeOption.active {
+  border-color: #2d5f9f;
+  background: #eef5ff;
+}
+
+.displayModeOption strong,
+.displayModeOption span {
+  display: block;
+}
+
+.displayModeOption span {
+  color: #526071;
+  font-size: 12px;
+}
+
 .compactMode .dialogBackdrop {
   padding: 12px;
+}
+
+.compactMode .dialogBody,
+.compactMode .dialogServerGrid {
+  grid-template-columns: 1fr;
+}
+
+.compactMode .dialogNav {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  border-right: 0;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.compactMode .dialogNavItem {
+  flex: 0 0 auto;
+  width: auto;
+  margin-bottom: 0;
 }
 
 .compactMode .dialogSummary,
