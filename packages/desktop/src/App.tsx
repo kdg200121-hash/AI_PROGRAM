@@ -137,6 +137,7 @@ export function App() {
   const [isCompact, setIsCompact] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRegistryDialogOpen, setIsRegistryDialogOpen] = useState(false);
+  const [isMonitorDialogOpen, setIsMonitorDialogOpen] = useState(false);
   const [activeSettingsSection, setActiveSettingsSection] =
     useState<SettingsSectionId>("servers");
   const [colorMode, setColorMode] = useState<ColorMode>("light");
@@ -258,6 +259,23 @@ export function App() {
     setActiveOpenTabId(tab.id);
   };
 
+  const openRegistryDialogAsTab = () => {
+    const tab = {
+      ...createSectionTab(nextTabId(), "servers", registryWorkspaceTab.id),
+      title: registryWorkspaceTab.label
+    };
+    setOpenTabs((tabs) => [...tabs, tab]);
+    setActiveOpenTabId(tab.id);
+    setIsRegistryDialogOpen(false);
+  };
+
+  const openMonitorDialogAsTab = () => {
+    const tab = createSectionTab(nextTabId(), "monitor", activeTab);
+    setOpenTabs((tabs) => [...tabs, tab]);
+    setActiveOpenTabId(tab.id);
+    setIsMonitorDialogOpen(false);
+  };
+
   const duplicateOpenTab = (tabId: string) => {
     const source = openTabs.find((tab) => tab.id === tabId);
     if (!source) {
@@ -324,7 +342,7 @@ export function App() {
   };
 
   const openMonitorSection = () => {
-    openSectionInCurrentTab("monitor");
+    setIsMonitorDialogOpen(true);
   };
 
   const showSidebarContextMenu = (
@@ -508,17 +526,46 @@ export function App() {
               }
 
               return (
-                <button
+                <div
                   key={section.id}
-                  className={
-                    section.id === activeSidebarSection ? "navItem favorite active" : "navItem favorite"
-                  }
-                  onClick={() => openSectionInCurrentTab(section.id)}
-                  onContextMenu={(event) => showSidebarContextMenu(event, section.id)}
+                  className={[
+                    "navRow",
+                    "favoriteRow",
+                    section.id === activeSidebarSection ? "active" : "",
+                    expandedSectionIds.includes(section.id) ? "expanded" : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
-                  <span className="navShort">{section.shortLabel}</span>
-                  <span className="navFull">★ {section.label}</span>
-                </button>
+                  <button className="navOrderButton" aria-label={`${section.label} shortcut`}>
+                    ☰
+                  </button>
+                  <button
+                    className={section.id === activeSidebarSection ? "navItem favorite active" : "navItem favorite"}
+                    onClick={() => openSectionInCurrentTab(section.id)}
+                    onContextMenu={(event) => showSidebarContextMenu(event, section.id)}
+                  >
+                    <span className="navShort">{section.shortLabel}</span>
+                    <span className="navFull">{section.label}</span>
+                  </button>
+                  <button
+                    className="navExpandButton"
+                    aria-label={`${section.label} 펼치기`}
+                    aria-expanded={expandedSectionIds.includes(section.id)}
+                    onClick={() => toggleExpandedSection(section.id)}
+                  >
+                    {expandedSectionIds.includes(section.id) ? "△" : "▽"}
+                  </button>
+                  {expandedSectionIds.includes(section.id) ? (
+                    <div className="navSubPanel">
+                      <button>도구 목록</button>
+                      <button>연결 설정</button>
+                      <button className="navAddSubButton" aria-label={`${section.label} 추가`}>
+                        +
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -528,6 +575,7 @@ export function App() {
           <div
             className={[
               "navRow",
+              section.id === activeSidebarSection ? "active" : "",
               section.id === draggedSectionId ? "dragging" : "",
               expandedSectionIds.includes(section.id) ? "expanded" : "",
               dragOverSection?.id === section.id && dragOverSection.position === "before"
@@ -587,6 +635,9 @@ export function App() {
               <div className="navSubPanel">
                 <button>도구 목록</button>
                 <button>연결 설정</button>
+                <button className="navAddSubButton" aria-label={`${section.label} 추가`}>
+                  +
+                </button>
               </div>
             ) : null}
           </div>
@@ -680,9 +731,24 @@ export function App() {
                 <h2 id="registryDialogTitle">MCP Registry 설정</h2>
                 <span>전체 창의 연결 관리 기능을 작은 설정 창에서 확인합니다.</span>
               </div>
-              <button className="dialogCloseButton" onClick={() => setIsRegistryDialogOpen(false)}>
-                닫기
-              </button>
+              <div className="dialogHeaderActions">
+                <button
+                  className="dialogWindowButton"
+                  aria-label="탭으로 열기"
+                  title="탭으로 열기"
+                  onClick={openRegistryDialogAsTab}
+                >
+                  ↗
+                </button>
+                <button
+                  className="dialogWindowButton"
+                  aria-label="닫기"
+                  title="닫기"
+                  onClick={() => setIsRegistryDialogOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <div className="dialogBody">
               <nav className="dialogNav" aria-label="설정 메뉴">
@@ -779,6 +845,45 @@ export function App() {
                   </section>
                 )}
               </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isMonitorDialogOpen ? (
+        <div className="dialogBackdrop" role="presentation">
+          <section
+            className="registryDialog monitorDialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="monitorDialogTitle"
+          >
+            <div className="dialogHeader">
+              <div>
+                <h2 id="monitorDialogTitle">Process Monitor</h2>
+                <span>MCP Bridge 실행 상태와 로그를 별도 창에서 확인합니다.</span>
+              </div>
+              <div className="dialogHeaderActions">
+                <button
+                  className="dialogWindowButton"
+                  aria-label="탭으로 열기"
+                  title="탭으로 열기"
+                  onClick={openMonitorDialogAsTab}
+                >
+                  ↗
+                </button>
+                <button
+                  className="dialogWindowButton"
+                  aria-label="닫기"
+                  title="닫기"
+                  onClick={() => setIsMonitorDialogOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="dialogContent standaloneDialogContent">
+              <MonitorView runningCount={runningCount} totalCount={registry.servers.length} />
             </div>
           </section>
         </div>
