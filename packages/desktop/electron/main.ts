@@ -1,10 +1,14 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import { join } from "node:path";
+import { getWindowModeSize } from "../src/windowMode";
+
+let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
-  const window = new BrowserWindow({
-    width: 1200,
-    height: 760,
+  const normalSize = getWindowModeSize(false);
+  mainWindow = new BrowserWindow({
+    width: normalSize.width,
+    height: normalSize.height,
     minWidth: 980,
     minHeight: 640,
     webPreferences: {
@@ -13,11 +17,21 @@ function createWindow() {
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {
-    void window.loadURL(process.env.VITE_DEV_SERVER_URL);
+    void mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    void window.loadFile(join(__dirname, "../dist/index.html"));
+    void mainWindow.loadFile(join(__dirname, "../dist/index.html"));
   }
 }
+
+ipcMain.handle("window:set-compact-mode", (_event, enabled: boolean) => {
+  if (!mainWindow) {
+    return;
+  }
+
+  const size = getWindowModeSize(enabled);
+  mainWindow.setMinimumSize(enabled ? 390 : 980, enabled ? 640 : 640);
+  mainWindow.setSize(size.width, size.height, true);
+});
 
 void app.whenReady().then(createWindow);
 

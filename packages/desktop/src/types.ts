@@ -5,5 +5,8 @@ declare global {
     mcpRegistry?: {
       loadRegistry: () => Promise<RegistryFile>;
     };
+    mcpWindow?: {
+      setCompactMode: (enabled: boolean) => Promise<void>;
+    };
   }
 }

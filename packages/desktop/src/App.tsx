@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { McpServerRecord, RegistryFile } from "@mcp-registry/shared";
 import { getConnectionSummary } from "./connectionSummary";
+import { getToolsForWorkspace } from "./mcpToolCatalog";
 import {
   filterServersByWorkspace,
   workspaceTabs,
@@ -86,6 +87,13 @@ export function App() {
   const revitCount = registry.servers.filter((server) => server.target === "revit").length;
   const runningCount = registry.servers.filter((server) => server.status === "running").length;
   const connectionSummary = getConnectionSummary(registry.servers);
+  const workspaceTools = getToolsForWorkspace(activeTab);
+
+  const toggleCompactMode = () => {
+    const nextValue = !isCompact;
+    setIsCompact(nextValue);
+    void window.mcpWindow?.setCompactMode(nextValue);
+  };
 
   return (
     <div className={isCompact ? "appShell compactMode" : "appShell"}>
@@ -102,7 +110,7 @@ export function App() {
           ))}
         </div>
         <div className="topUtility">
-          <button className="compactButton" onClick={() => setIsCompact((value) => !value)}>
+          <button className="compactButton" onClick={toggleCompactMode}>
             {isCompact ? "기본 보기" : "간소화"}
           </button>
           <div className="connectionBadge">
@@ -169,7 +177,7 @@ export function App() {
               </tbody>
             </table>
             <div className="workflowHint">
-              <h3>다음 단계 자리: CAD → Revit 작업</h3>
+              <h3>다음 단계 자리: CAD &lt;-&gt; Revit 작업</h3>
               <p>
                 CAD에서 레이어, 블록, 위치 정보를 읽고 Revit에서 벽, 장비, 패밀리 생성 작업을
                 실행하는 기능을 이 영역에 추가합니다.
@@ -197,6 +205,20 @@ export function App() {
               <p className="emptyState">서버를 선택하세요.</p>
             )}
           </aside>
+
+          <section className="panel toolPanel">
+            <div className="panelHeader">
+              <h2>{toolPanelTitle(activeTab)}</h2>
+            </div>
+            <div className="toolList">
+              {workspaceTools.map((tool) => (
+                <div className="toolItem" key={tool.name}>
+                  <strong>{tool.name}</strong>
+                  <span>{tool.description}</span>
+                </div>
+              ))}
+            </div>
+          </section>
         </section>
       </main>
     </div>
@@ -234,7 +256,17 @@ function topbarTitle(tabId: WorkspaceTabId) {
     registry: "CAD/Revit MCP 연결 관리자",
     cad: "CAD MCP 연결",
     revit: "REVIT MCP 연결",
-    workflow: "CAD → Revit 작업 흐름"
+    workflow: "CAD <-> REVIT 작업 흐름"
+  };
+  return titles[tabId];
+}
+
+function toolPanelTitle(tabId: WorkspaceTabId) {
+  const titles: Record<WorkspaceTabId, string> = {
+    registry: "Registry MCP 툴",
+    cad: "CAD MCP 툴",
+    revit: "REVIT MCP 툴",
+    workflow: "CAD <-> REVIT MCP 툴"
   };
   return titles[tabId];
 }

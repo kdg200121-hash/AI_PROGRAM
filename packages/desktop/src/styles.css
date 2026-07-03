@@ -4,7 +4,7 @@
 
 body {
   margin: 0;
-  min-width: 980px;
+  min-width: 0;
   min-height: 640px;
   font-family: "Segoe UI", Arial, sans-serif;
   color: #172033;
@@ -186,7 +186,65 @@ button.primary {
 }
 
 .compactMode .contentGrid {
+  grid-template-columns: 1fr;
   padding-top: 16px;
+  overflow-y: auto;
+}
+
+.compactMode .topbar {
+  height: auto;
+  min-height: 58px;
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.compactMode .topbar h1 {
+  font-size: 16px;
+}
+
+.compactMode .topActions {
+  width: 100%;
+}
+
+.compactMode .topActions button {
+  flex: 1;
+}
+
+.compactMode .workspaceTabs {
+  min-height: 96px;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.compactMode .workspaceTabsInner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.compactMode .workspaceTab {
+  min-width: 0;
+  width: 100%;
+}
+
+.compactMode .workspaceTab.active::after {
+  bottom: -4px;
+}
+
+.compactMode .topUtility {
+  width: 100%;
+  margin-left: 0;
+}
+
+.compactMode .compactButton,
+.compactMode .connectionBadge {
+  flex: 1;
+  justify-content: center;
 }
 
 .topbar {
@@ -345,6 +403,50 @@ tbody tr {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.toolPanel {
+  grid-column: 1 / -1;
+}
+
+.toolList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.toolItem {
+  min-height: 78px;
+  padding: 13px;
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.toolItem strong,
+.toolItem span {
+  display: block;
+}
+
+.toolItem strong {
+  color: #172033;
+  font-size: 13px;
+}
+
+.toolItem span {
+  margin-top: 7px;
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.compactMode .toolPanel {
+  grid-column: auto;
+}
+
+.compactMode .toolList {
+  grid-template-columns: 1fr;
 }
 
 .emptyState {

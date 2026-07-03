@@ -11,7 +11,7 @@ export const workspaceTabs: WorkspaceTab[] = [
   { id: "registry", label: "MCP Registry" },
   { id: "cad", label: "CAD" },
   { id: "revit", label: "REVIT" },
-  { id: "workflow", label: "CAD → Revit" }
+  { id: "workflow", label: "CAD <-> REVIT" }
 ];
 
 export function filterServersByWorkspace(

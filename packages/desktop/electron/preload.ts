@@ -1,4 +1,4 @@
-import { contextBridge } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 import type { RegistryFile } from "@mcp-registry/shared";
 
 const initialRegistry: RegistryFile = {
@@ -39,4 +39,10 @@ const initialRegistry: RegistryFile = {
 
 contextBridge.exposeInMainWorld("mcpRegistry", {
   loadRegistry: async () => initialRegistry
+});
+
+contextBridge.exposeInMainWorld("mcpWindow", {
+  setCompactMode: async (enabled: boolean) => {
+    await ipcRenderer.invoke("window:set-compact-mode", enabled);
+  }
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { McpServerRecord } from "@mcp-registry/shared";
-import { filterServersByWorkspace, type WorkspaceTabId } from "./workspaceTabs";
+import { filterServersByWorkspace, workspaceTabs, type WorkspaceTabId } from "./workspaceTabs";
 
 const servers: McpServerRecord[] = [
   {
@@ -36,6 +36,10 @@ const servers: McpServerRecord[] = [
 ];
 
 describe("filterServersByWorkspace", () => {
+  it("uses CAD <-> REVIT for the workflow tab label", () => {
+    expect(workspaceTabs.find((tab) => tab.id === "workflow")?.label).toBe("CAD <-> REVIT");
+  });
+
   it.each([
     ["registry", ["revit", "cad"]],
     ["cad", ["cad"]],
