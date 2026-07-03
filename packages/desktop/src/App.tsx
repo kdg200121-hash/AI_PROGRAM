@@ -755,7 +755,7 @@ export function App() {
                   title="탭으로 열기"
                   onClick={openRegistryDialogAsTab}
                 >
-                  ↗
+                  <span className="dialogWindowIcon popout" aria-hidden="true" />
                 </button>
                 <button
                   className="dialogWindowButton"
@@ -763,7 +763,7 @@ export function App() {
                   title="닫기"
                   onClick={() => setIsRegistryDialogOpen(false)}
                 >
-                  ×
+                  <span className="dialogWindowIcon close" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -887,7 +887,7 @@ export function App() {
                   title="탭으로 열기"
                   onClick={openMonitorDialogAsTab}
                 >
-                  ↗
+                  <span className="dialogWindowIcon popout" aria-hidden="true" />
                 </button>
                 <button
                   className="dialogWindowButton"
@@ -895,7 +895,7 @@ export function App() {
                   title="닫기"
                   onClick={() => setIsMonitorDialogOpen(false)}
                 >
-                  ×
+                  <span className="dialogWindowIcon close" aria-hidden="true" />
                 </button>
               </div>
             </div>
