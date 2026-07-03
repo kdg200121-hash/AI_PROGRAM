@@ -22,6 +22,7 @@ import {
   duplicateTab,
   getPinnedTabs,
   moveTab,
+  moveTabToEnd,
   togglePinnedTab,
   type TabDropPosition,
   type AppTab
@@ -146,6 +147,7 @@ export function App() {
     id: string;
     position: TabDropPosition;
   } | null>(null);
+  const [isTabEndDragOver, setIsTabEndDragOver] = useState(false);
 
   const activeOpenTab = openTabs.find((tab) => tab.id === activeOpenTabId) ?? openTabs[0];
   const activeTab = activeOpenTab.workspaceTabId;
@@ -338,6 +340,17 @@ export function App() {
     setDragOverTab(null);
   };
 
+  const moveOpenTabToEnd = () => {
+    if (!draggedTabId) {
+      return;
+    }
+
+    setOpenTabs((tabs) => moveTabToEnd(tabs, draggedTabId));
+    setDraggedTabId(null);
+    setDragOverTab(null);
+    setIsTabEndDragOver(false);
+  };
+
   const getDropPosition = (event: MouseEvent<HTMLButtonElement>): TabDropPosition => {
     const bounds = event.currentTarget.getBoundingClientRect();
     return event.clientX > bounds.left + bounds.width / 2 ? "after" : "before";
@@ -398,6 +411,7 @@ export function App() {
               onDragEnd={() => {
                 setDraggedTabId(null);
                 setDragOverTab(null);
+                setIsTabEndDragOver(false);
               }}
             >
               {tab.isPinned ? <span className="pinMark">●</span> : null}
@@ -420,6 +434,24 @@ export function App() {
         <button className="newTabButton" aria-label="새 탭" onClick={openBlankTab}>
           +
         </button>
+        <div
+          className={isTabEndDragOver ? "tabEndDropZone active" : "tabEndDropZone"}
+          aria-hidden="true"
+          onDragEnter={() => setIsTabEndDragOver(Boolean(draggedTabId))}
+          onDragOver={(event) => {
+            if (!draggedTabId) {
+              return;
+            }
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            setIsTabEndDragOver(true);
+          }}
+          onDragLeave={() => setIsTabEndDragOver(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            moveOpenTabToEnd();
+          }}
+        />
         <div className="topUtility">
           <button className="compactButton" onClick={toggleCompactMode}>
             {isCompact ? "기본 보기" : "간소화"}
@@ -486,14 +518,6 @@ export function App() {
             }}
           >
             <button
-              className={section.id === activeSidebarSection ? "navItem active" : "navItem"}
-              onClick={() => openSectionInCurrentTab(section.id)}
-              onContextMenu={(event) => showSidebarContextMenu(event, section.id)}
-            >
-              <span className="navShort">{section.shortLabel}</span>
-              <span className="navFull">{section.label}</span>
-            </button>
-            <button
               className="navOrderButton"
               aria-label={`${section.label} 순서 변경`}
               draggable
@@ -501,6 +525,14 @@ export function App() {
               onDragEnd={() => setDraggedSectionId(null)}
             >
               ☰
+            </button>
+            <button
+              className={section.id === activeSidebarSection ? "navItem active" : "navItem"}
+              onClick={() => openSectionInCurrentTab(section.id)}
+              onContextMenu={(event) => showSidebarContextMenu(event, section.id)}
+            >
+              <span className="navShort">{section.shortLabel}</span>
+              <span className="navFull">{section.label}</span>
             </button>
             <button
               className={

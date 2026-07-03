@@ -86,6 +86,19 @@ export function moveTab(
   return nextTabs;
 }
 
+export function moveTabToEnd(tabs: AppTab[], draggedTabId: string): AppTab[] {
+  const draggedIndex = tabs.findIndex((tab) => tab.id === draggedTabId);
+
+  if (draggedIndex === -1 || draggedIndex === tabs.length - 1) {
+    return tabs;
+  }
+
+  const nextTabs = [...tabs];
+  const [draggedTab] = nextTabs.splice(draggedIndex, 1);
+  nextTabs.push(draggedTab);
+  return nextTabs;
+}
+
 function sectionLabel(sectionId: SidebarSectionId) {
   return sidebarSections.find((section) => section.id === sectionId)?.label ?? "새 탭";
 }

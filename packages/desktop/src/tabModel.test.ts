@@ -6,6 +6,7 @@ import {
   duplicateTab,
   getPinnedTabs,
   moveTab,
+  moveTabToEnd,
   togglePinnedTab
 } from "./tabModel";
 
@@ -80,6 +81,20 @@ describe("tabModel", () => {
       "tab-12",
       "tab-14",
       "tab-15"
+    ]);
+  });
+
+  it("moves a tab to the end of the tab strip", () => {
+    const tabs = [
+      createBlankTab("tab-16"),
+      createBlankTab("tab-17"),
+      createBlankTab("tab-18")
+    ];
+
+    expect(moveTabToEnd(tabs, "tab-16").map((tab) => tab.id)).toEqual([
+      "tab-17",
+      "tab-18",
+      "tab-16"
     ]);
   });
 });

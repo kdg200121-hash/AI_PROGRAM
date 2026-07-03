@@ -159,6 +159,18 @@ button.primary {
   font-weight: 400;
 }
 
+.tabEndDropZone {
+  align-self: stretch;
+  flex: 1 1 28px;
+  min-width: 28px;
+  border-left: 3px solid transparent;
+}
+
+.tabEndDropZone.active {
+  border-left-color: #2d5f9f;
+  background: rgba(45, 95, 159, 0.06);
+}
+
 .workspaceTabsInner {
   display: flex;
   align-items: center;
@@ -198,7 +210,7 @@ button.primary {
 }
 
 .topUtility {
-  margin-left: auto;
+  margin-left: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -302,7 +314,7 @@ button.primary {
 
 .navItem {
   width: 100%;
-  margin-bottom: 6px;
+  margin-bottom: 0;
   border: 0;
   text-align: left;
   background: transparent;
@@ -311,12 +323,24 @@ button.primary {
 
 .navRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px 34px;
+  grid-template-columns: 30px minmax(0, 1fr) 34px;
   gap: 4px;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
 }
 
 .navRow.dragging {
-  opacity: 0.55;
+  border-color: rgba(147, 197, 253, 0.45);
+  background: rgba(45, 95, 159, 0.24);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+  opacity: 0.9;
+}
+
+.navRow.dragging .navOrderButton,
+.navRow.dragging .favoriteButton,
+.navRow.dragging .navItem {
+  background: transparent;
 }
 
 .navOrderButton,
@@ -540,6 +564,11 @@ button.primary {
 .compactMode .newTabButton {
   width: 28px;
   min-width: 28px;
+}
+
+.compactMode .tabEndDropZone {
+  flex-basis: 12px;
+  min-width: 12px;
 }
 
 .compactMode .workspaceTabsInner {
