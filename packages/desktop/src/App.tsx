@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { McpServerRecord, RegistryFile } from "@mcp-registry/shared";
+import {
+  filterServersByWorkspace,
+  workspaceTabs,
+  type WorkspaceTabId
+} from "./workspaceTabs";
 
 const fallbackRegistry: RegistryFile = {
   version: 1,
@@ -39,6 +44,7 @@ const fallbackRegistry: RegistryFile = {
 
 export function App() {
   const [registry, setRegistry] = useState<RegistryFile>(fallbackRegistry);
+  const [activeTab, setActiveTab] = useState<WorkspaceTabId>("registry");
   const [selectedId, setSelectedId] = useState<string>("revit-default");
 
   useEffect(() => {
@@ -53,9 +59,25 @@ export function App() {
     });
   }, []);
 
+  const visibleServers = useMemo(
+    () => filterServersByWorkspace(registry.servers, activeTab),
+    [activeTab, registry.servers]
+  );
+
+  useEffect(() => {
+    if (visibleServers.length === 0) {
+      setSelectedId("");
+      return;
+    }
+
+    if (!visibleServers.some((server) => server.id === selectedId)) {
+      setSelectedId(visibleServers[0].id);
+    }
+  }, [selectedId, visibleServers]);
+
   const selected = useMemo<McpServerRecord | undefined>(
-    () => registry.servers.find((server) => server.id === selectedId),
-    [registry.servers, selectedId]
+    () => visibleServers.find((server) => server.id === selectedId),
+    [selectedId, visibleServers]
   );
 
   const cadCount = registry.servers.filter((server) => server.target === "cad").length;
@@ -64,6 +86,20 @@ export function App() {
 
   return (
     <div className="appShell">
+      <nav className="workspaceTabs" aria-label="작업 영역 선택">
+        <div className="workspaceTabsInner">
+          {workspaceTabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={tab.id === activeTab ? "workspaceTab active" : "workspaceTab"}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       <aside className="sidebar">
         <div className="brand">
           <strong>MCP Registry</strong>
@@ -74,20 +110,23 @@ export function App() {
         <button className="navItem">Process Monitor</button>
         <button className="navItem">Settings</button>
       </aside>
+
       <main className="main">
         <header className="topbar">
-          <h1>CAD/Revit MCP 연결 관리자</h1>
+          <h1>{topbarTitle(activeTab)}</h1>
           <div className="topActions">
             <button>상태 새로고침</button>
             <button className="primary">서버 추가</button>
           </div>
         </header>
+
         <section className="metrics">
           <Metric label="등록 서버" value={registry.servers.length} />
           <Metric label="실행 중" value={runningCount} />
           <Metric label="CAD" value={cadCount} />
           <Metric label="Revit" value={revitCount} />
         </section>
+
         <section className="contentGrid">
           <section className="panel">
             <div className="panelHeader">
@@ -103,7 +142,7 @@ export function App() {
                 </tr>
               </thead>
               <tbody>
-                {registry.servers.map((server) => (
+                {visibleServers.map((server) => (
                   <tr
                     key={server.id}
                     className={server.id === selectedId ? "selectedRow" : ""}
@@ -118,13 +157,14 @@ export function App() {
               </tbody>
             </table>
             <div className="workflowHint">
-              <h3>다음 단계 자리: CAD -&gt; Revit 작업</h3>
+              <h3>다음 단계 자리: CAD → Revit 작업</h3>
               <p>
                 CAD에서 레이어, 블록, 위치 정보를 읽고 Revit에서 벽, 장비, 패밀리 생성 작업을
                 실행하는 기능을 이 영역에 추가합니다.
               </p>
             </div>
           </section>
+
           <aside className="panel detailPanel">
             <div className="panelHeader">
               <h2>선택 서버 상세</h2>
@@ -175,6 +215,16 @@ function Field({
       <div className={multiline ? "multilineValue" : undefined}>{value}</div>
     </label>
   );
+}
+
+function topbarTitle(tabId: WorkspaceTabId) {
+  const titles: Record<WorkspaceTabId, string> = {
+    registry: "CAD/Revit MCP 연결 관리자",
+    cad: "CAD MCP 연결",
+    revit: "REVIT MCP 연결",
+    workflow: "CAD → Revit 작업 흐름"
+  };
+  return titles[tabId];
 }
 
 function statusLabel(status: McpServerRecord["status"]) {

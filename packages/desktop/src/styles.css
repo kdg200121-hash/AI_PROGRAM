@@ -29,10 +29,49 @@ button.primary {
 .appShell {
   height: 100vh;
   display: grid;
+  grid-template-rows: 58px 1fr;
   grid-template-columns: 248px 1fr;
 }
 
+.workspaceTabs {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: end;
+  padding: 0 22px;
+  border-bottom: 1px solid #d7dee9;
+  background: #e5e7eb;
+}
+
+.workspaceTabsInner {
+  display: flex;
+  align-items: end;
+  gap: 4px;
+  height: 42px;
+}
+
+.workspaceTab {
+  min-width: 124px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid #cbd5e1;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #eef2f7;
+  color: #46566c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.workspaceTab.active {
+  height: 42px;
+  background: #fff;
+  color: #172033;
+  border-color: #d7dee9;
+  box-shadow: 0 -1px 0 #fff inset;
+}
+
 .sidebar {
+  grid-row: 2;
   background: #172033;
   color: #e8edf5;
   padding: 18px 14px;
@@ -70,6 +109,7 @@ button.primary {
 }
 
 .main {
+  grid-row: 2;
   display: grid;
   grid-template-rows: 64px auto 1fr;
   min-width: 0;
