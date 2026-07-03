@@ -108,6 +108,7 @@ button.primary {
 .openTab.dragOverAfter::after {
   content: "";
   position: absolute;
+  z-index: 2;
   top: 5px;
   bottom: 5px;
   width: 3px;
@@ -121,6 +122,10 @@ button.primary {
 
 .openTab.dragOverAfter::after {
   right: -4px;
+}
+
+.openTab.dragOverEnd::after {
+  right: 0;
 }
 
 .openTabTitle {

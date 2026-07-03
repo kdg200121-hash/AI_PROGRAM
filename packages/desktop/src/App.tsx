@@ -389,6 +389,17 @@ export function App() {
     setIsTabEndDragOver(false);
   };
 
+  const markTabEndDragOver = (event: DragEvent<HTMLElement>) => {
+    if (!draggedTabId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverTab(null);
+    setIsTabEndDragOver(true);
+  };
+
   const getDropPosition = (event: MouseEvent<HTMLButtonElement>): TabDropPosition => {
     const bounds = event.currentTarget.getBoundingClientRect();
     return event.clientX > bounds.left + bounds.width / 2 ? "after" : "before";
@@ -419,6 +430,9 @@ export function App() {
                 (tab.id === dragOverTab?.id && dragOverTab.position === "after") ||
                 (isTabEndDragOver && tab.id === openTabs[openTabs.length - 1]?.id)
                   ? "dragOverAfter"
+                  : "",
+                isTabEndDragOver && tab.id === openTabs[openTabs.length - 1]?.id
+                  ? "dragOverEnd"
                   : "",
                 tab.id === draggedTabId ? "dragging" : ""
               ]
@@ -470,21 +484,24 @@ export function App() {
             </button>
           ))}
         </div>
-        <button className="newTabButton" aria-label="새 탭" onClick={openBlankTab}>
+        <button
+          className="newTabButton"
+          aria-label="새 탭"
+          onClick={openBlankTab}
+          onDragEnter={markTabEndDragOver}
+          onDragOver={markTabEndDragOver}
+          onDrop={(event) => {
+            event.preventDefault();
+            moveOpenTabToEnd();
+          }}
+        >
           +
         </button>
         <div
           className={isTabEndDragOver ? "tabEndDropZone active" : "tabEndDropZone"}
           aria-hidden="true"
-          onDragEnter={() => setIsTabEndDragOver(Boolean(draggedTabId))}
-          onDragOver={(event) => {
-            if (!draggedTabId) {
-              return;
-            }
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "move";
-            setIsTabEndDragOver(true);
-          }}
+          onDragEnter={markTabEndDragOver}
+          onDragOver={markTabEndDragOver}
           onDragLeave={() => setIsTabEndDragOver(false)}
           onDrop={(event) => {
             event.preventDefault();
