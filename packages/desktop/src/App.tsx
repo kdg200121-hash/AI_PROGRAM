@@ -93,6 +93,34 @@ function workspaceLabel(tabId: WorkspaceTabId) {
   return workspaceTabs.find((tab) => tab.id === tabId)?.label ?? "CAD";
 }
 
+function PopoutIcon() {
+  return (
+    <svg
+      className="dialogWindowIcon"
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+    >
+      <path d="M6 4H12V10" />
+      <path d="M12 4L5 11" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      className="dialogWindowIcon"
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+    >
+      <path d="M4.5 4.5L11.5 11.5" />
+      <path d="M11.5 4.5L4.5 11.5" />
+    </svg>
+  );
+}
+
 const fallbackRegistry: RegistryFile = {
   version: 1,
   servers: [
@@ -761,7 +789,7 @@ export function App() {
                   title="탭으로 열기"
                   onClick={openRegistryDialogAsTab}
                 >
-                  <span className="dialogWindowIcon popout" aria-hidden="true" />
+                  <PopoutIcon />
                 </button>
                 <button
                   className="dialogWindowButton"
@@ -769,7 +797,7 @@ export function App() {
                   title="닫기"
                   onClick={() => setIsRegistryDialogOpen(false)}
                 >
-                  <span className="dialogWindowIcon close" aria-hidden="true" />
+                  <CloseIcon />
                 </button>
               </div>
             </div>
@@ -893,7 +921,7 @@ export function App() {
                   title="탭으로 열기"
                   onClick={openMonitorDialogAsTab}
                 >
-                  <span className="dialogWindowIcon popout" aria-hidden="true" />
+                  <PopoutIcon />
                 </button>
                 <button
                   className="dialogWindowButton"
@@ -901,7 +929,7 @@ export function App() {
                   title="닫기"
                   onClick={() => setIsMonitorDialogOpen(false)}
                 >
-                  <span className="dialogWindowIcon close" aria-hidden="true" />
+                  <CloseIcon />
                 </button>
               </div>
             </div>
