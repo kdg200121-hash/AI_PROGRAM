@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { McpServerRecord } from "@mcp-registry/shared";
-import { filterServersByWorkspace, workspaceTabs, type WorkspaceTabId } from "./workspaceTabs";
+import {
+  filterServersByWorkspace,
+  getAdjacentWorkspaceTab,
+  registryWorkspaceTab,
+  workspaceTabs,
+  type WorkspaceTabId
+} from "./workspaceTabs";
 
 const servers: McpServerRecord[] = [
   {
@@ -36,8 +42,20 @@ const servers: McpServerRecord[] = [
 ];
 
 describe("filterServersByWorkspace", () => {
-  it("uses CAD <-> REVIT for the workflow tab label", () => {
-    expect(workspaceTabs.find((tab) => tab.id === "workflow")?.label).toBe("CAD <-> REVIT");
+  it("keeps MCP Registry as a right-side action instead of a primary tab", () => {
+    expect(registryWorkspaceTab.label).toBe("MCP Registry");
+    expect(workspaceTabs.map((tab) => tab.id)).toEqual(["cad", "revit", "workflow"]);
+  });
+
+  it("uses a bidirectional arrow symbol for the workflow tab label", () => {
+    expect(workspaceTabs.find((tab) => tab.id === "workflow")?.label).toBe("CAD ↔ REVIT");
+  });
+
+  it("cycles compact tab navigation through the primary tabs", () => {
+    expect(getAdjacentWorkspaceTab("cad", "previous")).toBe("workflow");
+    expect(getAdjacentWorkspaceTab("cad", "next")).toBe("revit");
+    expect(getAdjacentWorkspaceTab("workflow", "next")).toBe("cad");
+    expect(getAdjacentWorkspaceTab("registry", "next")).toBe("cad");
   });
 
   it.each([

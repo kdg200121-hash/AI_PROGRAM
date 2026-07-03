@@ -33,14 +33,19 @@ button.primary {
   grid-template-columns: 248px 1fr;
 }
 
+.appShell.sidebarCollapsed {
+  grid-template-columns: 64px 1fr;
+}
+
 .workspaceTabs {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   padding: 0 22px 0 18px;
   border-bottom: 1px solid #d7dee9;
   background: #fff;
+  min-width: 0;
 }
 
 .workspaceTabsInner {
@@ -48,6 +53,8 @@ button.primary {
   align-items: center;
   gap: 6px;
   height: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .workspaceTab {
@@ -79,19 +86,31 @@ button.primary {
   background: #2d5f9f;
 }
 
+.tabArrow {
+  display: none;
+}
+
 .topUtility {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
+.registryButton,
 .compactButton {
   min-height: 32px;
   padding: 0 11px;
   color: #2d5f9f;
   font-size: 12px;
   font-weight: 600;
+}
+
+.registryButton.active {
+  border-color: #2d5f9f;
+  background: #eef5ff;
+  color: #1f4d82;
 }
 
 .connectionBadge {
@@ -125,10 +144,31 @@ button.primary {
 }
 
 .sidebar {
+  position: relative;
   grid-row: 2;
   background: #172033;
   color: #e8edf5;
   padding: 18px 14px;
+  overflow: hidden;
+  transition: width 160ms ease;
+}
+
+.sidebarToggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: #ef4444;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sidebarCollapsed .sidebar {
+  padding: 52px 8px 18px;
 }
 
 .brand {
@@ -157,9 +197,34 @@ button.primary {
   color: #c8d1df;
 }
 
+.navShort {
+  display: none;
+}
+
 .navItem.active {
   background: #2d5f9f;
   color: #fff;
+}
+
+.sidebarCollapsed .brand {
+  display: none;
+}
+
+.sidebarCollapsed .navItem {
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  padding: 0;
+  text-align: center;
+}
+
+.sidebarCollapsed .navFull {
+  display: none;
+}
+
+.sidebarCollapsed .navShort {
+  display: inline;
+  font-weight: 700;
 }
 
 .main {
@@ -171,6 +236,7 @@ button.primary {
 
 .compactMode {
   grid-template-columns: 1fr;
+  grid-template-rows: 48px 1fr;
 }
 
 .compactMode .sidebar {
@@ -214,37 +280,77 @@ button.primary {
 }
 
 .compactMode .workspaceTabs {
-  min-height: 96px;
-  align-items: stretch;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 10px;
+  min-height: 48px;
+  align-items: center;
+  flex-direction: row;
+  gap: 4px;
+  padding: 6px 8px;
+  overflow: hidden;
 }
 
 .compactMode .workspaceTabsInner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex: 1 1 auto;
   gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.compactMode .workspaceTabsInner::-webkit-scrollbar {
+  display: none;
 }
 
 .compactMode .workspaceTab {
-  min-width: 0;
-  width: 100%;
+  min-width: 80px;
+  height: 32px;
+  padding: 0 8px;
+  flex: 0 0 auto;
+  font-size: 12px;
 }
 
 .compactMode .workspaceTab.active::after {
   bottom: -4px;
 }
 
+.compactMode .tabArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  min-height: 32px;
+  padding: 0;
+  border-color: #d7dee9;
+  color: #2d5f9f;
+  font-size: 20px;
+  font-weight: 700;
+}
+
 .compactMode .topUtility {
-  width: 100%;
-  margin-left: 0;
+  width: auto;
+  margin-left: auto;
+  gap: 4px;
 }
 
 .compactMode .compactButton,
+.compactMode .registryButton,
 .compactMode .connectionBadge {
-  flex: 1;
+  flex: 0 0 auto;
   justify-content: center;
+}
+
+.compactMode .registryButton,
+.compactMode .compactButton {
+  padding: 0 8px;
+}
+
+.compactMode .connectionBadge {
+  width: 32px;
+  padding: 0;
+}
+
+.compactMode .connectionBadge span:last-child {
+  display: none;
 }
 
 .topbar {

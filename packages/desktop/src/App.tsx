@@ -4,6 +4,8 @@ import { getConnectionSummary } from "./connectionSummary";
 import { getToolsForWorkspace } from "./mcpToolCatalog";
 import {
   filterServersByWorkspace,
+  getAdjacentWorkspaceTab,
+  registryWorkspaceTab,
   workspaceTabs,
   type WorkspaceTabId
 } from "./workspaceTabs";
@@ -37,7 +39,7 @@ const fallbackRegistry: RegistryFile = {
       workingDirectory: "C:\\Tools\\AutoCadMcpBridge",
       environment: {},
       status: "unknown",
-      notes: "CAD 연결 자리입니다. 도면 정보를 읽는 기능이 이후 단계에 연결됩니다.",
+      notes: "CAD 연결 자리입니다. 도면 정보를 읽는 기능을 이후 단계에서 연결합니다.",
       createdAt: "2026-07-03T00:00:00.000Z",
       updatedAt: "2026-07-03T00:00:00.000Z"
     }
@@ -49,6 +51,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState<WorkspaceTabId>("registry");
   const [selectedId, setSelectedId] = useState<string>("revit-default");
   const [isCompact, setIsCompact] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const api = window.mcpRegistry;
@@ -95,9 +98,28 @@ export function App() {
     void window.mcpWindow?.setCompactMode(nextValue);
   };
 
+  const moveCompactTab = (direction: "previous" | "next") => {
+    setActiveTab((current) => getAdjacentWorkspaceTab(current, direction));
+  };
+
+  const shellClassName = [
+    "appShell",
+    isCompact ? "compactMode" : "",
+    isSidebarCollapsed ? "sidebarCollapsed" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className={isCompact ? "appShell compactMode" : "appShell"}>
+    <div className={shellClassName}>
       <nav className="workspaceTabs" aria-label="작업 영역 선택">
+        <button
+          className="tabArrow"
+          aria-label="이전 탭"
+          onClick={() => moveCompactTab("previous")}
+        >
+          ‹
+        </button>
         <div className="workspaceTabsInner">
           {workspaceTabs.map((tab) => (
             <button
@@ -109,11 +131,22 @@ export function App() {
             </button>
           ))}
         </div>
+        <button className="tabArrow" aria-label="다음 탭" onClick={() => moveCompactTab("next")}>
+          ›
+        </button>
         <div className="topUtility">
+          <button
+            className={
+              activeTab === registryWorkspaceTab.id ? "registryButton active" : "registryButton"
+            }
+            onClick={() => setActiveTab(registryWorkspaceTab.id)}
+          >
+            {registryWorkspaceTab.label}
+          </button>
           <button className="compactButton" onClick={toggleCompactMode}>
             {isCompact ? "기본 보기" : "간소화"}
           </button>
-          <div className="connectionBadge">
+          <div className="connectionBadge" title={connectionSummary.label}>
             <span className={`statusDot ${connectionSummary.tone}`} />
             <span>{connectionSummary.label}</span>
           </div>
@@ -121,14 +154,33 @@ export function App() {
       </nav>
 
       <aside className="sidebar">
+        <button
+          className="sidebarToggle"
+          aria-label={isSidebarCollapsed ? "메뉴 펼치기" : "메뉴 접기"}
+          onClick={() => setIsSidebarCollapsed((value) => !value)}
+        >
+          {isSidebarCollapsed ? "»" : "«"}
+        </button>
         <div className="brand">
           <strong>MCP Registry</strong>
           <span>CAD/Revit 연결 관리자</span>
         </div>
-        <button className="navItem active">MCP Servers</button>
-        <button className="navItem">CAD to Revit</button>
-        <button className="navItem">Process Monitor</button>
-        <button className="navItem">Settings</button>
+        <button className="navItem active">
+          <span className="navShort">M</span>
+          <span className="navFull">MCP Servers</span>
+        </button>
+        <button className="navItem">
+          <span className="navShort">C</span>
+          <span className="navFull">CAD ↔ Revit</span>
+        </button>
+        <button className="navItem">
+          <span className="navShort">P</span>
+          <span className="navFull">Process Monitor</span>
+        </button>
+        <button className="navItem">
+          <span className="navShort">S</span>
+          <span className="navFull">Settings</span>
+        </button>
       </aside>
 
       <main className="main">
@@ -177,10 +229,10 @@ export function App() {
               </tbody>
             </table>
             <div className="workflowHint">
-              <h3>다음 단계 자리: CAD &lt;-&gt; Revit 작업</h3>
+              <h3>다음 단계 자리: CAD ↔ Revit 작업</h3>
               <p>
-                CAD에서 레이어, 블록, 위치 정보를 읽고 Revit에서 벽, 장비, 패밀리 생성 작업을
-                실행하는 기능을 이 영역에 추가합니다.
+                CAD에서 레이어, 블록, 위치 정보를 읽고 Revit에서 벽, 장비, 패밀리 생성
+                작업을 실행하는 기능을 이 영역에 추가합니다.
               </p>
             </div>
           </section>
@@ -256,7 +308,7 @@ function topbarTitle(tabId: WorkspaceTabId) {
     registry: "CAD/Revit MCP 연결 관리자",
     cad: "CAD MCP 연결",
     revit: "REVIT MCP 연결",
-    workflow: "CAD <-> REVIT 작업 흐름"
+    workflow: "CAD ↔ REVIT 작업 흐름"
   };
   return titles[tabId];
 }
@@ -266,7 +318,7 @@ function toolPanelTitle(tabId: WorkspaceTabId) {
     registry: "Registry MCP 툴",
     cad: "CAD MCP 툴",
     revit: "REVIT MCP 툴",
-    workflow: "CAD <-> REVIT MCP 툴"
+    workflow: "CAD ↔ REVIT MCP 툴"
   };
   return titles[tabId];
 }

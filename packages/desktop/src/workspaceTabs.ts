@@ -7,12 +7,27 @@ export interface WorkspaceTab {
   label: string;
 }
 
+export const registryWorkspaceTab: WorkspaceTab = { id: "registry", label: "MCP Registry" };
+
 export const workspaceTabs: WorkspaceTab[] = [
-  { id: "registry", label: "MCP Registry" },
   { id: "cad", label: "CAD" },
   { id: "revit", label: "REVIT" },
-  { id: "workflow", label: "CAD <-> REVIT" }
+  { id: "workflow", label: "CAD ↔ REVIT" }
 ];
+
+export function getAdjacentWorkspaceTab(
+  activeTab: WorkspaceTabId,
+  direction: "previous" | "next"
+): WorkspaceTabId {
+  const currentIndex = workspaceTabs.findIndex((tab) => tab.id === activeTab);
+  if (currentIndex === -1) {
+    return direction === "next" ? workspaceTabs[0].id : workspaceTabs[workspaceTabs.length - 1].id;
+  }
+
+  const offset = direction === "next" ? 1 : -1;
+  const nextIndex = (currentIndex + offset + workspaceTabs.length) % workspaceTabs.length;
+  return workspaceTabs[nextIndex].id;
+}
 
 export function filterServersByWorkspace(
   servers: McpServerRecord[],

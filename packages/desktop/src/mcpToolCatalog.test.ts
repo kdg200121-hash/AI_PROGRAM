@@ -18,7 +18,7 @@ describe("getToolsForWorkspace", () => {
     ]);
   });
 
-  it("shows bridge tools on the CAD <-> REVIT tab", () => {
+  it("shows bridge tools on the CAD ↔ REVIT tab", () => {
     expect(getToolsForWorkspace("workflow").map((tool) => tool.name)).toEqual([
       "CAD 정보 변환",
       "Revit 실행 큐",
