@@ -163,7 +163,8 @@ export function App() {
             title={`${registryWorkspaceTab.label} 열기`}
             onClick={() => setIsRegistryDialogOpen(true)}
           >
-            ☰
+            <span aria-hidden="true">☰</span>
+            <span>Settings</span>
           </button>
         </div>
       </nav>
@@ -194,10 +195,6 @@ export function App() {
         <button className="navItem">
           <span className="navShort">P</span>
           <span className="navFull">Process Monitor</span>
-        </button>
-        <button className="navItem">
-          <span className="navShort">S</span>
-          <span className="navFull">Settings</span>
         </button>
       </aside>
 

@@ -112,16 +112,24 @@ button.primary {
 }
 
 .registryIconButton {
-  width: 34px;
-  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 92px;
   min-height: 32px;
-  padding: 0;
+  padding: 0 10px;
   border-color: #c9d3e1;
   background: #fff;
   color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.registryIconButton span:first-child {
   font-size: 16px;
   font-weight: 500;
-  line-height: 1;
 }
 
 .registryIconButton:hover {
@@ -374,8 +382,14 @@ button.primary {
 }
 
 .compactMode .registryIconButton {
-  width: 32px;
   min-width: 32px;
+  width: 32px;
+  gap: 0;
+  padding: 0;
+}
+
+.compactMode .registryIconButton span:last-child {
+  display: none;
 }
 
 .compactMode .connectionBadge {
