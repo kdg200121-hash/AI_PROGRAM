@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { McpServerRecord, RegistryFile } from "@mcp-registry/shared";
+import { getConnectionSummary } from "./connectionSummary";
 import {
   filterServersByWorkspace,
   workspaceTabs,
@@ -46,6 +47,7 @@ export function App() {
   const [registry, setRegistry] = useState<RegistryFile>(fallbackRegistry);
   const [activeTab, setActiveTab] = useState<WorkspaceTabId>("registry");
   const [selectedId, setSelectedId] = useState<string>("revit-default");
+  const [isCompact, setIsCompact] = useState(false);
 
   useEffect(() => {
     const api = window.mcpRegistry;
@@ -83,9 +85,10 @@ export function App() {
   const cadCount = registry.servers.filter((server) => server.target === "cad").length;
   const revitCount = registry.servers.filter((server) => server.target === "revit").length;
   const runningCount = registry.servers.filter((server) => server.status === "running").length;
+  const connectionSummary = getConnectionSummary(registry.servers);
 
   return (
-    <div className="appShell">
+    <div className={isCompact ? "appShell compactMode" : "appShell"}>
       <nav className="workspaceTabs" aria-label="작업 영역 선택">
         <div className="workspaceTabsInner">
           {workspaceTabs.map((tab) => (
@@ -97,6 +100,15 @@ export function App() {
               {tab.label}
             </button>
           ))}
+        </div>
+        <div className="topUtility">
+          <button className="compactButton" onClick={() => setIsCompact((value) => !value)}>
+            {isCompact ? "기본 보기" : "간소화"}
+          </button>
+          <div className="connectionBadge">
+            <span className={`statusDot ${connectionSummary.tone}`} />
+            <span>{connectionSummary.label}</span>
+          </div>
         </div>
       </nav>
 

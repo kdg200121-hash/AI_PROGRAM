@@ -29,45 +29,99 @@ button.primary {
 .appShell {
   height: 100vh;
   display: grid;
-  grid-template-rows: 58px 1fr;
+  grid-template-rows: 48px 1fr;
   grid-template-columns: 248px 1fr;
 }
 
 .workspaceTabs {
   grid-column: 1 / -1;
   display: flex;
-  align-items: end;
-  padding: 0 22px;
+  align-items: center;
+  gap: 16px;
+  padding: 0 22px 0 18px;
   border-bottom: 1px solid #d7dee9;
-  background: #e5e7eb;
+  background: #fff;
 }
 
 .workspaceTabsInner {
   display: flex;
-  align-items: end;
-  gap: 4px;
-  height: 42px;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
 }
 
 .workspaceTab {
-  min-width: 124px;
-  height: 36px;
-  padding: 0 16px;
-  border: 1px solid #cbd5e1;
-  border-bottom: 0;
-  border-radius: 8px 8px 0 0;
-  background: #eef2f7;
-  color: #46566c;
+  position: relative;
+  min-width: 98px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #526071;
   font-size: 13px;
   font-weight: 600;
 }
 
 .workspaceTab.active {
-  height: 42px;
-  background: #fff;
-  color: #172033;
-  border-color: #d7dee9;
-  box-shadow: 0 -1px 0 #fff inset;
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
+.workspaceTab.active::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -7px;
+  height: 3px;
+  border-radius: 999px;
+  background: #2d5f9f;
+}
+
+.topUtility {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.compactButton {
+  min-height: 32px;
+  padding: 0 11px;
+  color: #2d5f9f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.connectionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #d7dee9;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.statusDot.online {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+}
+
+.statusDot.offline {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.13);
 }
 
 .sidebar {
@@ -113,6 +167,26 @@ button.primary {
   display: grid;
   grid-template-rows: 64px auto 1fr;
   min-width: 0;
+}
+
+.compactMode {
+  grid-template-columns: 1fr;
+}
+
+.compactMode .sidebar {
+  display: none;
+}
+
+.compactMode .main {
+  grid-column: 1 / -1;
+}
+
+.compactMode .metrics {
+  display: none;
+}
+
+.compactMode .contentGrid {
+  padding-top: 16px;
 }
 
 .topbar {
