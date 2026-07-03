@@ -28,7 +28,6 @@ import {
 } from "./tabModel";
 import {
   filterServersByWorkspace,
-  getAdjacentWorkspaceTab,
   registryWorkspaceTab,
   workspaceTabs,
   type WorkspaceTabId
@@ -202,14 +201,6 @@ export function App() {
     setOpenTabs((tabs) =>
       tabs.map((tab) => (tab.id === activeOpenTabId ? { ...tab, ...patch } : tab))
     );
-  };
-
-  const selectWorkspaceTab = (workspaceTabId: WorkspaceTabId) => {
-    updateActiveOpenTab({
-      workspaceTabId,
-      sectionId: "servers",
-      title: workspaceLabel(workspaceTabId)
-    });
   };
 
   const openBlankTab = () => {
@@ -469,35 +460,6 @@ export function App() {
           <div>
             <h1>{topbarTitle(activeTab, activeSidebarSection)}</h1>
             <p>{topbarSubtitle(activeTab, activeSidebarSection)}</p>
-          </div>
-          <div className="topActions">
-            <div className="targetSwitch" aria-label="작업 대상 선택">
-              <button
-                className="tabArrow"
-                aria-label="이전 작업 대상"
-                onClick={() => selectWorkspaceTab(getAdjacentWorkspaceTab(activeTab, "previous"))}
-              >
-                ‹
-              </button>
-              {workspaceTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  className={tab.id === activeTab ? "targetButton active" : "targetButton"}
-                  onClick={() => selectWorkspaceTab(tab.id)}
-                >
-                  {tab.label}
-                </button>
-              ))}
-              <button
-                className="tabArrow"
-                aria-label="다음 작업 대상"
-                onClick={() => selectWorkspaceTab(getAdjacentWorkspaceTab(activeTab, "next"))}
-              >
-                ›
-              </button>
-            </div>
-            <button>상태 새로고침</button>
-            <button className="primary">서버 추가</button>
           </div>
         </header>
 
