@@ -27,6 +27,7 @@ import {
 } from "./tabModel";
 import {
   filterServersByWorkspace,
+  getAdjacentWorkspaceTab,
   registryWorkspaceTab,
   workspaceTabs,
   type WorkspaceTabId
@@ -199,6 +200,14 @@ export function App() {
     );
   };
 
+  const selectWorkspaceTab = (workspaceTabId: WorkspaceTabId) => {
+    updateActiveOpenTab({
+      workspaceTabId,
+      sectionId: "servers",
+      title: workspaceLabel(workspaceTabId)
+    });
+  };
+
   const openBlankTab = () => {
     const tab = createBlankTab(nextTabId());
     setOpenTabs((tabs) => [...tabs, tab]);
@@ -364,8 +373,7 @@ export function App() {
           onClick={() => setIsSidebarCollapsed((value) => !value)}
         >
           <span className="sidebarToggleMark" aria-hidden="true">
-            <span>{isSidebarCollapsed ? ">" : "<"}</span>
-            <span>{isSidebarCollapsed ? ">" : "<"}</span>
+            {isSidebarCollapsed ? "›" : "‹"}
           </span>
         </button>
         <div className="brand">
@@ -445,15 +453,29 @@ export function App() {
           </div>
           <div className="topActions">
             <div className="targetSwitch" aria-label="작업 대상 선택">
+              <button
+                className="tabArrow"
+                aria-label="이전 작업 대상"
+                onClick={() => selectWorkspaceTab(getAdjacentWorkspaceTab(activeTab, "previous"))}
+              >
+                ‹
+              </button>
               {workspaceTabs.map((tab) => (
                 <button
                   key={tab.id}
                   className={tab.id === activeTab ? "targetButton active" : "targetButton"}
-                  onClick={() => updateActiveOpenTab({ workspaceTabId: tab.id })}
+                  onClick={() => selectWorkspaceTab(tab.id)}
                 >
                   {tab.label}
                 </button>
               ))}
+              <button
+                className="tabArrow"
+                aria-label="다음 작업 대상"
+                onClick={() => selectWorkspaceTab(getAdjacentWorkspaceTab(activeTab, "next"))}
+              >
+                ›
+              </button>
             </div>
             <button>상태 새로고침</button>
             <button className="primary">서버 추가</button>
