@@ -571,7 +571,7 @@ export function App() {
                     aria-expanded={expandedSectionIds.includes(section.id)}
                     onClick={() => toggleExpandedSection(section.id)}
                   >
-                    {expandedSectionIds.includes(section.id) ? "△" : "▽"}
+                    {expandedSectionIds.includes(section.id) ? "▲" : "▼"}
                   </button>
                   {expandedSectionIds.includes(section.id) ? (
                     <div className="navSubPanel">
@@ -646,7 +646,7 @@ export function App() {
               aria-expanded={expandedSectionIds.includes(section.id)}
               onClick={() => toggleExpandedSection(section.id)}
             >
-              {expandedSectionIds.includes(section.id) ? "△" : "▽"}
+              {expandedSectionIds.includes(section.id) ? "▲" : "▼"}
             </button>
             {expandedSectionIds.includes(section.id) ? (
               <div className="navSubPanel">
