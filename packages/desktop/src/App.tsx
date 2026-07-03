@@ -48,10 +48,11 @@ const fallbackRegistry: RegistryFile = {
 
 export function App() {
   const [registry, setRegistry] = useState<RegistryFile>(fallbackRegistry);
-  const [activeTab, setActiveTab] = useState<WorkspaceTabId>("registry");
+  const [activeTab, setActiveTab] = useState<WorkspaceTabId>("cad");
   const [selectedId, setSelectedId] = useState<string>("revit-default");
   const [isCompact, setIsCompact] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isRegistryDialogOpen, setIsRegistryDialogOpen] = useState(false);
 
   useEffect(() => {
     const api = window.mcpRegistry;
@@ -136,12 +137,12 @@ export function App() {
         </button>
         <div className="topUtility">
           <button
-            className={
-              activeTab === registryWorkspaceTab.id ? "registryButton active" : "registryButton"
-            }
-            onClick={() => setActiveTab(registryWorkspaceTab.id)}
+            className="registryIconButton"
+            aria-label={`${registryWorkspaceTab.label} 열기`}
+            title={`${registryWorkspaceTab.label} 열기`}
+            onClick={() => setIsRegistryDialogOpen(true)}
           >
-            {registryWorkspaceTab.label}
+            ⚙
           </button>
           <button className="compactButton" onClick={toggleCompactMode}>
             {isCompact ? "기본 보기" : "간소화"}
@@ -273,6 +274,35 @@ export function App() {
           </section>
         </section>
       </main>
+
+      {isRegistryDialogOpen ? (
+        <div className="dialogBackdrop" role="presentation">
+          <section className="registryDialog" role="dialog" aria-modal="true" aria-labelledby="registryDialogTitle">
+            <div className="dialogHeader">
+              <div>
+                <h2 id="registryDialogTitle">MCP Registry</h2>
+                <span>등록된 MCP 연결과 Registry 전용 툴을 확인합니다.</span>
+              </div>
+              <button className="dialogCloseButton" onClick={() => setIsRegistryDialogOpen(false)}>
+                닫기
+              </button>
+            </div>
+            <div className="dialogSummary">
+              <Metric label="등록 서버" value={registry.servers.length} />
+              <Metric label="CAD" value={cadCount} />
+              <Metric label="Revit" value={revitCount} />
+            </div>
+            <div className="toolList dialogToolList">
+              {getToolsForWorkspace(registryWorkspaceTab.id).map((tool) => (
+                <div className="toolItem" key={tool.name}>
+                  <strong>{tool.name}</strong>
+                  <span>{tool.description}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

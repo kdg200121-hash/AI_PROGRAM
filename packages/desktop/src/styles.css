@@ -98,7 +98,6 @@ button.primary {
   flex-shrink: 0;
 }
 
-.registryButton,
 .compactButton {
   min-height: 32px;
   padding: 0 11px;
@@ -107,10 +106,16 @@ button.primary {
   font-weight: 600;
 }
 
-.registryButton.active {
+.registryIconButton {
+  width: 34px;
+  min-width: 34px;
+  min-height: 32px;
+  padding: 0;
   border-color: #2d5f9f;
   background: #eef5ff;
   color: #1f4d82;
+  font-size: 17px;
+  line-height: 1;
 }
 
 .connectionBadge {
@@ -161,10 +166,14 @@ button.primary {
   min-height: 32px;
   border: 0;
   background: transparent;
-  color: #ef4444;
+  color: #d7dee9;
   font-size: 30px;
   font-weight: 800;
   line-height: 1;
+}
+
+.sidebarToggle:hover {
+  color: #fff;
 }
 
 .sidebarCollapsed .sidebar {
@@ -333,15 +342,19 @@ button.primary {
 }
 
 .compactMode .compactButton,
-.compactMode .registryButton,
+.compactMode .registryIconButton,
 .compactMode .connectionBadge {
   flex: 0 0 auto;
   justify-content: center;
 }
 
-.compactMode .registryButton,
 .compactMode .compactButton {
   padding: 0 8px;
+}
+
+.compactMode .registryIconButton {
+  width: 32px;
+  min-width: 32px;
 }
 
 .compactMode .connectionBadge {
@@ -558,4 +571,70 @@ tbody tr {
 .emptyState {
   margin: 16px;
   color: #617086;
+}
+
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.registryDialog {
+  width: min(680px, 100%);
+  max-height: min(620px, calc(100vh - 44px));
+  overflow: auto;
+  border: 1px solid #d7dee9;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2);
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.dialogHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.dialogHeader span {
+  display: block;
+  margin-top: 5px;
+  color: #617086;
+  font-size: 12px;
+}
+
+.dialogCloseButton {
+  min-width: 72px;
+}
+
+.dialogSummary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 14px 18px 0;
+}
+
+.dialogToolList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 14px 18px 18px;
+}
+
+.compactMode .dialogBackdrop {
+  padding: 12px;
+}
+
+.compactMode .dialogSummary,
+.compactMode .dialogToolList {
+  grid-template-columns: 1fr;
 }
