@@ -9,6 +9,12 @@ import {
   type SettingsSectionId
 } from "./settingsDialog";
 import {
+  overviewCards,
+  sidebarSections,
+  workflowSteps,
+  type SidebarSectionId
+} from "./navigationModel";
+import {
   filterServersByWorkspace,
   getAdjacentWorkspaceTab,
   registryWorkspaceTab,
@@ -61,6 +67,8 @@ export function App() {
   const [isRegistryDialogOpen, setIsRegistryDialogOpen] = useState(false);
   const [activeSettingsSection, setActiveSettingsSection] =
     useState<SettingsSectionId>("servers");
+  const [activeSidebarSection, setActiveSidebarSection] =
+    useState<SidebarSectionId>("servers");
   const [colorMode, setColorMode] = useState<ColorMode>("light");
 
   useEffect(() => {
@@ -175,18 +183,16 @@ export function App() {
           <strong>MCP Registry</strong>
           <span>CAD/Revit 연결 관리자</span>
         </div>
-        <button className="navItem active">
-          <span className="navShort">M</span>
-          <span className="navFull">MCP Servers</span>
-        </button>
-        <button className="navItem">
-          <span className="navShort">C</span>
-          <span className="navFull">CAD ↔ Revit</span>
-        </button>
-        <button className="navItem">
-          <span className="navShort">P</span>
-          <span className="navFull">Process Monitor</span>
-        </button>
+        {sidebarSections.map((section) => (
+          <button
+            key={section.id}
+            className={section.id === activeSidebarSection ? "navItem active" : "navItem"}
+            onClick={() => setActiveSidebarSection(section.id)}
+          >
+            <span className="navShort">{section.shortLabel}</span>
+            <span className="navFull">{section.label}</span>
+          </button>
+        ))}
         <button
           className="sidebarSettingsButton"
           aria-label={`${registryWorkspaceTab.label} 열기`}
@@ -205,7 +211,10 @@ export function App() {
 
       <main className="main">
         <header className="topbar">
-          <h1>{topbarTitle(activeTab)}</h1>
+          <div>
+            <h1>{topbarTitle(activeTab, activeSidebarSection)}</h1>
+            <p>{topbarSubtitle(activeTab, activeSidebarSection)}</p>
+          </div>
           <div className="topActions">
             <button>상태 새로고침</button>
             <button className="primary">서버 추가</button>
@@ -219,79 +228,22 @@ export function App() {
           <Metric label="Revit" value={revitCount} />
         </section>
 
-        <section className="contentGrid">
-          <section className="panel">
-            <div className="panelHeader">
-              <h2>서버 목록</h2>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>이름</th>
-                  <th>대상</th>
-                  <th>포트/URL</th>
-                  <th>상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleServers.map((server) => (
-                  <tr
-                    key={server.id}
-                    className={server.id === selectedId ? "selectedRow" : ""}
-                    onClick={() => setSelectedId(server.id)}
-                  >
-                    <td>{server.name}</td>
-                    <td>{server.target === "cad" ? "CAD" : "Revit"}</td>
-                    <td>{server.port ?? server.url}</td>
-                    <td>{statusLabel(server.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="workflowHint">
-              <h3>다음 단계 자리: CAD ↔ Revit 작업</h3>
-              <p>
-                CAD에서 레이어, 블록, 위치 정보를 읽고 Revit에서 벽, 장비, 패밀리 생성
-                작업을 실행하는 기능을 이 영역에 추가합니다.
-              </p>
-            </div>
-          </section>
+        {activeSidebarSection === "servers" ? (
+          <ServersView
+            activeTab={activeTab}
+            selected={selected}
+            selectedId={selectedId}
+            servers={visibleServers}
+            tools={workspaceTools}
+            onSelectServer={setSelectedId}
+          />
+        ) : null}
 
-          <aside className="panel detailPanel">
-            <div className="panelHeader">
-              <h2>선택 서버 상세</h2>
-            </div>
-            {selected ? (
-              <div className="details">
-                <Field label="서버 이름" value={selected.name} />
-                <Field label="연결 URL" value={selected.url} />
-                <Field label="실행 명령" value={selected.launchCommand} />
-                <Field label="작업 폴더" value={selected.workingDirectory} />
-                <Field label="메모" value={selected.notes} multiline />
-                <div className="buttonStack">
-                  <button className="primary">실행</button>
-                  <button>중지</button>
-                </div>
-              </div>
-            ) : (
-              <p className="emptyState">서버를 선택하세요.</p>
-            )}
-          </aside>
+        {activeSidebarSection === "workflow" ? <WorkflowView /> : null}
 
-          <section className="panel toolPanel">
-            <div className="panelHeader">
-              <h2>{toolPanelTitle(activeTab)}</h2>
-            </div>
-            <div className="toolList">
-              {workspaceTools.map((tool) => (
-                <div className="toolItem" key={tool.name}>
-                  <strong>{tool.name}</strong>
-                  <span>{tool.description}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </section>
+        {activeSidebarSection === "monitor" ? (
+          <MonitorView runningCount={runningCount} totalCount={registry.servers.length} />
+        ) : null}
       </main>
 
       {isRegistryDialogOpen ? (
@@ -440,14 +392,204 @@ function Field({
   );
 }
 
-function topbarTitle(tabId: WorkspaceTabId) {
+function ServersView({
+  activeTab,
+  selected,
+  selectedId,
+  servers,
+  tools,
+  onSelectServer
+}: {
+  activeTab: WorkspaceTabId;
+  selected: McpServerRecord | undefined;
+  selectedId: string;
+  servers: McpServerRecord[];
+  tools: ReturnType<typeof getToolsForWorkspace>;
+  onSelectServer: (serverId: string) => void;
+}) {
+  return (
+    <section className="contentGrid">
+      <section className="panel serverPanel">
+        <div className="panelHeader">
+          <h2>서버 목록</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>대상</th>
+              <th>포트/URL</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {servers.map((server) => (
+              <tr
+                key={server.id}
+                className={server.id === selectedId ? "selectedRow" : ""}
+                onClick={() => onSelectServer(server.id)}
+              >
+                <td>{server.name}</td>
+                <td>{server.target === "cad" ? "CAD" : "Revit"}</td>
+                <td>{server.port ?? server.url}</td>
+                <td>{statusLabel(server.status)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="overviewGrid">
+          {overviewCards.map((card) => (
+            <div className="overviewCard" key={card.title}>
+              <strong>{card.title}</strong>
+              <span>{card.body}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <aside className="panel detailPanel">
+        <div className="panelHeader">
+          <h2>선택 서버 상세</h2>
+        </div>
+        {selected ? (
+          <div className="details">
+            <Field label="서버 이름" value={selected.name} />
+            <Field label="연결 URL" value={selected.url} />
+            <Field label="실행 명령" value={selected.launchCommand} />
+            <Field label="작업 폴더" value={selected.workingDirectory} />
+            <Field label="메모" value={selected.notes} multiline />
+            <div className="buttonStack">
+              <button className="primary">실행</button>
+              <button>중지</button>
+            </div>
+          </div>
+        ) : (
+          <p className="emptyState">서버를 선택하세요.</p>
+        )}
+      </aside>
+
+      <section className="panel toolPanel">
+        <div className="panelHeader">
+          <h2>{toolPanelTitle(activeTab)}</h2>
+        </div>
+        <div className="toolList">
+          {tools.map((tool) => (
+            <div className="toolItem" key={tool.name}>
+              <strong>{tool.name}</strong>
+              <span>{tool.description}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function WorkflowView() {
+  return (
+    <section className="sectionView">
+      <div className="workflowRail">
+        {workflowSteps.map((step, index) => (
+          <div className="workflowStep" key={step.title}>
+            <span>{index + 1}</span>
+            <strong>{step.title}</strong>
+            <p>{step.body}</p>
+          </div>
+        ))}
+      </div>
+      <div className="panel workflowBoard">
+        <div className="panelHeader">
+          <h2>CAD ↔ Revit 작업 보드</h2>
+        </div>
+        <div className="workflowBoardGrid">
+          <div>
+            <strong>입력 대기</strong>
+            <span>CAD 레이어/블록 정보를 읽으면 여기에 표시됩니다.</span>
+          </div>
+          <div>
+            <strong>검토 필요</strong>
+            <span>Revit 패밀리와 매핑이 필요한 항목을 모읍니다.</span>
+          </div>
+          <div>
+            <strong>실행 준비</strong>
+            <span>검토가 끝난 작업을 Revit 실행 큐로 넘깁니다.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MonitorView({ runningCount, totalCount }: { runningCount: number; totalCount: number }) {
+  return (
+    <section className="sectionView monitorView">
+      <div className="monitorStatus">
+        <div className="panel monitorTile">
+          <span>연결 상태</span>
+          <strong>{runningCount > 0 ? "일부 실행 중" : "대기 중"}</strong>
+          <p>
+            실행 중 {runningCount}개 / 전체 {totalCount}개
+          </p>
+        </div>
+        <div className="panel monitorTile">
+          <span>CAD Bridge</span>
+          <strong>확인 전</strong>
+          <p>AutoCAD MCP 포트 5100 상태를 확인합니다.</p>
+        </div>
+        <div className="panel monitorTile">
+          <span>Revit Bridge</span>
+          <strong>확인 전</strong>
+          <p>Revit MCP 포트 5001 상태를 확인합니다.</p>
+        </div>
+      </div>
+      <div className="panel logPanel">
+        <div className="panelHeader">
+          <h2>실행 로그</h2>
+        </div>
+        <div className="logList">
+          <p>[대기] MCP 서버 상태 확인 준비</p>
+          <p>[대기] CAD 도면 정보 수집 준비</p>
+          <p>[대기] Revit 작업 큐 실행 준비</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function topbarTitle(tabId: WorkspaceTabId, sectionId: SidebarSectionId) {
+  if (sectionId === "workflow") {
+    return "CAD ↔ Revit 작업 흐름";
+  }
+
+  if (sectionId === "monitor") {
+    return "Process Monitor";
+  }
+
   const titles: Record<WorkspaceTabId, string> = {
-    registry: "CAD/Revit MCP 연결 관리자",
-    cad: "CAD MCP 연결",
-    revit: "REVIT MCP 연결",
-    workflow: "CAD ↔ REVIT 작업 흐름"
+    registry: "MCP 서버 연결 관리",
+    cad: "CAD MCP 서버",
+    revit: "REVIT MCP 서버",
+    workflow: "CAD ↔ REVIT MCP 서버"
   };
   return titles[tabId];
+}
+
+function topbarSubtitle(tabId: WorkspaceTabId, sectionId: SidebarSectionId) {
+  if (sectionId === "workflow") {
+    return "CAD에서 읽은 정보를 Revit 작업으로 넘기는 과정을 관리합니다.";
+  }
+
+  if (sectionId === "monitor") {
+    return "MCP Bridge 실행 상태와 작업 로그를 확인합니다.";
+  }
+
+  const subtitles: Record<WorkspaceTabId, string> = {
+    registry: "전체 MCP 서버 등록 정보를 관리합니다.",
+    cad: "CAD에서 도면 정보를 읽는 MCP 연결을 관리합니다.",
+    revit: "Revit에서 모델 작업을 실행하는 MCP 연결을 관리합니다.",
+    workflow: "CAD와 Revit 사이의 연결 서버를 함께 확인합니다."
+  };
+  return subtitles[tabId];
 }
 
 function toolPanelTitle(tabId: WorkspaceTabId) {

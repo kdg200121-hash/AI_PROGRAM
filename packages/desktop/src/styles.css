@@ -407,6 +407,12 @@ button.primary {
   font-size: 20px;
 }
 
+.topbar p {
+  margin: 5px 0 0;
+  color: #617086;
+  font-size: 12px;
+}
+
 .topActions {
   display: flex;
   gap: 8px;
@@ -448,6 +454,10 @@ button.primary {
   grid-template-columns: 1fr 330px;
   gap: 16px;
   padding: 0 22px 22px;
+}
+
+.serverPanel {
+  min-height: 520px;
 }
 
 .panel {
@@ -494,25 +504,146 @@ tbody tr {
   background: #eef5ff;
 }
 
-.workflowHint {
-  margin: 188px 12px 12px;
-  padding: 16px;
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.overviewCard {
+  min-height: 112px;
+  padding: 14px;
   border: 1px solid #d4e2f5;
   border-radius: 8px;
   background: #f8fbff;
 }
 
-.workflowHint h3 {
-  margin: 0 0 8px;
+.overviewCard strong,
+.overviewCard span {
+  display: block;
+}
+
+.overviewCard strong {
   color: #1f4d82;
   font-size: 14px;
 }
 
-.workflowHint p {
-  margin: 0;
+.overviewCard span {
+  margin-top: 8px;
   color: #475569;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.sectionView {
+  min-height: 0;
+  display: grid;
+  gap: 16px;
+  padding: 0 22px 22px;
+}
+
+.workflowRail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workflowStep {
+  position: relative;
+  min-height: 142px;
+  padding: 16px;
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.workflowStep > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: #2d5f9f;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workflowStep strong,
+.workflowStep p {
+  display: block;
+}
+
+.workflowStep p {
+  margin: 7px 0 0;
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.workflowBoardGrid,
+.monitorStatus {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.workflowBoardGrid div,
+.monitorTile {
+  min-height: 128px;
+  padding: 14px;
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.workflowBoardGrid strong,
+.workflowBoardGrid span,
+.monitorTile span,
+.monitorTile strong,
+.monitorTile p {
+  display: block;
+}
+
+.workflowBoardGrid span,
+.monitorTile p {
+  margin-top: 8px;
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.monitorTile span {
+  color: #617086;
+  font-size: 12px;
+}
+
+.monitorTile strong {
+  margin-top: 8px;
+  font-size: 20px;
+}
+
+.monitorView {
+  grid-template-rows: auto 1fr;
+}
+
+.logList {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.logList p {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
 }
 
 .details {
@@ -592,6 +723,13 @@ tbody tr {
 }
 
 .compactMode .toolList {
+  grid-template-columns: 1fr;
+}
+
+.compactMode .overviewGrid,
+.compactMode .workflowRail,
+.compactMode .workflowBoardGrid,
+.compactMode .monitorStatus {
   grid-template-columns: 1fr;
 }
 
@@ -817,10 +955,15 @@ tbody tr {
   background: #2dd4bf;
 }
 
+.darkMode .topbar p,
 .darkMode .connectionBadge,
 .darkMode .field div,
 .darkMode .toolItem,
-.darkMode .workflowHint {
+.darkMode .overviewCard,
+.darkMode .workflowStep,
+.darkMode .workflowBoardGrid div,
+.darkMode .monitorTile,
+.darkMode .logList p {
   border-color: #343a42;
   background: #20242b;
   color: #dde1e6;
@@ -836,7 +979,10 @@ tbody tr {
 .darkMode .metric span,
 .darkMode .field span,
 .darkMode .toolItem span,
-.darkMode .workflowHint p,
+.darkMode .overviewCard span,
+.darkMode .workflowStep p,
+.darkMode .workflowBoardGrid span,
+.darkMode .monitorTile p,
 .darkMode .dialogHeader span,
 .darkMode .displayModeOption span,
 .darkMode .emptyState {
@@ -854,7 +1000,9 @@ tbody tr {
   background: #143735;
 }
 
-.darkMode .workflowHint h3,
+.darkMode .overviewCard strong,
+.darkMode .workflowStep strong,
+.darkMode .workflowBoardGrid strong,
 .darkMode .toolItem strong {
   color: #d5f5ef;
 }
