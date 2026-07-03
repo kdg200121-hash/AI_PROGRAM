@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP Registry Scope Options</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f5f7fb;
+      color: #172033;
+    }
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin: 0 0 24px;
+      color: #526071;
+      line-height: 1.5;
+    }
+    .options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .option {
+      border: 1px solid #d7dee9;
+      border-radius: 8px;
+      background: #fff;
+      padding: 18px;
+    }
+    .letter {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #214f8f;
+      color: #fff;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0;
+      line-height: 1.55;
+      color: #3f4b5f;
+    }
+    .flow {
+      border: 1px solid #d7dee9;
+      border-radius: 8px;
+      background: #fff;
+      padding: 18px;
+    }
+    .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .node {
+      min-height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border: 1px dashed #9ca9bc;
+      border-radius: 8px;
+      background: #f9fbfe;
+      color: #26364d;
+      font-weight: 600;
+      line-height: 1.35;
+      padding: 10px;
+    }
+    @media (max-width: 720px) {
+      .flow-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>1차로 만들 범위 선택</h1>
+    <p class="subtitle">Codex/Claude와 CAD/Revit MCP 연결을 저장하고 실행하는 프로그램을 어떤 단위부터 만들지 고르는 단계입니다.</p>
+    <section class="options">
+      <article class="option">
+        <div class="letter">A</div>
+        <h2>MCP 연결 저장소 먼저</h2>
+        <p>CAD/Revit별 MCP 서버 정보, 포트, 실행 명령, 상태를 저장하고 불러오는 로컬 관리 앱부터 만듭니다.</p>
+      </article>
+      <article class="option">
+        <div class="letter">B</div>
+        <h2>Codex/Claude 연결 허브 먼저</h2>
+        <p>Codex와 Claude가 각각 어떤 포트와 MCP 서버를 쓰는지 감지/등록하고, 선택한 대상에 연결하는 허브를 먼저 만듭니다.</p>
+      </article>
+      <article class="option">
+        <div class="letter">C</div>
+        <h2>CAD/Revit 브리지 먼저</h2>
+        <p>AutoCAD와 Revit 쪽 플러그인 또는 브리지 프로세스부터 만들고, 나중에 관리 앱과 Codex/Claude 연결을 얹습니다.</p>
+      </article>
+    </section>
+    <section class="flow">
+      <h2>개념 흐름</h2>
+      <div class="flow-grid">
+        <div class="node">Codex<br>Claude</div>
+        <div class="node">포트/프로필<br>선택</div>
+        <div class="node">MCP Tool Registry<br>서버 정보 저장/실행/상태 확인</div>
+        <div class="node">CAD<br>Revit</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

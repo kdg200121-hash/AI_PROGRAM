@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP Registry Electron App Example</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #eef2f7;
+      color: #162033;
+    }
+    .window {
+      width: min(1180px, calc(100vw - 32px));
+      height: min(720px, calc(100vh - 32px));
+      margin: 16px auto;
+      display: grid;
+      grid-template-columns: 248px 1fr;
+      border: 1px solid #cfd7e3;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(24, 36, 58, .14);
+    }
+    .sidebar {
+      background: #172033;
+      color: #e8edf5;
+      padding: 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .brand {
+      padding: 8px 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, .12);
+    }
+    .brand strong {
+      display: block;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+    .brand span {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      color: #aeb9ca;
+    }
+    .nav {
+      display: grid;
+      gap: 6px;
+    }
+    .nav button {
+      width: 100%;
+      min-height: 38px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #c8d1df;
+      text-align: left;
+      font: inherit;
+      cursor: default;
+    }
+    .nav button.active {
+      background: #2d5f9f;
+      color: #fff;
+    }
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 12px 10px;
+      border-radius: 6px;
+      background: rgba(255,255,255,.07);
+      color: #c8d1df;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .main {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      min-width: 0;
+      background: #f7f9fc;
+    }
+    .titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      height: 64px;
+      padding: 0 22px;
+      background: #fff;
+      border-bottom: 1px solid #dde4ee;
+    }
+    .titlebar h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      height: 36px;
+      padding: 0 13px;
+      border: 1px solid #c7d0dd;
+      border-radius: 6px;
+      background: #fff;
+      color: #26364d;
+      font: inherit;
+    }
+    .btn.primary {
+      border-color: #2d5f9f;
+      background: #2d5f9f;
+      color: #fff;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      padding: 16px 22px;
+    }
+    .metric {
+      min-height: 84px;
+      padding: 14px;
+      border: 1px solid #dde4ee;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .metric span {
+      display: block;
+      font-size: 12px;
+      color: #617086;
+    }
+    .metric strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+    .content {
+      padding: 0 22px 22px;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 16px;
+    }
+    .panel {
+      min-width: 0;
+      border: 1px solid #dde4ee;
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 48px;
+      padding: 0 14px;
+      border-bottom: 1px solid #edf1f6;
+    }
+    .panel-header h2 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #edf1f6;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th {
+      color: #617086;
+      font-weight: 600;
+      background: #fbfcfe;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #e9f0fa;
+      color: #244f87;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #2f6f4f;
+      font-weight: 600;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #35a26b;
+    }
+    .detail {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+    .field label {
+      font-size: 12px;
+      color: #617086;
+    }
+    .field div {
+      min-height: 34px;
+      padding: 8px 10px;
+      border: 1px solid #d9e1ec;
+      border-radius: 6px;
+      background: #f9fbfe;
+      color: #26364d;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 900px) {
+      .window {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .sidebar {
+        display: none;
+      }
+      .summary,
+      .content {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>MCP Registry</strong>
+        <span>Desktop Manager</span>
+      </div>
+      <nav class="nav">
+        <button class="active">MCP Servers</button>
+        <button>Profiles</button>
+        <button>Process Monitor</button>
+        <button>Settings</button>
+      </nav>
+      <div class="sidebar-footer">
+        Local storage: registry.json<br>
+        Future: web dashboard API
+      </div>
+    </aside>
+    <main class="main">
+      <header class="titlebar">
+        <h1>CAD/Revit MCP 연결 저장소</h1>
+        <div class="actions">
+          <button class="btn">상태 새로고침</button>
+          <button class="btn primary">서버 추가</button>
+        </div>
+      </header>
+      <section class="summary">
+        <div class="metric"><span>등록 서버</span><strong>4</strong></div>
+        <div class="metric"><span>실행 중</span><strong>2</strong></div>
+        <div class="metric"><span>Revit</span><strong>2</strong></div>
+        <div class="metric"><span>CAD</span><strong>2</strong></div>
+      </section>
+      <section class="content">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>서버 목록</h2>
+            <button class="btn">필터</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>대상</th>
+                <th>포트</th>
+                <th>상태</th>
+                <th>실행 명령</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Revit MCP Bridge</td>
+                <td><span class="tag">Revit</span></td>
+                <td>5001</td>
+                <td><span class="status"><span class="dot"></span>Running</span></td>
+                <td>revit-mcp-bridge.exe</td>
+              </tr>
+              <tr>
+                <td>AutoCAD MCP Bridge</td>
+                <td><span class="tag">CAD</span></td>
+                <td>5100</td>
+                <td>Stopped</td>
+                <td>acad-mcp-server.exe</td>
+              </tr>
+              <tr>
+                <td>Revit Test Server</td>
+                <td><span class="tag">Revit</span></td>
+                <td>5002</td>
+                <td>Stopped</td>
+                <td>node server.js</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <aside class="panel">
+          <div class="panel-header">
+            <h2>선택 서버 상세</h2>
+          </div>
+          <div class="detail">
+            <div class="field">
+              <label>서버 이름</label>
+              <div>Revit MCP Bridge</div>
+            </div>
+            <div class="field">
+              <label>연결 URL</label>
+              <div>http://localhost:5001/mcp</div>
+            </div>
+            <div class="field">
+              <label>실행 파일</label>
+              <div>C:\Tools\RevitMcpBridge\bridge.exe</div>
+            </div>
+            <div class="field">
+              <label>메모</label>
+              <div>Revit 2025용 기본 MCP 브리지. 추후 Codex/Claude 프로필에서 선택 가능.</div>
+            </div>
+            <button class="btn primary">실행</button>
+            <button class="btn">중지</button>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
