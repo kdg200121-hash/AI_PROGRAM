@@ -17,7 +17,7 @@ export interface WorkflowStep {
 }
 
 export const sidebarSections: SidebarSection[] = [
-  { id: "servers", label: "MCP Servers", shortLabel: "M" },
+  { id: "servers", label: "CAD", shortLabel: "C" },
   { id: "workflow", label: "CAD ↔ Revit", shortLabel: "C" },
   { id: "excel", label: "Excel", shortLabel: "E" },
   { id: "tekla", label: "Tekla", shortLabel: "T" }

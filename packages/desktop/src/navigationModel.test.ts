@@ -10,7 +10,7 @@ describe("navigationModel", () => {
       "tekla"
     ]);
     expect(sidebarSections.map((section) => section.label)).toEqual([
-      "MCP Servers",
+      "CAD",
       "CAD ↔ Revit",
       "Excel",
       "Tekla"

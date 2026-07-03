@@ -30,7 +30,8 @@ button.primary {
   height: 100vh;
   display: grid;
   grid-template-rows: 48px 1fr;
-  grid-template-columns: 248px 1fr;
+  grid-template-columns: var(--sidebar-width, 248px) 1fr;
+  overflow: hidden;
 }
 
 .darkMode {
@@ -43,7 +44,8 @@ button.primary {
 }
 
 .appTabs {
-  grid-column: 1 / -1;
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -53,10 +55,56 @@ button.primary {
   min-width: 0;
 }
 
+.historyControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  margin-right: 22px;
+}
+
+.historyControls button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #7a8797;
+  font-size: 16px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    transform 80ms ease;
+}
+
+.historyControls button:not(:disabled) {
+  color: #2f5f9f;
+}
+
+.historyControls button:not(:disabled):hover,
+.historyControls button:not(:disabled):focus-visible {
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
+.historyControls button:not(:disabled):active {
+  background: rgba(83, 133, 196, 0.24);
+  transform: translateY(1px);
+}
+
+.historyControls button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
 .openTabs {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: 0;
   min-width: 0;
   height: 100%;
   overflow-x: auto;
@@ -84,6 +132,22 @@ button.primary {
   color: #526071;
   font-size: 12px;
   font-weight: 600;
+}
+
+.openTab:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: 12px;
+  width: 1px;
+  height: 18px;
+  background: #c5ccd6;
+  pointer-events: none;
+}
+
+.openTab.active::after,
+.openTab.beforeActive::after {
+  display: none;
 }
 
 .openTab.active {
@@ -174,8 +238,13 @@ button.primary {
 }
 
 .newTabButton {
+  position: relative;
+  align-self: flex-end;
+  display: grid;
+  place-items: center;
   width: 32px;
   min-width: 32px;
+  height: 32px;
   min-height: 32px;
   padding: 0;
   border: 0;
@@ -187,7 +256,7 @@ button.primary {
 
 .tabEndDropZone {
   align-self: stretch;
-  flex: 1 1 28px;
+  flex: 0 0 28px;
   min-width: 28px;
   border-left: 3px solid transparent;
 }
@@ -235,7 +304,7 @@ button.primary {
 }
 
 .topUtility {
-  margin-left: 0;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -282,7 +351,7 @@ button.primary {
 
 .sidebar {
   position: relative;
-  grid-row: 2;
+  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
   background: #172033;
@@ -292,15 +361,59 @@ button.primary {
   transition: width 160ms ease;
 }
 
-.sidebarToggle {
+.newTabButton::before {
+  content: "";
   position: absolute;
+  left: -3px;
   top: 10px;
-  right: 10px;
+  width: 1px;
+  height: 18px;
+  background: #c5ccd6;
+}
+
+.newTabButton.afterActive::before {
+  display: none;
+}
+
+.resizingSidebar {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.sidebarResizeHandle {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.sidebarResizeHandle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+}
+
+.sidebarResizeHandle:hover::after,
+.resizingSidebar .sidebarResizeHandle::after {
+  background: rgba(139, 183, 240, 0.9);
+}
+
+.sidebarToggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
   min-width: 34px;
   min-height: 28px;
-  border: 1px solid rgba(226, 232, 240, 0.48);
+  border: 0;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
   color: #e2e8f0;
   font-size: 20px;
   font-weight: 400;
@@ -308,7 +421,19 @@ button.primary {
 }
 
 .sidebarToggle:hover {
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
+.sidebarToggleCollapsed {
+  display: none;
+}
+
+.sidebarToggleInline {
+  width: 34px;
+  min-width: 34px;
+  min-height: 28px;
+  font-size: 22px;
 }
 
 .sidebarToggleMark {
@@ -316,8 +441,18 @@ button.primary {
   align-items: center;
 }
 
+.sidebarToggleInline .sidebarToggleMark {
+  font-size: inherit;
+  line-height: 1;
+}
+
 .sidebarCollapsed .sidebar {
   padding: 52px 8px 18px;
+}
+
+.sidebarCollapsed .sidebarResizeHandle,
+.compactMode .sidebarResizeHandle {
+  display: none;
 }
 
 .brand {
@@ -326,20 +461,38 @@ button.primary {
   margin-bottom: 14px;
 }
 
+.brandHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
 .brand strong,
-.brand span {
+.brandVersion {
   display: block;
 }
 
-.brand span {
+.brandVersion {
   margin-top: 4px;
   color: #aeb9ca;
   font-size: 12px;
 }
 
+.brandVersion {
+  color: #7f8da2 !important;
+  font-size: 11px !important;
+  font-weight: 600;
+}
+
 .navItem {
+  display: flex;
+  align-items: center;
   width: 100%;
+  min-height: 36px;
   margin-bottom: 0;
+  padding: 0;
   border: 0;
   text-align: left;
   background: transparent;
@@ -356,9 +509,29 @@ button.primary {
   border-radius: 8px;
 }
 
-.navRow.active,
+.navRow:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.navRow:hover .navOrderButton,
+.navRow:hover .navExpandButton,
+.navRow:hover .navItem {
+  color: #fff;
+}
+
+.navRow.active {
+  background: rgba(83, 133, 196, 0.34);
+  color: #fff;
+}
+
+.navRow.active .navOrderButton,
+.navRow.active .navExpandButton,
+.navRow.active .navItem {
+  color: #fff;
+}
+
 .navRow.dragging {
-  background: #2d5f9f;
   color: #fff;
 }
 
@@ -366,9 +539,6 @@ button.primary {
   opacity: 0.95;
 }
 
-.navRow.active .navOrderButton,
-.navRow.active .navExpandButton,
-.navRow.active .navItem,
 .navRow.dragging .navOrderButton,
 .navRow.dragging .navExpandButton,
 .navRow.dragging .navItem {
@@ -423,8 +593,28 @@ button.primary {
   line-height: 1;
 }
 
+.favoriteRow .navExpandButton {
+  font-size: 0;
+}
+.favoriteRow .navExpandButton::after {
+  content: "▼";
+  font-size: 10px;
+}
+
+.favoriteRow .navExpandButton[aria-expanded="true"]::after {
+  content: "▲";
+}
+
 .navRow.expanded {
   background: rgba(45, 95, 159, 0.12);
+}
+
+.submenuList {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0;
+  padding: 6px 8px 8px 34px;
+  background: rgba(45, 95, 159, 0.2);
 }
 
 .navSubPanel {
@@ -433,6 +623,122 @@ button.primary {
   gap: 4px;
   padding: 6px 8px 8px 34px;
   background: rgba(45, 95, 159, 0.2);
+}
+
+.navSubPanel:has(.navAddSubButton) {
+  display: none;
+}
+
+.submenuRow {
+  display: grid;
+  position: relative;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.submenuRow:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+
+.submenuRow:hover .submenuDragButton,
+.submenuRow:hover .submenuButton {
+  background: transparent;
+  color: #fff;
+}
+
+.submenuRow.addRow {
+  grid-template-columns: 1fr;
+}
+
+.submenuRow.addRow .submenuDragButton {
+  display: none;
+}
+
+.submenuRow.addRow .submenuButton {
+  display: grid;
+  place-items: center;
+  color: #dbeafe;
+  font-size: 16px;
+  text-align: center;
+}
+
+.submenuRow.dragging {
+  opacity: 0.95;
+  background: rgba(83, 133, 196, 0.28);
+  border-radius: 6px;
+}
+
+.navRow:has(.submenuRow.dragging)::before,
+.navRow:has(.submenuRow.dragging)::after {
+  display: none;
+}
+
+.submenuRow.dropBefore::before,
+.submenuRow.dropAfter::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: #8bb7f0;
+  pointer-events: none;
+}
+
+.submenuRow.dropBefore::before {
+  top: -3px;
+}
+
+.submenuRow.dropAfter::after {
+  bottom: -3px;
+}
+
+.submenuDragButton,
+.submenuButton {
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+}
+
+.submenuDragButton {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #8d9aab;
+  cursor: grab;
+}
+
+.submenuDragButton span {
+  display: block;
+  width: 12px;
+  height: 12px;
+  background:
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 0 0 / 6px 6px,
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 6px 0 / 6px 6px,
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 0 6px / 6px 6px,
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 6px 6px / 6px 6px;
+  font-size: 0;
+  line-height: 0;
+}
+
+.submenuButton {
+  padding: 0 8px;
+  color: #b8c4d6;
+  text-align: left;
+  font-size: 12px;
+}
+
+.submenuRow.active {
+  background: rgba(83, 133, 196, 0.34);
+  border-radius: 6px;
+}
+
+.submenuRow.active .submenuDragButton,
+.submenuRow.active .submenuButton {
+  background: transparent;
+  color: #fff;
 }
 
 .navSubPanel button {
@@ -476,17 +782,170 @@ button.primary {
   color: #e0e7f1;
 }
 
+.favoriteSubmenuButton,
+.recentSubmenuButton {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 28px;
+  margin-bottom: 5px;
+  padding: 0 8px 0 0;
+  border: 0;
+  background: transparent;
+  color: #c8d1df;
+  text-align: left;
+  font-size: 13px;
+}
+
+.favoriteSubmenuButton {
+  grid-template-columns: 30px minmax(0, 1fr) 22px;
+  min-height: 36px;
+  margin-bottom: 6px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.favoriteSubmenuButton .navFull {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0;
+  color: #e0e7f1;
+  font: inherit;
+}
+
+.favoriteSubmenuButton .submenuMiniIcon {
+  width: 12px;
+  height: 12px;
+  justify-self: center;
+  margin: 0;
+}
+
+.recentSubmenuButton {
+  grid-template-columns: minmax(0, 1fr);
+  width: calc(100% - 14px);
+  margin-left: 14px;
+  padding: 0 10px;
+}
+
+.favoriteSubmenuButton:hover,
+.recentSubmenuButton:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.favoriteSubmenuButton .navFull,
+.recentSubmenuButton .navFull {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentSubmenuGroup {
+  margin-top: auto;
+  margin-bottom: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(226, 232, 240, 0.14);
+}
+
+.recentSubmenuHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 2px 10px 7px;
+}
+
+.recentSubmenuHeader .sidebarLabel {
+  margin: 0;
+}
+
+.recentClearButton {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #c8d1df;
+}
+
+.recentClearButton:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+
+.recentClearButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.recentClearButton span,
+.recentClearButton::before,
+.recentClearButton::after {
+  content: "";
+  display: block;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.recentClearButton span {
+  width: 11px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-top: 0;
+  background: transparent;
+}
+
+.recentClearButton::before {
+  position: absolute;
+  top: 6px;
+  width: 13px;
+  height: 2px;
+  background: currentColor;
+}
+
+.recentClearButton::after {
+  position: absolute;
+  top: 4px;
+  width: 7px;
+  height: 2px;
+  background: currentColor;
+}
+
+.favoriteSubmenuButton.active,
+.recentSubmenuButton.active {
+  background: rgba(83, 133, 196, 0.34);
+  color: #fff;
+}
+
+.submenuMiniIcon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: 0 auto;
+  color: #8d9aab;
+  background:
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 0 0 / 6px 6px,
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 6px 0 / 6px 6px,
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 0 6px / 6px 6px,
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 6px 6px / 6px 6px;
+}
+
 .navShort {
   display: none;
 }
 
 .navItem.active {
-  background: #2d5f9f;
-  color: #fff;
-}
-
-.navRow.active .navItem.active {
   background: transparent;
+  color: #fff;
 }
 
 .sidebarMonitorButton,
@@ -503,6 +962,10 @@ button.primary {
   position: relative;
   margin-top: auto;
   margin-bottom: 6px;
+}
+
+.recentSubmenuGroup + .sidebarMonitorButton {
+  margin-top: 0;
 }
 
 .sidebarMonitorButton::before {
@@ -535,12 +998,24 @@ button.primary {
 }
 
 .sidebarMonitorButton.active {
-  border-color: #2d5f9f;
-  background: #2d5f9f;
+  border-color: rgba(83, 133, 196, 0.62);
+  background: rgba(83, 133, 196, 0.42);
   color: #fff;
 }
 
 .sidebarCollapsed .brand {
+  display: none;
+}
+
+.sidebarCollapsed .sidebarToggleCollapsed {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  display: grid;
+  transform: translateX(-50%);
+}
+
+.sidebarCollapsed .favoriteGroup .sidebarLabel {
   display: none;
 }
 
@@ -556,9 +1031,23 @@ button.primary {
   grid-template-columns: 1fr;
 }
 
+.sidebarCollapsed .favoriteSubmenuButton {
+  grid-template-columns: 1fr;
+  place-items: center;
+  min-height: 40px;
+  margin: 0 0 5px;
+  padding: 0;
+}
+
+.sidebarCollapsed .favoriteSubmenuButton .submenuMiniIcon {
+  justify-self: center;
+  margin: 0;
+}
+
 .sidebarCollapsed .navOrderButton,
 .sidebarCollapsed .navExpandButton,
-.sidebarCollapsed .navSubPanel {
+.sidebarCollapsed .navSubPanel,
+.sidebarCollapsed .submenuList {
   display: none;
 }
 
@@ -579,10 +1068,12 @@ button.primary {
 }
 
 .main {
+  grid-column: 2;
   grid-row: 2;
   display: grid;
-  grid-template-rows: 64px auto 1fr;
+  grid-template-rows: 56px auto minmax(0, 1fr);
   min-width: 0;
+  overflow: hidden;
 }
 
 .compactMode {
@@ -591,12 +1082,18 @@ button.primary {
 }
 
 .compactMode .sidebar {
+  grid-row: 1 / -1;
   display: flex;
   padding: 52px 8px 14px;
 }
 
+.compactMode .appTabs {
+  grid-column: 2;
+}
+
 .compactMode .main {
   grid-column: 2;
+  grid-row: 2;
   grid-template-rows: auto 1fr;
   overflow: hidden;
 }
@@ -606,7 +1103,8 @@ button.primary {
 .compactMode .navFull,
 .compactMode .navOrderButton,
 .compactMode .navExpandButton,
-.compactMode .navSubPanel {
+.compactMode .navSubPanel,
+.compactMode .submenuList {
   display: none;
 }
 
@@ -640,6 +1138,7 @@ button.primary {
 }
 
 .compactMode .topbar {
+  position: relative;
   height: auto;
   min-height: 0;
   align-items: flex-start;
@@ -647,6 +1146,13 @@ button.primary {
   justify-content: center;
   gap: 8px;
   padding: 10px 14px;
+}
+
+.compactMode .historyControls {
+  position: absolute;
+  top: 18px;
+  right: 28px;
+  margin-right: 0;
 }
 
 .compactMode .topbar h1 {
@@ -663,8 +1169,9 @@ button.primary {
 }
 
 .compactMode .openTabs {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: calc(100% - 104px);
 }
 
 .compactMode .openTab {
@@ -692,8 +1199,7 @@ button.primary {
 }
 
 .compactMode .tabEndDropZone {
-  flex-basis: 12px;
-  min-width: 12px;
+  display: none;
 }
 
 .compactMode .workspaceTabsInner {
@@ -749,14 +1255,14 @@ button.primary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 22px;
+  padding: 0 18px;
   background: #fff;
   border-bottom: 1px solid #dde4ee;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .topbar p {
@@ -768,8 +1274,8 @@ button.primary {
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  padding: 16px 22px;
+  gap: 10px;
+  padding: 10px 18px;
 }
 
 .metric,
@@ -780,7 +1286,7 @@ button.primary {
 }
 
 .metric {
-  padding: 14px;
+  padding: 10px 12px;
 }
 
 .metric span {
@@ -791,20 +1297,22 @@ button.primary {
 
 .metric strong {
   display: block;
-  margin-top: 8px;
-  font-size: 24px;
+  margin-top: 4px;
+  font-size: 20px;
 }
 
 .contentGrid {
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 330px;
-  gap: 16px;
-  padding: 0 22px 22px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 0 18px 16px;
+  overflow: hidden;
 }
 
 .serverPanel {
-  min-height: 520px;
+  min-height: 0;
 }
 
 .panel {
@@ -812,7 +1320,7 @@ button.primary {
 }
 
 .panelHeader {
-  min-height: 48px;
+  min-height: 42px;
   display: flex;
   align-items: center;
   padding: 0 14px;
@@ -831,7 +1339,7 @@ table {
 
 th,
 td {
-  padding: 12px 14px;
+  padding: 9px 12px;
   border-bottom: 1px solid #edf1f6;
   text-align: left;
   white-space: nowrap;
@@ -854,13 +1362,13 @@ tbody tr {
 .overviewGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .overviewCard {
-  min-height: 112px;
-  padding: 14px;
+  min-height: 88px;
+  padding: 11px;
   border: 1px solid #d4e2f5;
   border-radius: 8px;
   background: #f8fbff;
@@ -995,8 +1503,8 @@ tbody tr {
 
 .details {
   display: grid;
-  gap: 14px;
-  padding: 16px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .field {
@@ -1019,7 +1527,7 @@ tbody tr {
 }
 
 .field .multilineValue {
-  min-height: 64px;
+  min-height: 52px;
   line-height: 1.45;
 }
 
@@ -1036,13 +1544,13 @@ tbody tr {
 .toolList {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .toolItem {
-  min-height: 78px;
-  padding: 13px;
+  min-height: 62px;
+  padding: 10px;
   border: 1px solid #dde4ee;
   border-radius: 8px;
   background: #f8fafc;
@@ -1321,10 +1829,18 @@ tbody tr {
   grid-template-columns: 1fr;
 }
 
+.compactMode .dialogBody {
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: min(480px, calc(100vh - 72px));
+}
+
 .compactMode .dialogNav {
   display: flex;
+  align-self: start;
+  align-items: center;
   gap: 6px;
   overflow-x: auto;
+  padding: 10px 12px;
   border-right: 0;
   border-bottom: 1px solid #edf1f6;
 }
@@ -1332,7 +1848,18 @@ tbody tr {
 .compactMode .dialogNavItem {
   flex: 0 0 auto;
   width: auto;
+  min-height: 34px;
+  padding: 0 12px;
   margin-bottom: 0;
+}
+
+.compactMode .dialogContent {
+  min-height: 0;
+}
+
+.compactMode .displayModePanel {
+  width: 100%;
+  max-width: none;
 }
 
 .compactMode .dialogSummary,
@@ -1347,51 +1874,152 @@ tbody tr {
 .darkMode .metric,
 .darkMode .registryDialog,
 .darkMode .dialogPanel {
-  border-color: #2a2f36;
-  background: #181b20;
-  color: #e6e7e9;
+  border-color: #2c3442;
+  background: #171c24;
+  color: #e8edf5;
 }
 
 .darkMode .main,
 .darkMode .dialogContent {
-  background: #101214;
+  background: #0f131a;
 }
 
 .darkMode .sidebar {
-  background: #13171d;
-  color: #e6e7e9;
+  background: #151a23;
+  color: #e8edf5;
 }
 
 .darkMode button {
-  border-color: #343a42;
-  background: #20242b;
-  color: #e6e7e9;
+  border-color: #343d4d;
+  background: #202631;
+  color: #e8edf5;
+}
+
+.darkMode .sidebar button,
+.darkMode .navItem,
+.darkMode .navOrderButton,
+.darkMode .navExpandButton,
+.darkMode .submenuDragButton,
+.darkMode .submenuButton,
+.darkMode .favoriteSubmenuButton,
+.darkMode .recentSubmenuButton,
+.darkMode .sidebarToggle {
+  border-color: transparent;
+  background: transparent;
 }
 
 .darkMode button.primary {
-  border-color: #0f766e;
-  background: #0f766e;
+  border-color: #3f6fba;
+  background: #3f6fba;
   color: #fff;
 }
 
-.darkMode .workspaceTab {
-  color: #a7adb6;
+.darkMode .navRow:hover,
+.darkMode .favoriteSubmenuButton:hover,
+.darkMode .recentSubmenuButton:hover {
+  background: #202838;
+}
+
+.darkMode .navRow.active,
+.darkMode .favoriteSubmenuButton.active,
+.darkMode .recentSubmenuButton.active,
+.darkMode .submenuRow.active {
+  background: #2b3850;
+  color: #fff;
+}
+
+.darkMode .navRow.active .navItem,
+.darkMode .navRow.active .navOrderButton,
+.darkMode .navRow.active .navExpandButton,
+.darkMode .submenuRow.active .submenuButton,
+.darkMode .submenuRow.active .submenuDragButton,
+.darkMode .favoriteSubmenuButton.active .navFull {
+  color: #fff;
+}
+
+.darkMode .navRow.expanded {
+  background: #1d2533;
+}
+
+.darkMode .submenuList,
+.darkMode .navSubPanel {
+  background: #1a212e;
+}
+
+.darkMode .submenuRow:hover {
+  background: #242d3e;
+}
+
+.darkMode .navItem,
+.darkMode .navItem.favorite,
+.darkMode .favoriteSubmenuButton .navFull {
+  color: #dce5f3;
+}
+
+.darkMode .navOrderButton,
+.darkMode .navExpandButton,
+.darkMode .submenuDragButton,
+.darkMode .submenuMiniIcon,
+.darkMode .recentClearButton {
+  color: #9aa7ba;
+}
+
+.darkMode .sidebarLabel,
+.darkMode .brandVersion {
+  color: #8d9aaf !important;
+}
+
+.darkMode .brand {
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+.darkMode .favoriteGroup,
+.darkMode .recentSubmenuGroup,
+.darkMode .sidebarMonitorButton::before {
+  border-color: rgba(148, 163, 184, 0.16);
+  background-color: transparent;
 }
 
 .darkMode .openTab {
-  color: #a7adb6;
+  color: #aab5c5;
 }
 
-.darkMode .openTab.active,
+.darkMode .openTab:not(:last-child)::after,
+.darkMode .newTabButton::before {
+  background: #3a4353;
+}
+
+.darkMode .openTab.active {
+  border-color: #3b4658;
+  background: #222b39;
+  color: #f4f7fb;
+}
+
+.darkMode .newTabButton,
+.darkMode .historyControls button {
+  color: #9aa7ba;
+}
+
+.darkMode .newTabButton:hover,
+.darkMode .historyControls button:not(:disabled):hover,
+.darkMode .historyControls button:not(:disabled):focus-visible {
+  background: #202838;
+  color: #f4f7fb;
+}
+
+.darkMode .workspaceTab {
+  color: #aab5c5;
+}
+
 .darkMode .workspaceTab.active,
 .darkMode .dialogNavItem.active,
 .darkMode .displayModeOption.active {
-  background: #143735;
-  color: #d5f5ef;
+  background: #243049;
+  color: #f4f7fb;
 }
 
 .darkMode .workspaceTab.active::after {
-  background: #2dd4bf;
+  background: #7aa7e8;
 }
 
 .darkMode .topbar p,

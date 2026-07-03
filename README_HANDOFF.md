@@ -64,7 +64,8 @@ logs
 
 ## 현재 주의점
 
-- 기존 `README.md`는 한글이 깨져 보이는 상태입니다. 필요하면 별도 작업으로 UTF-8 기준 문장으로 다시 정리하세요.
+- `README.md`는 UTF-8 기준 한글 문장으로 다시 정리했습니다.
+- 앱 소스(`packages/desktop/src`)의 깨진 한글 UI 문자열은 복구했습니다. 남은 영어 고유명은 `CAD`, `Revit`, `MCP` 등 제품/기술 용어 위주입니다.
 - `node_modules` 안에 100MB 이상 Electron 실행 파일이 있으나 Git 제외 대상입니다.
 - Codex 채팅 기록은 GitHub로 넘어가지 않습니다. 중요한 내용은 `WORK_LOG.md`, `TODO.md`, `README_HANDOFF.md`에 남겨야 합니다.
 

@@ -17,6 +17,8 @@ describe("tabModel", () => {
     expect(tab.title).toBe("새 탭");
     expect(tab.sectionId).toBe("servers");
     expect(tab.workspaceTabId).toBe("cad");
+    expect(tab.sidebarSource).toBe("menu");
+    expect(tab.submenuKey).toBeNull();
   });
 
   it("opens a sidebar section in a new tab", () => {
@@ -25,6 +27,8 @@ describe("tabModel", () => {
     expect(tab.title).toBe("CAD ↔ Revit");
     expect(tab.sectionId).toBe("workflow");
     expect(tab.workspaceTabId).toBe("revit");
+    expect(tab.sidebarSource).toBe("menu");
+    expect(tab.submenuKey).toBeNull();
   });
 
   it("duplicates and pins tabs", () => {

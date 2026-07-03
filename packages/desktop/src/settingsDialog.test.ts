@@ -9,6 +9,6 @@ describe("settingsSections", () => {
 
   it("offers normal mode and dark mode as display modes", () => {
     expect(colorModeOptions.map((option) => option.id)).toEqual(["light", "dark"]);
-    expect(colorModeOptions.map((option) => option.label)).toEqual(["일반모드", "다크모드"]);
+    expect(colorModeOptions.map((option) => option.label)).toEqual(["일반 모드", "다크 모드"]);
   });
 });

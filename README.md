@@ -1,41 +1,52 @@
 # MCP Registry Desktop
 
-CAD와 Revit의 MCP 연결 정보를 한 곳에서 관리하는 Windows 데스크톱 앱입니다.
+CAD와 Revit의 MCP 연결 정보를 한곳에서 관리하기 위한 Windows 데스크톱 앱입니다.
 
-## 첫 버전에서 되는 일
+현재 버전은 실제 CAD/Revit 자동화 실행보다, 연결 정보를 등록하고 상태를 확인할 수 있는 기반을 마련하는 데 초점을 둡니다.
 
-- CAD 연결 정보를 보여줍니다.
-- Revit 연결 정보를 보여줍니다.
-- 연결 목록에서 항목을 선택하면 상세 정보를 보여줍니다.
-- CAD에서 정보를 읽어 Revit에서 실행하는 기능을 나중에 붙일 수 있는 자리를 제공합니다.
+## 현재 기능
+
+- CAD MCP 연결 정보 표시
+- Revit MCP 연결 정보 표시
+- MCP 서버 목록과 선택한 서버 상세 정보 표시
+- CAD/Revit/Workflow 관점의 작업 탭 제공
+- Process Monitor, Excel, Tekla 확장 영역의 기본 화면 제공
+- 개발용 연결 목록을 `data/registry.json`에 저장
 
 ## 실행
 
-```bash
+```powershell
 pnpm install
 pnpm dev
 ```
 
-개발 화면은 기본적으로 아래 주소에서 열립니다.
+개발 서버 기본 주소는 다음과 같습니다.
 
 ```text
 http://127.0.0.1:5173/
 ```
 
-## 테스트
+## 확인 명령
 
-```bash
+```powershell
 pnpm test
 pnpm typecheck
 pnpm build
 ```
 
-## 저장 위치
+## 프로젝트 구조
 
-개발 중에는 `data/registry.json`을 사용합니다.
-실사용 버전에서는 Windows 사용자 앱 데이터 폴더로 옮길 예정입니다.
+```text
+packages/shared   공통 타입 정의
+packages/core     MCP 연결 저장, 검증, 상태 확인 로직
+packages/desktop  Electron + React 데스크톱 화면
+data              개발용 registry JSON 데이터
+docs              설계 및 구현 계획 문서
+```
 
-## 현재 단계
+## 다음 단계
 
-현재는 첫 화면과 핵심 저장/검증/포트 상태 확인 로직이 준비된 상태입니다.
-다음 단계에서는 실제 추가/수정/삭제 버튼 동작과 CAD/Revit 연결 실행 기능을 붙입니다.
+- 앱 화면에 남아 있는 깨진 한글 문자열 복구
+- 서버 추가, 수정, 삭제 버튼의 실제 동작 연결
+- CAD/Revit MCP bridge 실행, 중지, 상태 새로고침 기능 연결
+- 실제 사용자 환경에서는 registry 저장 위치를 Windows 사용자 데이터 폴더로 이동

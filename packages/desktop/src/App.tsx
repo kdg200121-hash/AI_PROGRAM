@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DragEvent, MouseEvent } from "react";
+import type { CSSProperties, DragEvent, MouseEvent, PointerEvent } from "react";
 import type { McpServerRecord, RegistryFile } from "@mcp-registry/shared";
 import { getConnectionSummary } from "./connectionSummary";
 import { getToolsForWorkspace } from "./mcpToolCatalog";
@@ -24,6 +24,7 @@ import {
   moveTab,
   moveTabToEnd,
   togglePinnedTab,
+  type TabSidebarSource,
   type TabDropPosition,
   type AppTab
 } from "./tabModel";
@@ -36,12 +37,44 @@ import {
 
 const pinnedTabsStorageKey = "mcp-registry:pinned-tabs";
 const favoriteSectionsStorageKey = "mcp-registry:favorite-sections";
+const favoriteSubmenusStorageKey = "mcp-registry:favorite-submenus";
+const recentSubmenusStorageKey = "mcp-registry:recent-submenus";
 const sidebarOrderStorageKey = "mcp-registry:sidebar-order";
+const submenuOrderStorageKey = "mcp-registry:submenu-order";
+const sidebarWidthStorageKey = "mcp-registry:sidebar-width";
+const minSidebarWidth = 212;
+const maxSidebarWidth = 360;
 let tabCounter = 0;
+
+type SubmenuId = "tools" | "settings" | "add";
+type SubmenuKey = `${SidebarSectionId}:${SubmenuId}`;
+
+const defaultSubmenuItems: Array<{ id: SubmenuId; label: string }> = [
+  { id: "tools", label: "도구 목록" },
+  { id: "settings", label: "연결 설정" },
+  { id: "add", label: "추가" }
+];
 
 type ContextMenuState =
   | { type: "section"; sectionId: SidebarSectionId; x: number; y: number }
+  | {
+      type: "submenu";
+      sectionId: SidebarSectionId;
+      submenuId: SubmenuId;
+      source?: "recent";
+      x: number;
+      y: number;
+    }
   | { type: "tab"; tabId: string; x: number; y: number };
+
+type SidebarSource = TabSidebarSource;
+
+interface NavigationState {
+  sectionId: SidebarSectionId;
+  title: string;
+  source: SidebarSource;
+  submenuKey: SubmenuKey | null;
+}
 
 function nextTabId() {
   tabCounter += 1;
@@ -67,6 +100,44 @@ function loadFavoriteSections(): SidebarSectionId[] {
   }
 }
 
+function isSubmenuId(value: string): value is SubmenuId {
+  return defaultSubmenuItems.some((item) => item.id === value);
+}
+
+function parseSubmenuKey(key: SubmenuKey) {
+  const [sectionId, submenuId] = key.split(":") as [SidebarSectionId, SubmenuId];
+  return { sectionId, submenuId };
+}
+
+function makeSubmenuKey(sectionId: SidebarSectionId, submenuId: SubmenuId): SubmenuKey {
+  return `${sectionId}:${submenuId}`;
+}
+
+function isValidSubmenuKey(value: string): value is SubmenuKey {
+  const [sectionId, submenuId] = value.split(":");
+  return sidebarSections.some((section) => section.id === sectionId) && isSubmenuId(submenuId);
+}
+
+function loadFavoriteSubmenus(): SubmenuKey[] {
+  try {
+    const raw = window.localStorage.getItem(favoriteSubmenusStorageKey);
+    const keys = raw ? (JSON.parse(raw) as string[]) : [];
+    return keys.filter(isValidSubmenuKey);
+  } catch {
+    return [];
+  }
+}
+
+function loadRecentSubmenus(): SubmenuKey[] {
+  try {
+    const raw = window.localStorage.getItem(recentSubmenusStorageKey);
+    const keys = raw ? (JSON.parse(raw) as string[]) : [];
+    return keys.filter(isValidSubmenuKey).slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
 function loadSidebarOrder(): SidebarSectionId[] {
   try {
     const raw = window.localStorage.getItem(sidebarOrderStorageKey);
@@ -78,6 +149,31 @@ function loadSidebarOrder(): SidebarSectionId[] {
     ];
   } catch {
     return sidebarSections.map((section) => section.id);
+  }
+}
+
+function loadSubmenuOrder(): Partial<Record<SidebarSectionId, SubmenuId[]>> {
+  try {
+    const raw = window.localStorage.getItem(submenuOrderStorageKey);
+    const savedOrder = raw ? (JSON.parse(raw) as Partial<Record<SidebarSectionId, SubmenuId[]>>) : {};
+    return Object.fromEntries(
+      sidebarSections.map((section) => [
+        section.id,
+        (savedOrder[section.id] ?? []).filter((id) => isSubmenuId(id) && id !== "add")
+      ])
+    ) as Partial<Record<SidebarSectionId, SubmenuId[]>>;
+  } catch {
+    return {};
+  }
+}
+
+function loadSidebarWidth() {
+  try {
+    const raw = window.localStorage.getItem(sidebarWidthStorageKey);
+    const width = raw ? Number(raw) : 248;
+    return Math.min(maxSidebarWidth, Math.max(minSidebarWidth, width));
+  } catch {
+    return 248;
   }
 }
 
@@ -108,6 +204,10 @@ function tabSubmenuLabel(tab: AppTab) {
 
   if (tab.workspaceTabId === "registry" && tab.sectionId === "servers") {
     return "MCP 서버";
+  }
+
+  if (tab.title !== sidebarLabel(tab.sectionId)) {
+    return tab.title;
   }
 
   return defaultSubmenuLabel(tab.sectionId);
@@ -146,7 +246,7 @@ const fallbackRegistry: RegistryFile = {
   servers: [
     {
       id: "revit-default",
-      name: "Revit MCP Bridge",
+      name: "Revit MCP 브리지",
       target: "revit",
       connectionType: "http",
       url: "http://localhost:5001/mcp",
@@ -161,7 +261,7 @@ const fallbackRegistry: RegistryFile = {
     },
     {
       id: "cad-default",
-      name: "AutoCAD MCP Bridge",
+      name: "AutoCAD MCP 브리지",
       target: "cad",
       connectionType: "http",
       url: "http://localhost:5100/mcp",
@@ -192,10 +292,37 @@ export function App() {
   const [favoriteSectionIds, setFavoriteSectionIds] = useState<SidebarSectionId[]>(() =>
     loadFavoriteSections()
   );
+  const [favoriteSubmenuKeys, setFavoriteSubmenuKeys] = useState<SubmenuKey[]>(() =>
+    loadFavoriteSubmenus()
+  );
+  const [recentSubmenuKeys, setRecentSubmenuKeys] = useState<SubmenuKey[]>(() =>
+    loadRecentSubmenus()
+  );
   const [sidebarOrder, setSidebarOrder] = useState<SidebarSectionId[]>(() => loadSidebarOrder());
+  const [submenuOrder, setSubmenuOrder] = useState<Partial<Record<SidebarSectionId, SubmenuId[]>>>(
+    () => loadSubmenuOrder()
+  );
   const [draggedSectionId, setDraggedSectionId] = useState<SidebarSectionId | null>(null);
   const [expandedSectionIds, setExpandedSectionIds] = useState<SidebarSectionId[]>([]);
+  const [expandedFavoriteSectionIds, setExpandedFavoriteSectionIds] = useState<SidebarSectionId[]>(
+    []
+  );
+  const [activeSidebarSource, setActiveSidebarSource] = useState<SidebarSource>("menu");
+  const [activeSubmenuKey, setActiveSubmenuKey] = useState<SubmenuKey | null>(null);
+  const [backHistory, setBackHistory] = useState<NavigationState[]>([]);
+  const [forwardHistory, setForwardHistory] = useState<NavigationState[]>([]);
+  const [draggedSubmenu, setDraggedSubmenu] = useState<{
+    sectionId: SidebarSectionId;
+    submenuId: SubmenuId;
+  } | null>(null);
+  const [dragOverSubmenu, setDragOverSubmenu] = useState<{
+    sectionId: SidebarSectionId;
+    submenuId: SubmenuId;
+    position: TabDropPosition;
+  } | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(() => loadSidebarWidth());
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTab, setDragOverTab] = useState<{
     id: string;
@@ -212,6 +339,16 @@ export function App() {
   const activeSidebarSection = activeOpenTab.sectionId;
 
   useEffect(() => {
+    const source = activeOpenTab.sidebarSource ?? "menu";
+    const submenuKey =
+      activeOpenTab.submenuKey && isValidSubmenuKey(activeOpenTab.submenuKey)
+        ? activeOpenTab.submenuKey
+        : null;
+    setActiveSidebarSource(source);
+    setActiveSubmenuKey(submenuKey);
+  }, [activeOpenTab.id, activeOpenTab.sidebarSource, activeOpenTab.submenuKey]);
+
+  useEffect(() => {
     window.localStorage.setItem(pinnedTabsStorageKey, JSON.stringify(getPinnedTabs(openTabs)));
   }, [openTabs]);
 
@@ -220,8 +357,51 @@ export function App() {
   }, [favoriteSectionIds]);
 
   useEffect(() => {
+    window.localStorage.setItem(favoriteSubmenusStorageKey, JSON.stringify(favoriteSubmenuKeys));
+  }, [favoriteSubmenuKeys]);
+
+  useEffect(() => {
+    window.localStorage.setItem(recentSubmenusStorageKey, JSON.stringify(recentSubmenuKeys));
+  }, [recentSubmenuKeys]);
+
+  useEffect(() => {
     window.localStorage.setItem(sidebarOrderStorageKey, JSON.stringify(sidebarOrder));
   }, [sidebarOrder]);
+
+  useEffect(() => {
+    window.localStorage.setItem(submenuOrderStorageKey, JSON.stringify(submenuOrder));
+  }, [submenuOrder]);
+
+  useEffect(() => {
+    window.localStorage.setItem(sidebarWidthStorageKey, String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    const handleKeyboardShortcut = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (contextMenu || isRegistryDialogOpen || isMonitorDialogOpen) {
+          event.preventDefault();
+          setContextMenu(null);
+          setIsRegistryDialogOpen(false);
+          setIsMonitorDialogOpen(false);
+        }
+        return;
+      }
+
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        window.localStorage.setItem(sidebarOrderStorageKey, JSON.stringify(sidebarOrder));
+        window.localStorage.setItem(submenuOrderStorageKey, JSON.stringify(submenuOrder));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyboardShortcut);
+    return () => window.removeEventListener("keydown", handleKeyboardShortcut);
+  }, [contextMenu, isMonitorDialogOpen, isRegistryDialogOpen, sidebarOrder, submenuOrder]);
 
   useEffect(() => {
     const closeContextMenu = () => setContextMenu(null);
@@ -291,18 +471,146 @@ export function App() {
     );
   };
 
+  const getCurrentNavigationState = (): NavigationState => ({
+    sectionId: activeSidebarSection,
+    title: activeOpenTab.title,
+    source: activeOpenTab.sidebarSource ?? activeSidebarSource,
+    submenuKey:
+      activeOpenTab.submenuKey && isValidSubmenuKey(activeOpenTab.submenuKey)
+        ? activeOpenTab.submenuKey
+        : activeSubmenuKey
+  });
+
+  const applyNavigationState = (state: NavigationState) => {
+    setActiveSidebarSource(state.source);
+    setActiveSubmenuKey(state.submenuKey);
+    updateActiveOpenTab({
+      sectionId: state.sectionId,
+      title: state.title,
+      sidebarSource: state.source,
+      submenuKey: state.submenuKey
+    });
+  };
+
+  const isSameNavigationState = (left: NavigationState, right: NavigationState) =>
+    left.sectionId === right.sectionId &&
+    left.title === right.title &&
+    left.source === right.source &&
+    left.submenuKey === right.submenuKey;
+
+  const navigateInCurrentTab = (nextState: NavigationState) => {
+    const currentState = getCurrentNavigationState();
+    if (isSameNavigationState(currentState, nextState)) {
+      return;
+    }
+
+    setBackHistory((history) => [...history, currentState]);
+    setForwardHistory([]);
+    applyNavigationState(nextState);
+  };
+
+  const goBack = () => {
+    setBackHistory((history) => {
+      const previous = history.at(-1);
+      if (!previous) {
+        return history;
+      }
+
+      setForwardHistory((items) => [getCurrentNavigationState(), ...items]);
+      applyNavigationState(previous);
+      return history.slice(0, -1);
+    });
+  };
+
+  const goForward = () => {
+    setForwardHistory((history) => {
+      const next = history[0];
+      if (!next) {
+        return history;
+      }
+
+      setBackHistory((items) => [...items, getCurrentNavigationState()]);
+      applyNavigationState(next);
+      return history.slice(1);
+    });
+  };
+
   const openBlankTab = () => {
     const tab = createBlankTab(nextTabId());
     setOpenTabs((tabs) => [...tabs, tab]);
     setActiveOpenTabId(tab.id);
   };
 
-  const openSectionInCurrentTab = (sectionId: SidebarSectionId) => {
-    updateActiveOpenTab({ sectionId, title: sidebarLabel(sectionId) });
+  const openSectionInCurrentTab = (
+    sectionId: SidebarSectionId,
+    source: "menu" | "favorite" = "menu"
+  ) => {
+    navigateInCurrentTab({
+      sectionId,
+      title: sidebarLabel(sectionId),
+      source,
+      submenuKey: null
+    });
+  };
+
+  const getSubmenuLabel = (submenuId: SubmenuId) =>
+    defaultSubmenuItems.find((item) => item.id === submenuId)?.label ?? "";
+
+  const getOrderedSubmenuItems = (sectionId: SidebarSectionId) => {
+    const savedOrder = submenuOrder[sectionId] ?? [];
+    const orderedIds = [
+      ...savedOrder.filter((id) => id !== "add"),
+      ...defaultSubmenuItems
+        .map((item) => item.id)
+        .filter((id) => id !== "add" && !savedOrder.includes(id)),
+      "add" as SubmenuId
+    ];
+
+    return orderedIds.map((id) => ({ id, label: getSubmenuLabel(id) }));
+  };
+
+  const rememberRecentSubmenu = (sectionId: SidebarSectionId, submenuId: SubmenuId) => {
+    if (submenuId === "add") {
+      return;
+    }
+
+    const key = makeSubmenuKey(sectionId, submenuId);
+    setRecentSubmenuKeys((keys) => [key, ...keys.filter((item) => item !== key)].slice(0, 5));
+  };
+
+  const openSubmenu = (
+    sectionId: SidebarSectionId,
+    submenuId: SubmenuId,
+    source: "submenu" | "favoriteSubmenu" | "recent" = "submenu"
+  ) => {
+    if (submenuId === "add") {
+      return;
+    }
+
+    const key = makeSubmenuKey(sectionId, submenuId);
+    rememberRecentSubmenu(sectionId, submenuId);
+    navigateInCurrentTab({
+      sectionId,
+      title: getSubmenuLabel(submenuId),
+      source,
+      submenuKey: key
+    });
   };
 
   const openSectionInNewTab = (sectionId: SidebarSectionId) => {
     const tab = createSectionTab(nextTabId(), sectionId, activeTab);
+    setOpenTabs((tabs) => [...tabs, tab]);
+    setActiveOpenTabId(tab.id);
+  };
+
+  const openSubmenuInNewTab = (sectionId: SidebarSectionId, submenuId: SubmenuId) => {
+    const key = makeSubmenuKey(sectionId, submenuId);
+    const tab = {
+      ...createSectionTab(nextTabId(), sectionId, activeTab),
+      title: getSubmenuLabel(submenuId),
+      sidebarSource: "submenu" as const,
+      submenuKey: key
+    };
     setOpenTabs((tabs) => [...tabs, tab]);
     setActiveOpenTabId(tab.id);
   };
@@ -355,10 +663,57 @@ export function App() {
     );
   };
 
+  const toggleFavoriteSubmenu = (sectionId: SidebarSectionId, submenuId: SubmenuId) => {
+    if (submenuId === "add") {
+      return;
+    }
+
+    const key = makeSubmenuKey(sectionId, submenuId);
+    setFavoriteSubmenuKeys((keys) =>
+      keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key]
+    );
+  };
+
   const toggleExpandedSection = (sectionId: SidebarSectionId) => {
     setExpandedSectionIds((ids) =>
       ids.includes(sectionId) ? ids.filter((id) => id !== sectionId) : [...ids, sectionId]
     );
+  };
+
+  const toggleExpandedFavoriteSection = (sectionId: SidebarSectionId) => {
+    setExpandedFavoriteSectionIds((ids) =>
+      ids.includes(sectionId) ? ids.filter((id) => id !== sectionId) : [...ids, sectionId]
+    );
+  };
+
+  const moveSubmenu = (
+    targetSectionId: SidebarSectionId,
+    targetSubmenuId: SubmenuId,
+    position: TabDropPosition
+  ) => {
+    if (
+      !draggedSubmenu ||
+      draggedSubmenu.sectionId !== targetSectionId ||
+      draggedSubmenu.submenuId === targetSubmenuId ||
+      targetSubmenuId === "add"
+    ) {
+      return;
+    }
+
+    setSubmenuOrder((current) => {
+      const currentOrder = getOrderedSubmenuItems(targetSectionId)
+        .map((item) => item.id)
+        .filter((id) => id !== "add" && id !== draggedSubmenu.submenuId);
+      const targetIndex = currentOrder.indexOf(targetSubmenuId);
+      currentOrder.splice(
+        position === "after" ? targetIndex + 1 : targetIndex,
+        0,
+        draggedSubmenu.submenuId
+      );
+      return { ...current, [targetSectionId]: currentOrder };
+    });
+    setDraggedSubmenu(null);
+    setDragOverSubmenu(null);
   };
 
   const moveSidebarSection = (targetSectionId: SidebarSectionId, position: TabDropPosition) => {
@@ -412,6 +767,29 @@ export function App() {
     });
   };
 
+  const showSubmenuContextMenu = (
+    event: MouseEvent,
+    sectionId: SidebarSectionId,
+    submenuId: SubmenuId,
+    source?: "recent"
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      type: "submenu",
+      sectionId,
+      submenuId,
+      source,
+      x: event.clientX,
+      y: event.clientY
+    });
+  };
+
+  const removeRecentSubmenu = (sectionId: SidebarSectionId, submenuId: SubmenuId) => {
+    const key = makeSubmenuKey(sectionId, submenuId);
+    setRecentSubmenuKeys((keys) => keys.filter((item) => item !== key));
+  };
+
   const showTabContextMenu = (event: MouseEvent, tabId: string) => {
     event.preventDefault();
     setContextMenu({
@@ -459,25 +837,172 @@ export function App() {
     return event.clientX > bounds.left + bounds.width / 2 ? "after" : "before";
   };
 
+  const getSubmenuDropPosition = (event: DragEvent<HTMLDivElement>): TabDropPosition => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientY > bounds.top + bounds.height / 2 ? "after" : "before";
+  };
+
+  const startSidebarResize = (event: PointerEvent<HTMLDivElement>) => {
+    if (isSidebarCollapsed) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsResizingSidebar(true);
+    const startX = event.clientX;
+    const startWidth = sidebarWidth;
+
+    const resize = (pointerEvent: globalThis.PointerEvent) => {
+      const nextWidth = Math.min(
+        maxSidebarWidth,
+        Math.max(minSidebarWidth, startWidth + pointerEvent.clientX - startX)
+      );
+      setSidebarWidth(nextWidth);
+    };
+
+    const stopResize = () => {
+      setIsResizingSidebar(false);
+      window.removeEventListener("pointermove", resize);
+      window.removeEventListener("pointerup", stopResize);
+    };
+
+    window.addEventListener("pointermove", resize);
+    window.addEventListener("pointerup", stopResize);
+  };
+
+  const renderSubmenuList = (
+    section: (typeof sidebarSections)[number],
+    source: "menu" | "favorite"
+  ) => (
+    <div className="submenuList">
+      {getOrderedSubmenuItems(section.id).map((submenu) => {
+        const key = makeSubmenuKey(section.id, submenu.id);
+        const submenuSource = source === "favorite" ? "favoriteSubmenu" : "submenu";
+        const isActive =
+          activeSidebarSource === submenuSource &&
+          activeSubmenuKey === key &&
+          (source === "menu" || source === "favorite");
+
+        return (
+          <div
+            key={key}
+            className={[
+              "submenuRow",
+              submenu.id === "add" ? "addRow" : "",
+              draggedSubmenu?.sectionId === section.id && draggedSubmenu.submenuId === submenu.id
+                ? "dragging"
+                : "",
+              dragOverSubmenu?.sectionId === section.id &&
+              dragOverSubmenu.submenuId === submenu.id &&
+              dragOverSubmenu.position === "before"
+                ? "dropBefore"
+                : "",
+              dragOverSubmenu?.sectionId === section.id &&
+              dragOverSubmenu.submenuId === submenu.id &&
+              dragOverSubmenu.position === "after"
+                ? "dropAfter"
+                : "",
+              isActive ? "active" : ""
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            draggable={submenu.id !== "add"}
+            onDragStart={(event) => {
+              event.stopPropagation();
+              if (submenu.id === "add") {
+                return;
+              }
+              const row = event.currentTarget;
+              const bounds = row.getBoundingClientRect();
+              event.dataTransfer.setDragImage(
+                row,
+                event.clientX - bounds.left,
+                event.clientY - bounds.top
+              );
+              setDragOverSection(null);
+              setDraggedSectionId(null);
+              setDraggedSubmenu({ sectionId: section.id, submenuId: submenu.id });
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", key);
+            }}
+            onDragOver={(event) => {
+              event.stopPropagation();
+              if (!draggedSubmenu || submenu.id === "add") {
+                return;
+              }
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              setDragOverSubmenu({
+                sectionId: section.id,
+                submenuId: submenu.id,
+                position: getSubmenuDropPosition(event)
+              });
+            }}
+            onDragLeave={(event) => {
+              event.stopPropagation();
+              setDragOverSubmenu((current) =>
+                current?.sectionId === section.id && current.submenuId === submenu.id ? null : current
+              );
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              moveSubmenu(section.id, submenu.id, getSubmenuDropPosition(event));
+            }}
+            onDragEnd={(event) => {
+              event.stopPropagation();
+              setDraggedSubmenu(null);
+              setDragOverSubmenu(null);
+            }}
+          >
+            <button
+              className="submenuDragButton"
+              aria-label={`${submenu.label} 순서 변경`}
+              tabIndex={-1}
+              type="button"
+            >
+              <span />
+            </button>
+            <button
+              className="submenuButton"
+              onClick={(event) => {
+                event.stopPropagation();
+                openSubmenu(section.id, submenu.id, submenuSource);
+              }}
+              onContextMenu={(event) => showSubmenuContextMenu(event, section.id, submenu.id)}
+            >
+              {submenu.id === "add" ? "+" : submenu.label}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const shellClassName = [
     "appShell",
     isCompact ? "compactMode" : "",
     isSidebarCollapsed ? "sidebarCollapsed" : "",
+    isResizingSidebar ? "resizingSidebar" : "",
     colorMode === "dark" ? "darkMode" : ""
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <div className={shellClassName}>
+    <div
+      className={shellClassName}
+      style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+    >
       <nav className="appTabs" aria-label="열린 탭">
         <div className="openTabs">
-          {openTabs.map((tab) => (
+          {openTabs.map((tab, index) => (
             <button
               key={tab.id}
               className={[
                 "openTab",
                 tab.id === activeOpenTabId ? "active" : "",
+                openTabs[index + 1]?.id === activeOpenTabId ? "beforeActive" : "",
                 tab.id === dragOverTab?.id && dragOverTab.position === "before"
                   ? "dragOverBefore"
                   : "",
@@ -539,7 +1064,11 @@ export function App() {
           ))}
         </div>
         <button
-          className="newTabButton"
+          className={
+            openTabs[openTabs.length - 1]?.id === activeOpenTabId
+              ? "newTabButton afterActive"
+              : "newTabButton"
+          }
           aria-label="새 탭"
           onClick={openBlankTab}
           onDragEnter={markTabEndDragOver}
@@ -574,20 +1103,31 @@ export function App() {
       </nav>
 
       <aside className="sidebar">
+        <div className="brand">
+          <div className="brandHeader">
+            <strong>MCP 연결관리자</strong>
+            <button
+              className="sidebarToggle sidebarToggleInline"
+              aria-label={isSidebarCollapsed ? "메뉴 펼치기" : "메뉴 접기"}
+              onClick={() => setIsSidebarCollapsed((value) => !value)}
+            >
+              <span className="sidebarToggleMark" aria-hidden="true">
+                {isSidebarCollapsed ? "›" : "‹"}
+              </span>
+            </button>
+          </div>
+          <span className="brandVersion">v0.1.0</span>
+        </div>
         <button
-          className="sidebarToggle"
-          aria-label={isSidebarCollapsed ? "메뉴 펼치기" : "메뉴 접기"}
-          onClick={() => setIsSidebarCollapsed((value) => !value)}
+          className="sidebarToggle sidebarToggleCollapsed"
+          aria-label="메뉴 펼치기"
+          onClick={() => setIsSidebarCollapsed(false)}
         >
           <span className="sidebarToggleMark" aria-hidden="true">
-            {isSidebarCollapsed ? "›" : "‹"}
+            ›
           </span>
         </button>
-        <div className="brand">
-          <strong>MCP Registry</strong>
-          <span>CAD/Revit 연결 관리자</span>
-        </div>
-        {favoriteSectionIds.length > 0 ? (
+        {favoriteSectionIds.length > 0 || favoriteSubmenuKeys.length > 0 ? (
           <div className="favoriteGroup">
             <span className="sidebarLabel">즐겨찾기</span>
             {favoriteSectionIds.map((sectionId) => {
@@ -602,18 +1142,24 @@ export function App() {
                   className={[
                     "navRow",
                     "favoriteRow",
-                    section.id === activeSidebarSection ? "active" : "",
-                    expandedSectionIds.includes(section.id) ? "expanded" : ""
+                    section.id === activeSidebarSection && activeSidebarSource === "favorite"
+                      ? "active"
+                      : "",
+                    expandedFavoriteSectionIds.includes(section.id) ? "expanded" : ""
                   ]
                     .filter(Boolean)
                     .join(" ")}
                 >
-                  <button className="navOrderButton" aria-label={`${section.label} shortcut`}>
+                  <button className="navOrderButton" aria-label={`${section.label} 즐겨찾기`}>
                     ☰
                   </button>
                   <button
-                    className={section.id === activeSidebarSection ? "navItem favorite active" : "navItem favorite"}
-                    onClick={() => openSectionInCurrentTab(section.id)}
+                    className={
+                      section.id === activeSidebarSection && activeSidebarSource === "favorite"
+                        ? "navItem favorite active"
+                        : "navItem favorite"
+                    }
+                    onClick={() => openSectionInCurrentTab(section.id, "favorite")}
                     onContextMenu={(event) => showSidebarContextMenu(event, section.id)}
                   >
                     <span className="navShort">{section.shortLabel}</span>
@@ -622,21 +1168,43 @@ export function App() {
                   <button
                     className="navExpandButton"
                     aria-label={`${section.label} 펼치기`}
-                    aria-expanded={expandedSectionIds.includes(section.id)}
-                    onClick={() => toggleExpandedSection(section.id)}
+                    aria-expanded={expandedFavoriteSectionIds.includes(section.id)}
+                    onClick={() => toggleExpandedFavoriteSection(section.id)}
                   >
-                    {expandedSectionIds.includes(section.id) ? "▲" : "▼"}
+                    {expandedFavoriteSectionIds.includes(section.id) ? "▲" : "▼"}
                   </button>
-                  {expandedSectionIds.includes(section.id) ? (
-                    <div className="navSubPanel">
-                      <button>도구 목록</button>
-                      <button>연결 설정</button>
-                      <button className="navAddSubButton" aria-label={`${section.label} 추가`}>
-                        +
-                      </button>
-                    </div>
-                  ) : null}
+                  {expandedFavoriteSectionIds.includes(section.id)
+                    ? renderSubmenuList(section, "favorite")
+                    : null}
                 </div>
+              );
+            })}
+            {favoriteSubmenuKeys.map((key) => {
+              const { sectionId, submenuId } = parseSubmenuKey(key);
+              const section = sidebarSections.find((item) => item.id === sectionId);
+              if (!section) {
+                return null;
+              }
+
+              return (
+                <button
+                  key={key}
+                  className={[
+                    "favoriteSubmenuButton",
+                    activeSidebarSource === "favoriteSubmenu" && activeSubmenuKey === key
+                      ? "active"
+                      : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => openSubmenu(sectionId, submenuId, "favoriteSubmenu")}
+                  onContextMenu={(event) => showSubmenuContextMenu(event, sectionId, submenuId)}
+                >
+                  <span className="submenuMiniIcon" aria-hidden="true" />
+                  <span className="navFull">
+                    {section.label} / {getSubmenuLabel(submenuId)}
+                  </span>
+                </button>
               );
             })}
           </div>
@@ -646,7 +1214,7 @@ export function App() {
           <div
             className={[
               "navRow",
-              section.id === activeSidebarSection ? "active" : "",
+              section.id === activeSidebarSection && activeSidebarSource === "menu" ? "active" : "",
               section.id === draggedSectionId ? "dragging" : "",
               expandedSectionIds.includes(section.id) ? "expanded" : "",
               dragOverSection?.id === section.id && dragOverSection.position === "before"
@@ -660,6 +1228,9 @@ export function App() {
               .join(" ")}
             key={section.id}
             onDragOver={(event) => {
+              if (draggedSubmenu) {
+                return;
+              }
               event.preventDefault();
               event.dataTransfer.dropEffect = "move";
               setDragOverSection({ id: section.id, position: getSidebarDropPosition(event) });
@@ -668,6 +1239,9 @@ export function App() {
               setDragOverSection((current) => (current?.id === section.id ? null : current));
             }}
             onDrop={(event) => {
+              if (draggedSubmenu) {
+                return;
+              }
               event.preventDefault();
               moveSidebarSection(section.id, getSidebarDropPosition(event));
               setDraggedSectionId(null);
@@ -687,8 +1261,12 @@ export function App() {
               ☰
             </button>
             <button
-              className={section.id === activeSidebarSection ? "navItem active" : "navItem"}
-              onClick={() => openSectionInCurrentTab(section.id)}
+              className={
+                section.id === activeSidebarSection && activeSidebarSource === "menu"
+                  ? "navItem active"
+                  : "navItem"
+              }
+              onClick={() => openSectionInCurrentTab(section.id, "menu")}
               onContextMenu={(event) => showSidebarContextMenu(event, section.id)}
             >
               <span className="navShort">{section.shortLabel}</span>
@@ -702,21 +1280,54 @@ export function App() {
             >
               {expandedSectionIds.includes(section.id) ? "▲" : "▼"}
             </button>
-            {expandedSectionIds.includes(section.id) ? (
-              <div className="navSubPanel">
-                <button>도구 목록</button>
-                <button>연결 설정</button>
-                <button className="navAddSubButton" aria-label={`${section.label} 추가`}>
-                  +
-                </button>
-              </div>
-            ) : null}
+            {expandedSectionIds.includes(section.id) ? renderSubmenuList(section, "menu") : null}
           </div>
         ))}
+        <div className="recentSubmenuGroup">
+          <div className="recentSubmenuHeader navFull">
+            <span className="sidebarLabel">최근 사용</span>
+            <button
+              className="recentClearButton"
+              type="button"
+              aria-label="최근 사용 모두 삭제"
+              title="최근 사용 모두 삭제"
+              disabled={recentSubmenuKeys.length === 0}
+              onClick={() => setRecentSubmenuKeys([])}
+            >
+              <span aria-hidden="true" />
+            </button>
+          </div>
+          {recentSubmenuKeys.map((key) => {
+            const { sectionId, submenuId } = parseSubmenuKey(key);
+            const section = sidebarSections.find((item) => item.id === sectionId);
+            if (!section) {
+              return null;
+            }
+
+            return (
+              <button
+                key={key}
+                className={[
+                  "recentSubmenuButton",
+                  activeSidebarSource === "recent" && activeSubmenuKey === key ? "active" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => openSubmenu(sectionId, submenuId, "recent")}
+                onContextMenu={(event) =>
+                  showSubmenuContextMenu(event, sectionId, submenuId, "recent")
+                }
+              >
+                <span className="navFull">
+                  {section.label} / {getSubmenuLabel(submenuId)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
         <button
           className={activeSidebarSection === "monitor" ? "sidebarMonitorButton active" : "sidebarMonitorButton"}
           onClick={openMonitorSection}
-          onContextMenu={(event) => showSidebarContextMenu(event, "monitor")}
         >
           <span className="navShort" aria-hidden="true">
             ⏱
@@ -740,6 +1351,13 @@ export function App() {
             <span>Settings</span>
           </span>
         </button>
+        <div
+          className="sidebarResizeHandle"
+          role="separator"
+          aria-label="메뉴 너비 조절"
+          aria-orientation="vertical"
+          onPointerDown={startSidebarResize}
+        />
       </aside>
 
       <main className="main">
@@ -747,6 +1365,19 @@ export function App() {
           <div>
             <h1>{topbarTitle(activeTab, activeSidebarSection)}</h1>
             <p>{topbarSubtitle(activeTab, activeSidebarSection)}</p>
+          </div>
+          <div className="historyControls" aria-label="화면 이동">
+            <button type="button" aria-label="뒤로가기" disabled={backHistory.length === 0} onClick={goBack}>
+              ←
+            </button>
+            <button
+              type="button"
+              aria-label="앞으로가기"
+              disabled={forwardHistory.length === 0}
+              onClick={goForward}
+            >
+              →
+            </button>
           </div>
         </header>
 
@@ -932,7 +1563,7 @@ export function App() {
             <div className="dialogHeader">
               <div>
                 <h2 id="monitorDialogTitle">Process Monitor</h2>
-                <span>MCP Bridge 실행 상태와 로그를 별도 창에서 확인합니다.</span>
+                <span>MCP 브리지 실행 상태와 로그를 별도 창에서 확인합니다.</span>
               </div>
               <div className="dialogHeaderActions">
                 <button
@@ -982,6 +1613,39 @@ export function App() {
                   ? "즐겨찾기 해제"
                   : "즐겨찾기 추가"}
               </button>
+            </>
+          ) : contextMenu.type === "submenu" ? (
+            <>
+              <button
+                onClick={() => {
+                  toggleFavoriteSubmenu(contextMenu.sectionId, contextMenu.submenuId);
+                  setContextMenu(null);
+                }}
+              >
+                {favoriteSubmenuKeys.includes(
+                  makeSubmenuKey(contextMenu.sectionId, contextMenu.submenuId)
+                )
+                  ? "즐겨찾기 해제"
+                  : "즐겨찾기 추가"}
+              </button>
+              <button
+                onClick={() => {
+                  openSubmenuInNewTab(contextMenu.sectionId, contextMenu.submenuId);
+                  setContextMenu(null);
+                }}
+              >
+                새 탭에서 열기
+              </button>
+              {contextMenu.source === "recent" ? (
+                <button
+                  onClick={() => {
+                    removeRecentSubmenu(contextMenu.sectionId, contextMenu.submenuId);
+                    setContextMenu(null);
+                  }}
+                >
+                  삭제
+                </button>
+              ) : null}
             </>
           ) : (
             <>
@@ -1177,12 +1841,12 @@ function MonitorView({ runningCount, totalCount }: { runningCount: number; total
           </p>
         </div>
         <div className="panel monitorTile">
-          <span>CAD Bridge</span>
+          <span>CAD 브리지</span>
           <strong>확인 전</strong>
           <p>AutoCAD MCP 포트 5100 상태를 확인합니다.</p>
         </div>
         <div className="panel monitorTile">
-          <span>Revit Bridge</span>
+          <span>Revit 브리지</span>
           <strong>확인 전</strong>
           <p>Revit MCP 포트 5001 상태를 확인합니다.</p>
         </div>
@@ -1253,7 +1917,7 @@ function topbarSubtitle(tabId: WorkspaceTabId, sectionId: SidebarSectionId) {
   }
 
   if (sectionId === "monitor") {
-    return "MCP Bridge 실행 상태와 작업 로그를 확인합니다.";
+    return "MCP 브리지 실행 상태와 작업 로그를 확인합니다.";
   }
 
   if (sectionId === "excel") {

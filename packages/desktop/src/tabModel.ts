@@ -2,12 +2,16 @@ import type { SidebarSectionId } from "./navigationModel";
 import { sidebarSections } from "./navigationModel";
 import type { WorkspaceTabId } from "./workspaceTabs";
 
+export type TabSidebarSource = "menu" | "favorite" | "submenu" | "favoriteSubmenu" | "recent";
+
 export interface AppTab {
   id: string;
   title: string;
   sectionId: SidebarSectionId;
   workspaceTabId: WorkspaceTabId;
   isPinned: boolean;
+  sidebarSource: TabSidebarSource;
+  submenuKey: string | null;
 }
 
 export function createBlankTab(id: string): AppTab {
@@ -16,7 +20,9 @@ export function createBlankTab(id: string): AppTab {
     title: "새 탭",
     sectionId: "servers",
     workspaceTabId: "cad",
-    isPinned: false
+    isPinned: false,
+    sidebarSource: "menu",
+    submenuKey: null
   };
 }
 
@@ -30,7 +36,9 @@ export function createSectionTab(
     title: sectionLabel(sectionId),
     sectionId,
     workspaceTabId,
-    isPinned: false
+    isPinned: false,
+    sidebarSource: "menu",
+    submenuKey: null
   };
 }
 
