@@ -15,3 +15,8 @@
 - GitHub에서 AI Program용 저장소 URL을 확인하거나 새로 만든다.
 - 로컬 저장소에 `origin`을 연결한 뒤 현재 브랜치를 push한다.
 - B 컴퓨터에서는 저장소를 clone 또는 pull한 뒤 `pnpm install`을 실행한다.
+
+## 2026-07-03 추가
+
+- GitHub에 `https://github.com/kdg200121-hash/AI_PROGRAM.git` 저장소를 생성했다.
+- 로컬 저장소의 `origin` 원격으로 연결하고 push를 진행했다.

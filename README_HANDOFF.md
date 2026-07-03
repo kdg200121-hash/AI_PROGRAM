@@ -5,7 +5,7 @@
 ## 프로젝트 위치
 
 - A 컴퓨터 로컬 경로: `C:\Users\Donggeon\Documents\AI Program`
-- Git 저장소 상태: 로컬 Git 저장소는 준비됨. GitHub 원격 URL 확인 후 `origin` 연결 필요.
+- Git 저장소 상태: GitHub 원격 저장소 연결 완료.
 - 현재 브랜치: `codex/mcp-registry-desktop`
 
 ## 프로젝트 개요
@@ -67,3 +67,4 @@ logs
 - 기존 `README.md`는 한글이 깨져 보이는 상태입니다. 필요하면 별도 작업으로 UTF-8 기준 문장으로 다시 정리하세요.
 - `node_modules` 안에 100MB 이상 Electron 실행 파일이 있으나 Git 제외 대상입니다.
 - Codex 채팅 기록은 GitHub로 넘어가지 않습니다. 중요한 내용은 `WORK_LOG.md`, `TODO.md`, `README_HANDOFF.md`에 남겨야 합니다.
+
