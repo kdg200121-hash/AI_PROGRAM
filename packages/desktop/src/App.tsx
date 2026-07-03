@@ -167,7 +167,10 @@ export function App() {
           aria-label={isSidebarCollapsed ? "메뉴 펼치기" : "메뉴 접기"}
           onClick={() => setIsSidebarCollapsed((value) => !value)}
         >
-          {isSidebarCollapsed ? ">>" : "<<"}
+          <span className="sidebarToggleMark" aria-hidden="true">
+            <span>{isSidebarCollapsed ? ">" : "<"}</span>
+            <span>{isSidebarCollapsed ? ">" : "<"}</span>
+          </span>
         </button>
         <div className="brand">
           <strong>MCP Registry</strong>

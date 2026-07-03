@@ -183,6 +183,15 @@ button.primary {
   color: #fff;
 }
 
+.sidebarToggleMark {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sidebarToggleMark span + span {
+  margin-left: -3px;
+}
+
 .sidebarCollapsed .sidebar {
   padding: 52px 8px 18px;
 }
