@@ -113,13 +113,15 @@ button.primary {
 
 .tabCloseButton {
   position: absolute;
-  right: 8px;
+  right: 6px;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   color: #617086;
+  font-size: 18px;
+  line-height: 1;
   opacity: 0;
 }
 
@@ -413,6 +415,8 @@ button.primary {
 
 .compactMode .main {
   grid-column: 1 / -1;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
 }
 
 .compactMode .metrics {
@@ -421,13 +425,14 @@ button.primary {
 
 .compactMode .contentGrid {
   grid-template-columns: 1fr;
-  padding-top: 16px;
+  gap: 10px;
+  padding: 10px;
   overflow-y: auto;
 }
 
 .compactMode .topbar {
   height: auto;
-  min-height: 58px;
+  min-height: 0;
   align-items: flex-start;
   flex-direction: column;
   justify-content: center;
@@ -441,10 +446,13 @@ button.primary {
 
 .compactMode .topActions {
   width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .compactMode .topActions button {
-  flex: 1;
+  min-width: 0;
 }
 
 .compactMode .appTabs {
@@ -456,23 +464,46 @@ button.primary {
   overflow: hidden;
 }
 
+.compactMode .openTabs {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .compactMode .openTab {
-  min-width: 110px;
+  min-width: 96px;
+  max-width: 128px;
   height: 32px;
   min-height: 32px;
+  padding: 0 28px 0 9px;
+  font-size: 11px;
 }
 
 .compactMode .openTabMeta {
   display: none;
 }
 
+.compactMode .tabCloseButton {
+  width: 24px;
+  height: 24px;
+  opacity: 1;
+}
+
+.compactMode .newTabButton {
+  width: 28px;
+  min-width: 28px;
+}
+
 .compactMode .targetSwitch {
+  grid-column: 1 / -1;
   width: 100%;
   overflow-x: auto;
 }
 
 .compactMode .targetButton {
   flex: 1;
+  min-width: 0;
+  padding: 0 7px;
+  font-size: 11px;
 }
 
 .compactMode .workspaceTabsInner {
@@ -902,6 +933,18 @@ tbody tr {
 .compactMode .workflowBoardGrid,
 .compactMode .monitorStatus {
   grid-template-columns: 1fr;
+}
+
+.compactMode .serverPanel,
+.compactMode .workflowStep,
+.compactMode .workflowBoardGrid div,
+.compactMode .monitorTile {
+  min-height: auto;
+}
+
+.compactMode .overviewCard,
+.compactMode .toolItem {
+  min-height: auto;
 }
 
 .emptyState {
