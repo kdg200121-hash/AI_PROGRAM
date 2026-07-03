@@ -141,6 +141,7 @@ export function App() {
   );
   const [sidebarOrder, setSidebarOrder] = useState<SidebarSectionId[]>(() => loadSidebarOrder());
   const [draggedSectionId, setDraggedSectionId] = useState<SidebarSectionId | null>(null);
+  const [expandedSectionIds, setExpandedSectionIds] = useState<SidebarSectionId[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTab, setDragOverTab] = useState<{
@@ -276,6 +277,12 @@ export function App() {
 
   const toggleFavoriteSection = (sectionId: SidebarSectionId) => {
     setFavoriteSectionIds((ids) =>
+      ids.includes(sectionId) ? ids.filter((id) => id !== sectionId) : [...ids, sectionId]
+    );
+  };
+
+  const toggleExpandedSection = (sectionId: SidebarSectionId) => {
+    setExpandedSectionIds((ids) =>
       ids.includes(sectionId) ? ids.filter((id) => id !== sectionId) : [...ids, sectionId]
     );
   };
@@ -505,7 +512,13 @@ export function App() {
         <span className="sidebarLabel navFull">메뉴</span>
         {orderedSidebarSections.map((section) => (
           <div
-            className={section.id === draggedSectionId ? "navRow dragging" : "navRow"}
+            className={[
+              "navRow",
+              section.id === draggedSectionId ? "dragging" : "",
+              expandedSectionIds.includes(section.id) ? "expanded" : ""
+            ]
+              .filter(Boolean)
+              .join(" ")}
             key={section.id}
             onDragOver={(event) => {
               event.preventDefault();
@@ -535,6 +548,14 @@ export function App() {
               <span className="navFull">{section.label}</span>
             </button>
             <button
+              className="navExpandButton"
+              aria-label={`${section.label} 펼치기`}
+              aria-expanded={expandedSectionIds.includes(section.id)}
+              onClick={() => toggleExpandedSection(section.id)}
+            >
+              {expandedSectionIds.includes(section.id) ? "⌄" : "›"}
+            </button>
+            <button
               className={
                 favoriteSectionIds.includes(section.id)
                   ? "favoriteButton active"
@@ -545,6 +566,12 @@ export function App() {
             >
               ★
             </button>
+            {expandedSectionIds.includes(section.id) ? (
+              <div className="navSubPanel">
+                <button>도구 목록</button>
+                <button>연결 설정</button>
+              </div>
+            ) : null}
           </div>
         ))}
         <button

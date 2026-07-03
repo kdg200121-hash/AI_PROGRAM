@@ -323,11 +323,12 @@ button.primary {
 
 .navRow {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 34px;
+  grid-template-columns: 30px minmax(0, 1fr) 28px 34px;
   gap: 4px;
   margin-bottom: 6px;
   border: 1px solid transparent;
   border-radius: 8px;
+  overflow: hidden;
 }
 
 .navRow.dragging {
@@ -344,6 +345,7 @@ button.primary {
 }
 
 .navOrderButton,
+.navExpandButton,
 .favoriteButton {
   min-width: 34px;
   min-height: 36px;
@@ -363,8 +365,48 @@ button.primary {
   cursor: grabbing;
 }
 
+.navExpandButton {
+  min-width: 28px;
+  color: #9ca9ba;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.navRow.expanded {
+  background: rgba(45, 95, 159, 0.12);
+}
+
+.navSubPanel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  padding: 6px 8px 8px 34px;
+  background: rgba(45, 95, 159, 0.2);
+}
+
+.navSubPanel button {
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: #b8c4d6;
+  text-align: left;
+  font-size: 12px;
+}
+
+.navSubPanel button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
 .favoriteButton {
   color: #6f7d91;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+
+.navRow:hover .favoriteButton,
+.favoriteButton.active {
+  opacity: 1;
 }
 
 .favoriteButton.active {
@@ -436,6 +478,8 @@ button.primary {
 }
 
 .sidebarCollapsed .navOrderButton,
+.sidebarCollapsed .navExpandButton,
+.sidebarCollapsed .navSubPanel,
 .sidebarCollapsed .favoriteButton {
   display: none;
 }
@@ -482,7 +526,9 @@ button.primary {
 .compactMode .sidebarLabel,
 .compactMode .navFull,
 .compactMode .favoriteButton,
-.compactMode .navOrderButton {
+.compactMode .navOrderButton,
+.compactMode .navExpandButton,
+.compactMode .navSubPanel {
   display: none;
 }
 
