@@ -42,7 +42,7 @@ button.primary {
   grid-template-columns: 64px 1fr;
 }
 
-.workspaceTabs {
+.appTabs {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
@@ -51,6 +51,96 @@ button.primary {
   border-bottom: 1px solid #d7dee9;
   background: #fff;
   min-width: 0;
+}
+
+.openTabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 0;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.openTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.openTab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 136px;
+  max-width: 220px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 30px 0 12px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: #526071;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.openTab.active {
+  border-color: #d7dee9;
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
+.openTabTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.openTabMeta {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(45, 95, 159, 0.1);
+  color: #526071;
+  font-size: 10px;
+}
+
+.pinMark {
+  color: #2d5f9f;
+  font-size: 9px;
+}
+
+.tabCloseButton {
+  position: absolute;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #617086;
+  opacity: 0;
+}
+
+.openTab:hover .tabCloseButton {
+  opacity: 1;
+}
+
+.tabCloseButton:hover {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.newTabButton {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #526071;
+  font-size: 20px;
+  font-weight: 400;
 }
 
 .workspaceTabsInner {
@@ -211,6 +301,42 @@ button.primary {
   color: #c8d1df;
 }
 
+.navRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 4px;
+}
+
+.favoriteButton {
+  min-width: 34px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6f7d91;
+}
+
+.favoriteButton.active {
+  color: #f8c14a;
+}
+
+.favoriteGroup {
+  margin-bottom: 12px;
+}
+
+.sidebarLabel {
+  display: block;
+  margin: 2px 10px 7px;
+  color: #7f8da2;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.navItem.favorite {
+  color: #e0e7f1;
+}
+
 .navShort {
   display: none;
 }
@@ -321,13 +447,32 @@ button.primary {
   flex: 1;
 }
 
-.compactMode .workspaceTabs {
+.compactMode .appTabs {
   min-height: 48px;
   align-items: center;
   flex-direction: row;
   gap: 4px;
   padding: 6px 8px;
   overflow: hidden;
+}
+
+.compactMode .openTab {
+  min-width: 110px;
+  height: 32px;
+  min-height: 32px;
+}
+
+.compactMode .openTabMeta {
+  display: none;
+}
+
+.compactMode .targetSwitch {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.compactMode .targetButton {
+  flex: 1;
 }
 
 .compactMode .workspaceTabsInner {
@@ -415,7 +560,33 @@ button.primary {
 
 .topActions {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.targetSwitch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #d7dee9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.targetButton {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: #526071;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.targetButton.active {
+  background: #fff;
+  color: #1f4d82;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .metrics {
@@ -841,6 +1012,33 @@ tbody tr {
   padding: 14px;
 }
 
+.contextMenu {
+  position: fixed;
+  z-index: 20;
+  min-width: 158px;
+  padding: 6px;
+  border: 1px solid #d7dee9;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.contextMenu button {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: #26364d;
+  font-size: 12px;
+}
+
+.contextMenu button:hover {
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
 .dialogToolList {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 14px 18px 18px;
@@ -907,6 +1105,7 @@ tbody tr {
   grid-template-columns: 1fr;
 }
 
+.darkMode .appTabs,
 .darkMode .workspaceTabs,
 .darkMode .topbar,
 .darkMode .panel,
@@ -944,6 +1143,11 @@ tbody tr {
   color: #a7adb6;
 }
 
+.darkMode .openTab {
+  color: #a7adb6;
+}
+
+.darkMode .openTab.active,
 .darkMode .workspaceTab.active,
 .darkMode .dialogNavItem.active,
 .darkMode .displayModeOption.active {
@@ -957,6 +1161,8 @@ tbody tr {
 
 .darkMode .topbar p,
 .darkMode .connectionBadge,
+.darkMode .targetSwitch,
+.darkMode .contextMenu,
 .darkMode .field div,
 .darkMode .toolItem,
 .darkMode .overviewCard,
@@ -967,6 +1173,22 @@ tbody tr {
   border-color: #343a42;
   background: #20242b;
   color: #dde1e6;
+}
+
+.darkMode .targetButton.active {
+  background: #143735;
+  color: #d5f5ef;
+  box-shadow: none;
+}
+
+.darkMode .openTabMeta {
+  background: rgba(45, 212, 191, 0.12);
+  color: #9aa1ab;
+}
+
+.darkMode .contextMenu button:hover {
+  background: #143735;
+  color: #d5f5ef;
 }
 
 .darkMode .dialogNav,

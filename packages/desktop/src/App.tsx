@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { MouseEvent } from "react";
 import type { McpServerRecord, RegistryFile } from "@mcp-registry/shared";
 import { getConnectionSummary } from "./connectionSummary";
 import { getToolsForWorkspace } from "./mcpToolCatalog";
@@ -15,12 +16,60 @@ import {
   type SidebarSectionId
 } from "./navigationModel";
 import {
+  closeTab,
+  createBlankTab,
+  createSectionTab,
+  duplicateTab,
+  getPinnedTabs,
+  togglePinnedTab,
+  type AppTab
+} from "./tabModel";
+import {
   filterServersByWorkspace,
-  getAdjacentWorkspaceTab,
   registryWorkspaceTab,
   workspaceTabs,
   type WorkspaceTabId
 } from "./workspaceTabs";
+
+const pinnedTabsStorageKey = "mcp-registry:pinned-tabs";
+const favoriteSectionsStorageKey = "mcp-registry:favorite-sections";
+let tabCounter = 0;
+
+type ContextMenuState =
+  | { type: "section"; sectionId: SidebarSectionId; x: number; y: number }
+  | { type: "tab"; tabId: string; x: number; y: number };
+
+function nextTabId() {
+  tabCounter += 1;
+  return `tab-${Date.now()}-${tabCounter}`;
+}
+
+function loadPinnedTabs(): AppTab[] {
+  try {
+    const raw = window.localStorage.getItem(pinnedTabsStorageKey);
+    const pinnedTabs = raw ? (JSON.parse(raw) as AppTab[]) : [];
+    return pinnedTabs.length > 0 ? pinnedTabs : [createSectionTab("tab-initial", "servers", "cad")];
+  } catch {
+    return [createSectionTab("tab-initial", "servers", "cad")];
+  }
+}
+
+function loadFavoriteSections(): SidebarSectionId[] {
+  try {
+    const raw = window.localStorage.getItem(favoriteSectionsStorageKey);
+    return raw ? (JSON.parse(raw) as SidebarSectionId[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function sidebarLabel(sectionId: SidebarSectionId) {
+  return sidebarSections.find((section) => section.id === sectionId)?.label ?? "새 탭";
+}
+
+function workspaceLabel(tabId: WorkspaceTabId) {
+  return workspaceTabs.find((tab) => tab.id === tabId)?.label ?? "CAD";
+}
 
 const fallbackRegistry: RegistryFile = {
   version: 1,
@@ -60,16 +109,37 @@ const fallbackRegistry: RegistryFile = {
 
 export function App() {
   const [registry, setRegistry] = useState<RegistryFile>(fallbackRegistry);
-  const [activeTab, setActiveTab] = useState<WorkspaceTabId>("cad");
+  const [openTabs, setOpenTabs] = useState<AppTab[]>(() => loadPinnedTabs());
+  const [activeOpenTabId, setActiveOpenTabId] = useState(() => openTabs[0]?.id ?? "tab-initial");
   const [selectedId, setSelectedId] = useState<string>("revit-default");
   const [isCompact, setIsCompact] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRegistryDialogOpen, setIsRegistryDialogOpen] = useState(false);
   const [activeSettingsSection, setActiveSettingsSection] =
     useState<SettingsSectionId>("servers");
-  const [activeSidebarSection, setActiveSidebarSection] =
-    useState<SidebarSectionId>("servers");
   const [colorMode, setColorMode] = useState<ColorMode>("light");
+  const [favoriteSectionIds, setFavoriteSectionIds] = useState<SidebarSectionId[]>(() =>
+    loadFavoriteSections()
+  );
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  const activeOpenTab = openTabs.find((tab) => tab.id === activeOpenTabId) ?? openTabs[0];
+  const activeTab = activeOpenTab.workspaceTabId;
+  const activeSidebarSection = activeOpenTab.sectionId;
+
+  useEffect(() => {
+    window.localStorage.setItem(pinnedTabsStorageKey, JSON.stringify(getPinnedTabs(openTabs)));
+  }, [openTabs]);
+
+  useEffect(() => {
+    window.localStorage.setItem(favoriteSectionsStorageKey, JSON.stringify(favoriteSectionIds));
+  }, [favoriteSectionIds]);
+
+  useEffect(() => {
+    const closeContextMenu = () => setContextMenu(null);
+    window.addEventListener("click", closeContextMenu);
+    return () => window.removeEventListener("click", closeContextMenu);
+  }, []);
 
   useEffect(() => {
     const api = window.mcpRegistry;
@@ -120,8 +190,80 @@ export function App() {
     void window.mcpWindow?.setCompactMode(nextValue);
   };
 
-  const moveCompactTab = (direction: "previous" | "next") => {
-    setActiveTab((current) => getAdjacentWorkspaceTab(current, direction));
+  const updateActiveOpenTab = (patch: Partial<AppTab>) => {
+    setOpenTabs((tabs) =>
+      tabs.map((tab) => (tab.id === activeOpenTabId ? { ...tab, ...patch } : tab))
+    );
+  };
+
+  const openBlankTab = () => {
+    const tab = createBlankTab(nextTabId());
+    setOpenTabs((tabs) => [...tabs, tab]);
+    setActiveOpenTabId(tab.id);
+  };
+
+  const openSectionInCurrentTab = (sectionId: SidebarSectionId) => {
+    updateActiveOpenTab({ sectionId, title: sidebarLabel(sectionId) });
+  };
+
+  const openSectionInNewTab = (sectionId: SidebarSectionId) => {
+    const tab = createSectionTab(nextTabId(), sectionId, activeTab);
+    setOpenTabs((tabs) => [...tabs, tab]);
+    setActiveOpenTabId(tab.id);
+  };
+
+  const duplicateOpenTab = (tabId: string) => {
+    const source = openTabs.find((tab) => tab.id === tabId);
+    if (!source) {
+      return;
+    }
+
+    const duplicated = duplicateTab(source, nextTabId());
+    setOpenTabs((tabs) => [...tabs, duplicated]);
+    setActiveOpenTabId(duplicated.id);
+  };
+
+  const togglePinnedOpenTab = (tabId: string) => {
+    setOpenTabs((tabs) => tabs.map((tab) => (tab.id === tabId ? togglePinnedTab(tab) : tab)));
+  };
+
+  const closeOpenTab = (tabId: string) => {
+    setOpenTabs((tabs) => {
+      const nextTabs = closeTab(tabs, tabId);
+      if (activeOpenTabId === tabId) {
+        setActiveOpenTabId(nextTabs[Math.max(0, tabs.findIndex((tab) => tab.id === tabId) - 1)].id);
+      }
+      return nextTabs;
+    });
+  };
+
+  const toggleFavoriteSection = (sectionId: SidebarSectionId) => {
+    setFavoriteSectionIds((ids) =>
+      ids.includes(sectionId) ? ids.filter((id) => id !== sectionId) : [...ids, sectionId]
+    );
+  };
+
+  const showSidebarContextMenu = (
+    event: MouseEvent,
+    sectionId: SidebarSectionId
+  ) => {
+    event.preventDefault();
+    setContextMenu({
+      type: "section",
+      sectionId,
+      x: event.clientX,
+      y: event.clientY
+    });
+  };
+
+  const showTabContextMenu = (event: MouseEvent, tabId: string) => {
+    event.preventDefault();
+    setContextMenu({
+      type: "tab",
+      tabId,
+      x: event.clientX,
+      y: event.clientY
+    });
   };
 
   const shellClassName = [
@@ -135,27 +277,34 @@ export function App() {
 
   return (
     <div className={shellClassName}>
-      <nav className="workspaceTabs" aria-label="작업 영역 선택">
-        <button
-          className="tabArrow"
-          aria-label="이전 탭"
-          onClick={() => moveCompactTab("previous")}
-        >
-          ‹
-        </button>
-        <div className="workspaceTabsInner">
-          {workspaceTabs.map((tab) => (
+      <nav className="appTabs" aria-label="열린 탭">
+        <div className="openTabs">
+          {openTabs.map((tab) => (
             <button
               key={tab.id}
-              className={tab.id === activeTab ? "workspaceTab active" : "workspaceTab"}
-              onClick={() => setActiveTab(tab.id)}
+              className={tab.id === activeOpenTabId ? "openTab active" : "openTab"}
+              onClick={() => setActiveOpenTabId(tab.id)}
+              onContextMenu={(event) => showTabContextMenu(event, tab.id)}
             >
-              {tab.label}
+              {tab.isPinned ? <span className="pinMark">●</span> : null}
+              <span className="openTabTitle">{tab.title}</span>
+              <span className="openTabMeta">{workspaceLabel(tab.workspaceTabId)}</span>
+              <span
+                className="tabCloseButton"
+                role="button"
+                aria-label={`${tab.title} 닫기`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeOpenTab(tab.id);
+                }}
+              >
+                ×
+              </span>
             </button>
           ))}
         </div>
-        <button className="tabArrow" aria-label="다음 탭" onClick={() => moveCompactTab("next")}>
-          ›
+        <button className="newTabButton" aria-label="새 탭" onClick={openBlankTab}>
+          +
         </button>
         <div className="topUtility">
           <button className="compactButton" onClick={toggleCompactMode}>
@@ -183,15 +332,54 @@ export function App() {
           <strong>MCP Registry</strong>
           <span>CAD/Revit 연결 관리자</span>
         </div>
+        {favoriteSectionIds.length > 0 ? (
+          <div className="favoriteGroup">
+            <span className="sidebarLabel">즐겨찾기</span>
+            {favoriteSectionIds.map((sectionId) => {
+              const section = sidebarSections.find((item) => item.id === sectionId);
+              if (!section) {
+                return null;
+              }
+
+              return (
+                <button
+                  key={section.id}
+                  className={
+                    section.id === activeSidebarSection ? "navItem favorite active" : "navItem favorite"
+                  }
+                  onClick={() => openSectionInCurrentTab(section.id)}
+                  onContextMenu={(event) => showSidebarContextMenu(event, section.id)}
+                >
+                  <span className="navShort">{section.shortLabel}</span>
+                  <span className="navFull">★ {section.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        <span className="sidebarLabel navFull">메뉴</span>
         {sidebarSections.map((section) => (
-          <button
-            key={section.id}
-            className={section.id === activeSidebarSection ? "navItem active" : "navItem"}
-            onClick={() => setActiveSidebarSection(section.id)}
-          >
-            <span className="navShort">{section.shortLabel}</span>
-            <span className="navFull">{section.label}</span>
-          </button>
+          <div className="navRow" key={section.id}>
+            <button
+              className={section.id === activeSidebarSection ? "navItem active" : "navItem"}
+              onClick={() => openSectionInCurrentTab(section.id)}
+              onContextMenu={(event) => showSidebarContextMenu(event, section.id)}
+            >
+              <span className="navShort">{section.shortLabel}</span>
+              <span className="navFull">{section.label}</span>
+            </button>
+            <button
+              className={
+                favoriteSectionIds.includes(section.id)
+                  ? "favoriteButton active"
+                  : "favoriteButton"
+              }
+              aria-label={`${section.label} 즐겨찾기`}
+              onClick={() => toggleFavoriteSection(section.id)}
+            >
+              ★
+            </button>
+          </div>
         ))}
         <button
           className="sidebarSettingsButton"
@@ -216,6 +404,17 @@ export function App() {
             <p>{topbarSubtitle(activeTab, activeSidebarSection)}</p>
           </div>
           <div className="topActions">
+            <div className="targetSwitch" aria-label="작업 대상 선택">
+              {workspaceTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  className={tab.id === activeTab ? "targetButton active" : "targetButton"}
+                  onClick={() => updateActiveOpenTab({ workspaceTabId: tab.id })}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <button>상태 새로고침</button>
             <button className="primary">서버 추가</button>
           </div>
@@ -360,6 +559,54 @@ export function App() {
               </div>
             </div>
           </section>
+        </div>
+      ) : null}
+
+      {contextMenu ? (
+        <div className="contextMenu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          {contextMenu.type === "section" ? (
+            <>
+              <button
+                onClick={() => {
+                  openSectionInNewTab(contextMenu.sectionId);
+                  setContextMenu(null);
+                }}
+              >
+                새 탭에서 열기
+              </button>
+              <button
+                onClick={() => {
+                  toggleFavoriteSection(contextMenu.sectionId);
+                  setContextMenu(null);
+                }}
+              >
+                {favoriteSectionIds.includes(contextMenu.sectionId)
+                  ? "즐겨찾기 해제"
+                  : "즐겨찾기 추가"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  duplicateOpenTab(contextMenu.tabId);
+                  setContextMenu(null);
+                }}
+              >
+                탭 복제
+              </button>
+              <button
+                onClick={() => {
+                  togglePinnedOpenTab(contextMenu.tabId);
+                  setContextMenu(null);
+                }}
+              >
+                {openTabs.find((tab) => tab.id === contextMenu.tabId)?.isPinned
+                  ? "탭 고정 해제"
+                  : "탭 고정"}
+              </button>
+            </>
+          )}
         </div>
       ) : null}
     </div>
