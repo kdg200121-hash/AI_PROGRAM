@@ -398,7 +398,8 @@ export function App() {
                 tab.id === dragOverTab?.id && dragOverTab.position === "before"
                   ? "dragOverBefore"
                   : "",
-                tab.id === dragOverTab?.id && dragOverTab.position === "after"
+                (tab.id === dragOverTab?.id && dragOverTab.position === "after") ||
+                (isTabEndDragOver && tab.id === openTabs[openTabs.length - 1]?.id)
                   ? "dragOverAfter"
                   : "",
                 tab.id === draggedTabId ? "dragging" : ""
