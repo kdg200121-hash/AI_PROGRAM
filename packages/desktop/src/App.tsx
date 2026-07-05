@@ -62,6 +62,8 @@ import {
   type FlowConnection,
   type FlowGroup,
   type FlowNode,
+  type FlowPort,
+  type FlowPortType,
   type FlowSnapshot,
   type FlowTool,
   type StoredFlowGraph
@@ -78,6 +80,41 @@ const submenuMetaStorageKey = "mcp-registry:submenu-meta";
 const customToolsStorageKey = "mcp-registry:custom-tools";
 const accountUsersStorageKey = "mcp-registry:account-users";
 const accountPolicyStorageKey = "mcp-registry:account-policy";
+
+const flowTypePalette: Record<
+  FlowPortType | "tekla",
+  { accent: string; border: string; surface: string; group: string }
+> = {
+  cad: { accent: "#dc2626", border: "#f3b4b4", surface: "#fff1f2", group: "#fecdd3" },
+  revit: { accent: "#2563eb", border: "#b6ccf6", surface: "#eff6ff", group: "#bfdbfe" },
+  excel: { accent: "#16803c", border: "#acd8bd", surface: "#eefbf3", group: "#bbf7d0" },
+  tekla: { accent: "#7c3aed", border: "#cfbdfd", surface: "#f5f3ff", group: "#ddd6fe" },
+  object: { accent: "#d97706", border: "#f1cf9a", surface: "#fff7ed", group: "#fed7aa" },
+  number: { accent: "#0891b2", border: "#a5ddea", surface: "#ecfeff", group: "#a5f3fc" },
+  text: { accent: "#475569", border: "#cbd5e1", surface: "#f8fafc", group: "#e2e8f0" },
+  any: { accent: "#4f7fbd", border: "#bfd4ed", surface: "#f6faff", group: "#bfdbfe" }
+};
+
+const flowPaletteForType = (type?: FlowPortType | "tekla") =>
+  flowTypePalette[type ?? "any"] ?? flowTypePalette.any;
+
+const flowTypeForNode = (node: FlowNode): FlowPortType | "tekla" => {
+  if (node.programIcon === "tekla") {
+    return "tekla";
+  }
+
+  const iconType = node.programIcon as FlowPortType;
+  if (iconType in flowTypePalette) {
+    return iconType;
+  }
+
+  return node.outputs[0]?.type ?? node.inputs[0]?.type ?? "any";
+};
+
+const flowConnectionColor = (
+  fromNode: FlowNode,
+  outputPort?: FlowPort
+) => flowPaletteForType(outputPort?.type ?? flowTypeForNode(fromNode)).accent;
 const licenseNoticeStorageKey = "mcp-registry:license-notices";
 const sidebarWidthStorageKey = "mcp-registry:sidebar-width";
 const browserRegistryStorageKey = "mcp-registry:browser-registry";
@@ -5730,6 +5767,13 @@ function WorkflowView() {
     startWorldY: number;
     origins: { nodeId: string; x: number; y: number }[];
   } | null>(null);
+  const [draggingGroup, setDraggingGroup] = useState<{
+    groupId: string;
+    nodeIds: string[];
+    startWorldX: number;
+    startWorldY: number;
+    origins: { nodeId: string; x: number; y: number }[];
+  } | null>(null);
   const [selectionBox, setSelectionBox] = useState<{
     startX: number;
     startY: number;
@@ -5861,6 +5905,7 @@ function WorkflowView() {
       {
         id: `group-${Date.now()}`,
         name: `Group ${groups.length + 1}`,
+        color: flowTypePalette.any.group,
         nodeIds: validNodeIds
       }
     ]);
@@ -6138,6 +6183,43 @@ function WorkflowView() {
       window.removeEventListener("pointercancel", stopNodeDrag);
     };
   }, [draggingNode, flowPan.x, flowPan.y, flowScale]);
+
+  useEffect(() => {
+    if (!draggingGroup) {
+      return;
+    }
+
+    const moveGroup = (event: globalThis.PointerEvent) => {
+      if (!flowCanvasRef.current) {
+        return;
+      }
+
+      const rect = flowCanvasRef.current.getBoundingClientRect();
+      const nextWorldX = (event.clientX - rect.left - flowPan.x) / flowScale;
+      const nextWorldY = (event.clientY - rect.top - flowPan.y) / flowScale;
+      const deltaX = nextWorldX - draggingGroup.startWorldX;
+      const deltaY = nextWorldY - draggingGroup.startWorldY;
+      const originMap = new Map(draggingGroup.origins.map((origin) => [origin.nodeId, origin]));
+      setFlowNodes((items) =>
+        items.map((node) => {
+          const origin = originMap.get(node.nodeId);
+          return origin ? { ...node, x: origin.x + deltaX, y: origin.y + deltaY } : node;
+        })
+      );
+    };
+
+    const stopGroupDrag = () => setDraggingGroup(null);
+
+    window.addEventListener("pointermove", moveGroup);
+    window.addEventListener("pointerup", stopGroupDrag);
+    window.addEventListener("pointercancel", stopGroupDrag);
+
+    return () => {
+      window.removeEventListener("pointermove", moveGroup);
+      window.removeEventListener("pointerup", stopGroupDrag);
+      window.removeEventListener("pointercancel", stopGroupDrag);
+    };
+  }, [draggingGroup, flowPan.x, flowPan.y, flowScale]);
 
   useEffect(() => {
     if (!connectionDrag) {
@@ -6427,6 +6509,51 @@ function WorkflowView() {
     setFlowNodeMenu({ nodeId, x: event.clientX, y: event.clientY });
   };
 
+  const updateFlowGroupName = (groupId: string, name: string) => {
+    setFlowGroups((groups) =>
+      groups.map((group) => (group.id === groupId ? { ...group, name } : group))
+    );
+  };
+
+  const updateFlowGroupColor = (groupId: string, color: string) => {
+    rememberFlowState();
+    setFlowGroups((groups) =>
+      groups.map((group) => (group.id === groupId ? { ...group, color } : group))
+    );
+  };
+
+  const startGroupDrag = (event: PointerEvent<HTMLElement>, group: FlowGroup) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.button !== 0 || !flowCanvasRef.current) {
+      return;
+    }
+
+    const validNodeIds = group.nodeIds.filter((id) => flowNodes.some((node) => node.nodeId === id));
+    const origins = flowNodes
+      .filter((node) => validNodeIds.includes(node.nodeId))
+      .map((node) => ({ nodeId: node.nodeId, x: node.x, y: node.y }));
+    if (origins.length === 0) {
+      return;
+    }
+
+    const rect = flowCanvasRef.current.getBoundingClientRect();
+    const startWorldX = (event.clientX - rect.left - flowPan.x) / flowScale;
+    const startWorldY = (event.clientY - rect.top - flowPan.y) / flowScale;
+    rememberFlowState();
+    setFlowNodeMenu(null);
+    setSelectedNodeId(validNodeIds[0] ?? "");
+    setSelectedNodeIds(validNodeIds);
+    setDraggingGroup({
+      groupId: group.id,
+      nodeIds: validNodeIds,
+      startWorldX,
+      startWorldY,
+      origins
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
   const nodeMap = new Map(flowNodes.map((node) => [node.nodeId, node]));
   const flowGridSize = 26 * flowScale;
   const flowCanvasStyle = {
@@ -6466,6 +6593,7 @@ function WorkflowView() {
 
               const outputPort = node.outputs.find((port) => port.id === connection.fromPortId);
               const inputPort = nextNode.inputs.find((port) => port.id === connection.toPortId);
+              const connectionColor = flowConnectionColor(node, outputPort);
               const start = flowConnectionEndpoint(node, "output", connection.fromPortId);
               const end = flowConnectionEndpoint(nextNode, "input", connection.toPortId);
               const startX = start.x;
@@ -6481,6 +6609,7 @@ function WorkflowView() {
                   d={`M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}`}
                   key={connection.id}
                   onClick={() => removeFlowConnection(connection.id)}
+                  style={{ stroke: connectionColor } as CSSProperties}
                 />
               );
             })}
@@ -6491,6 +6620,8 @@ function WorkflowView() {
               }
 
               const start = flowConnectionEndpoint(node, "output", connectionDrag.fromPortId);
+              const outputPort = node.outputs.find((port) => port.id === connectionDrag.fromPortId);
+              const connectionColor = flowConnectionColor(node, outputPort);
               const startX = start.x;
               const startY = start.y;
               const endX = connectionDrag.x;
@@ -6501,26 +6632,52 @@ function WorkflowView() {
                 <path
                   className="pendingConnectionPath"
                   d={`M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}`}
+                  style={{ stroke: connectionColor } as CSSProperties}
                 />
               );
             })() : null}
           </svg>
           {renderedFlowGroups.map(({ group, bounds }) => (
             <div
-              className="flowGroupBox"
+              className={[
+                "flowGroupBox",
+                draggingGroup?.groupId === group.id ? "dragging" : ""
+              ]
+                .filter(Boolean)
+                .join(" ")}
               key={group.id}
+              onPointerDown={(event) => startGroupDrag(event, group)}
               style={{
                 left: bounds.left,
                 top: bounds.top,
                 width: bounds.right - bounds.left,
-                height: bounds.bottom - bounds.top
+                height: bounds.bottom - bounds.top,
+                "--flow-group-color": group.color,
+                "--flow-group-bg": `${group.color}38`
               } as CSSProperties}
             >
-              <span>{group.name}</span>
+              <div className="flowGroupHeader">
+                <input
+                  className="flowGroupNameInput"
+                  value={group.name}
+                  onChange={(event) => updateFlowGroupName(group.id, event.target.value)}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  aria-label="그룹 이름"
+                />
+                <input
+                  className="flowGroupColorInput"
+                  type="color"
+                  value={group.color}
+                  onChange={(event) => updateFlowGroupColor(group.id, event.target.value)}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  aria-label="그룹 배경색"
+                />
+              </div>
             </div>
           ))}
-          {flowNodes.map((node, index) => {
+          {flowNodes.map((node) => {
               const isExpanded = expandedNodeId === node.nodeId;
+              const nodePalette = flowPaletteForType(flowTypeForNode(node));
               const incomingPortIds = new Set(
                 flowConnections
                   .filter((connection) => connection.toNodeId === node.nodeId)
@@ -6544,7 +6701,13 @@ function WorkflowView() {
                   key={node.nodeId}
                   onPointerDown={(event) => handleFlowNodePointerDown(event, node.nodeId)}
                   onContextMenu={(event) => openFlowNodeMenu(event, node.nodeId)}
-                  style={{ left: node.x, top: node.y, zIndex: isExpanded ? 2 : 1 } as CSSProperties}
+                  style={{
+                    left: node.x,
+                    top: node.y,
+                    zIndex: isExpanded ? 5 : 4,
+                    "--flow-node-bg": nodePalette.surface,
+                    "--flow-node-border": nodePalette.border
+                  } as CSSProperties}
                 >
                   <div
                     className="flowNodeHeader"
@@ -6555,7 +6718,6 @@ function WorkflowView() {
                       <strong>{node.name}</strong>
                       <small>{node.description}</small>
                     </span>
-                    <span className="flowNodeNumber">{index + 1}</span>
                     <button
                       className="flowNodeChevron"
                       type="button"
@@ -6575,6 +6737,9 @@ function WorkflowView() {
                       <div className="flowPorts left">
                         <strong>Input</strong>
                         {node.inputs.map((port) => (
+                          (() => {
+                            const portPalette = flowPaletteForType(port.type);
+                            return (
                           <div
                             className={[
                               "flowPortRow",
@@ -6589,16 +6754,25 @@ function WorkflowView() {
                             onClick={(event) => handleInputPortClick(event, node.nodeId, port.id)}
                             title={`입력 포트: ${port.label}`}
                             aria-label={`${node.name} ${port.label} 입력 포트`}
+                            style={{
+                              "--flow-port-color": portPalette.accent,
+                              "--flow-port-ring": portPalette.border
+                            } as CSSProperties}
                           >
                             <span className="flowPortConnector" aria-hidden="true" />
                             <AppIcon name={port.iconName} />
                             <span>{port.label}</span>
                           </div>
+                            );
+                          })()
                         ))}
                       </div>
                       <div className="flowPorts right">
                         <strong>Output</strong>
                         {node.outputs.map((port) => (
+                          (() => {
+                            const portPalette = flowPaletteForType(port.type);
+                            return (
                           <div
                             className={[
                               "flowPortRow",
@@ -6615,11 +6789,17 @@ function WorkflowView() {
                             onPointerDown={(event) => startConnectionDrag(event, node.nodeId, port.id)}
                             title={`출력 포트: ${port.label}`}
                             aria-label={`${node.name} ${port.label} 출력 포트`}
+                            style={{
+                              "--flow-port-color": portPalette.accent,
+                              "--flow-port-ring": portPalette.border
+                            } as CSSProperties}
                           >
                             <AppIcon name={port.iconName} />
                             <span>{port.label}</span>
                             <span className="flowPortConnector" aria-hidden="true" />
                           </div>
+                            );
+                          })()
                         ))}
                       </div>
                     </div>

@@ -38,6 +38,7 @@ export interface FlowConnection {
 export interface FlowGroup {
   id: string;
   name: string;
+  color: string;
   nodeIds: string[];
 }
 
@@ -312,6 +313,7 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
             .map((group, index) => ({
               id: String(group.id ?? `stored-group-${index}`),
               name: String(group.name ?? `Group ${index + 1}`),
+              color: String(group.color ?? "#bfdbfe"),
               nodeIds: Array.isArray(group.nodeIds) ? group.nodeIds.map(String) : []
             }))
             .filter((group) => group.nodeIds.length > 0)

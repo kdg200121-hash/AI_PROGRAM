@@ -2720,9 +2720,9 @@ tbody tr {
 .flowNode {
   position: absolute;
   width: 348px;
-  border: 1px solid #bfd4ed;
+  border: 1px solid var(--flow-node-border, #bfd4ed);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--flow-node-bg, rgba(255, 255, 255, 0.96));
   box-shadow:
     0 14px 30px rgba(45, 95, 159, 0.11),
     0 1px 0 rgba(255, 255, 255, 0.9) inset;
@@ -2731,25 +2731,67 @@ tbody tr {
 
 .flowGroupBox {
   position: absolute;
-  z-index: 0;
-  border: 1px solid rgba(59, 130, 246, 0.32);
+  z-index: 3;
+  border: 1px solid color-mix(in srgb, var(--flow-group-color, #3b82f6) 52%, transparent);
   border-radius: 16px;
-  background: rgba(191, 219, 254, 0.22);
+  background: var(--flow-group-bg, rgba(191, 219, 254, 0.22));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
-  pointer-events: none;
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
+  touch-action: none;
 }
 
-.flowGroupBox span {
+.flowGroupBox.dragging {
+  cursor: grabbing;
+  box-shadow:
+    0 12px 24px rgba(45, 95, 159, 0.13),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.54);
+}
+
+.flowGroupHeader {
   position: absolute;
   left: 14px;
-  top: 8px;
-  padding: 2px 8px;
-  border: 1px solid rgba(59, 130, 246, 0.22);
+  top: 7px;
+  display: inline-grid;
+  grid-template-columns: minmax(72px, auto) 22px;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 28px);
+  padding: 2px 5px 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--flow-group-color, #3b82f6) 34%, transparent);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
+}
+
+.flowGroupNameInput {
+  width: 104px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
   color: #2d5f9f;
   font-size: 11px;
   font-weight: 800;
+  outline: none;
+}
+
+.flowGroupColorInput {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(45, 95, 159, 0.24);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.flowGroupColorInput::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.flowGroupColorInput::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
 }
 
 .flowSelectionBox {
@@ -2767,7 +2809,7 @@ tbody tr {
   inset: 0;
   width: 10000px;
   height: 7000px;
-  z-index: 1;
+  z-index: 2;
   overflow: visible;
   pointer-events: auto;
 }
@@ -2811,7 +2853,7 @@ tbody tr {
 
 .flowNodeHeader {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 9px;
   width: 100%;
@@ -2835,19 +2877,6 @@ tbody tr {
 .flowNodeHeader:focus-visible {
   background: #eef5ff;
   outline: none;
-}
-
-.flowNodeNumber {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid #d3e1f2;
-  border-radius: 999px;
-  background: #f5f9ff;
-  color: #5f7592;
-  font-size: 10px;
-  font-weight: 800;
 }
 
 .flowNodeProgramIcon {
@@ -3024,9 +3053,34 @@ tbody tr {
   height: 14px;
   border: 2px solid #fff;
   border-radius: 4px;
-  background: #2d5f9f;
-  box-shadow: 0 0 0 2px #8fb4e6;
+  background: var(--flow-port-color, #2d5f9f);
+  box-shadow: 0 0 0 2px var(--flow-port-ring, #8fb4e6);
   transform: translateY(-50%);
+}
+
+.inputPortRow .flowPortConnector::before,
+.inputPortRow .flowPortConnector::after {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: #fff;
+  content: "";
+  opacity: 0;
+  transform-origin: center;
+  transition: opacity 0.12s ease;
+}
+
+.inputPortRow:hover .flowPortConnector::before {
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.inputPortRow:hover .flowPortConnector::after {
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .inputPortRow .flowPortConnector {
@@ -5311,19 +5365,22 @@ button.toolRiskBadge:focus-visible {
 }
 
 .darkMode .flowNode {
-  border-color: #303948;
-  background: #1c222c;
+  border-color: color-mix(in srgb, var(--flow-node-border, #303948) 62%, #303948);
+  background: color-mix(in srgb, var(--flow-node-bg, #1c222c) 22%, #151a22);
 }
 
 .darkMode .flowGroupBox {
-  border-color: rgba(122, 167, 232, 0.32);
-  background: rgba(37, 99, 235, 0.14);
+  border-color: color-mix(in srgb, var(--flow-group-color, #7aa7e8) 48%, transparent);
+  background: color-mix(in srgb, var(--flow-group-color, #7aa7e8) 18%, #111824);
   box-shadow: inset 0 0 0 1px rgba(122, 167, 232, 0.08);
 }
 
-.darkMode .flowGroupBox span {
+.darkMode .flowGroupHeader {
   border-color: rgba(122, 167, 232, 0.2);
   background: rgba(20, 26, 36, 0.74);
+}
+
+.darkMode .flowGroupNameInput {
   color: #cfe1fb;
 }
 
@@ -5335,12 +5392,6 @@ button.toolRiskBadge:focus-visible {
 
 .darkMode .flowNodeHeader strong {
   color: #f4f7fb;
-}
-
-.darkMode .flowNodeNumber {
-  border-color: #364358;
-  background: #202a38;
-  color: #aebbd0;
 }
 
 .darkMode .flowNode.expanded {
@@ -5424,8 +5475,8 @@ button.toolRiskBadge:focus-visible {
 
 .darkMode .flowPortConnector {
   border-color: #1c222c;
-  background: #7aa7e8;
-  box-shadow: 0 0 0 2px #3b5f8f;
+  background: var(--flow-port-color, #7aa7e8);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--flow-port-ring, #3b5f8f) 70%, #111824);
 }
 
 .darkMode .flowCanvasHint {

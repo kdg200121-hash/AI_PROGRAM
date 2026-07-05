@@ -137,8 +137,11 @@ logs
 - Custom Flow 노드, 연결선, 줌 배율, 패닝 위치는 localStorage `mcp-registry:custom-flow-graph`에 저장됩니다.
 - Custom Flow 격자는 `.flowCanvas` viewport 배경으로 그리며, CSS 변수 `--flow-grid-size`, `--flow-grid-x`, `--flow-grid-y`가 줌/패닝에 맞춰 업데이트됩니다. 월드 요소 밖 왼쪽/상단으로 패닝해도 격자가 끊기지 않도록 이 구조를 유지해야 합니다.
 - Custom Flow 노드는 내부 좌우 포트 행에 입력/출력 아이콘과 텍스트를 표시하고, 연결선은 해당 포트 행 중앙 높이에 맞춰 붙습니다. 포트 행은 `button`이 아니라 일반 행 요소로 렌더링해 버튼처럼 보이지 않게 유지해야 합니다.
+- Custom Flow 노드 배경, 입력/출력 커넥터, 연결선은 `App.tsx`의 프로그램/포트 타입 색상표를 사용합니다. 연결선 색상은 출발 출력 포트 타입을 기준으로 합니다.
+- Custom Flow 입력 포트 커넥터는 hover 시 X 표시를 보여 클릭하면 연결을 끊을 수 있음을 알려줍니다.
 - Custom Flow에서는 빈 캔버스를 드래그해 여러 노드를 박스 선택할 수 있고, 선택된 노드 하나를 드래그하면 선택 묶음이 함께 이동합니다. `Ctrl/Shift` 클릭은 노드 선택을 토글합니다.
-- Custom Flow에서 선택된 노드를 우클릭해 `그룹 만들기`를 누르거나 `Ctrl+G`를 누르면 그룹 박스를 생성합니다. 그룹 정보는 localStorage `mcp-registry:custom-flow-graph`의 `groups`에 저장됩니다.
+- Custom Flow에서 선택된 노드를 우클릭해 `그룹 만들기`를 누르거나 `Ctrl+G`를 누르면 그룹 박스를 생성합니다. 그룹 박스를 드래그하면 포함된 노드들이 함께 이동합니다.
+- Custom Flow 그룹 헤더에서는 그룹 이름과 배경색을 바로 수정할 수 있습니다. 그룹 이름, 색상, 포함 노드 정보는 localStorage `mcp-registry:custom-flow-graph`의 `groups`에 저장됩니다.
 - Custom Flow 노드는 왼쪽/상단 음수 좌표로도 이동할 수 있습니다. 연결선 SVG는 `overflow: visible` 구조를 전제로 하므로, 다시 좌표 clamp를 넣으면 좌상단 이동이 막힐 수 있습니다.
 - Custom Flow 캔버스에서 마우스 휠 버튼을 빠르게 두 번 누르면 전체 노드가 보이도록 자동 fit 됩니다.
 - Custom Flow의 포트/노드/저장/드래그 직렬화 모델은 `packages/desktop/src/customFlowModel.ts`로 분리되어 있습니다. UI 렌더링은 아직 `App.tsx`의 `WorkflowView`에 남아 있습니다.
