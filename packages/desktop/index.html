@@ -4,9 +4,76 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MCP Registry</title>
+    <style>
+      html,
+      body,
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: #eef4fb;
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      .htmlStartupLoading {
+        display: grid;
+        place-items: center;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(180deg, #f4f8fd 0%, #eaf3fb 100%);
+        color: #172033;
+      }
+
+      .htmlStartupLoadingPanel {
+        display: grid;
+        justify-items: center;
+        gap: 9px;
+        min-width: 260px;
+        padding: 22px 26px;
+        border: 1px solid rgba(201, 211, 225, 0.9);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 20px 55px rgba(15, 23, 42, 0.16);
+      }
+
+      .htmlStartupSpinner {
+        width: 26px;
+        height: 26px;
+        border: 3px solid #d7e2ef;
+        border-top-color: #2d5f9f;
+        border-radius: 50%;
+        animation: htmlStartupSpin 0.8s linear infinite;
+      }
+
+      .htmlStartupLoadingPanel strong {
+        font-size: 15px;
+      }
+
+      .htmlStartupLoadingPanel span {
+        color: #617086;
+        font-size: 12px;
+      }
+
+      @keyframes htmlStartupSpin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="htmlStartupLoading" role="status" aria-live="polite">
+        <div class="htmlStartupLoadingPanel">
+          <span class="htmlStartupSpinner" aria-hidden="true"></span>
+          <strong>MCP 연결관리자 준비 중</strong>
+          <span>작업 화면을 불러오고 있습니다.</span>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

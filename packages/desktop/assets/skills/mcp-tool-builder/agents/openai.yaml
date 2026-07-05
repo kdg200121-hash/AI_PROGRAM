@@ -1,0 +1,4 @@
+interface:
+  display_name: "MCP Tool Builder"
+  short_description: "AI Program용 MCP/MD 툴을 설계하고 Markdown 파일로 만드는 과정을 안내합니다."
+  default_prompt: "AI Program에서 사용할 MCP TOOL md 파일을 만들 수 있게 질문하면서 도와줘."

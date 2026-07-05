@@ -1,0 +1,4 @@
+interface:
+  display_name: "Save Tool"
+  short_description: "Create local MD tool drafts from /save requests."
+  default_prompt: "Use $save-tool when I type /save ToolName to create a local Markdown tool draft."

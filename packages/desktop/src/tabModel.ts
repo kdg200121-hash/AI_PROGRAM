@@ -17,8 +17,8 @@ export interface AppTab {
 export function createBlankTab(id: string): AppTab {
   return {
     id,
-    title: "새 탭",
-    sectionId: "servers",
+    title: "Home",
+    sectionId: "home",
     workspaceTabId: "cad",
     isPinned: false,
     sidebarSource: "menu",
@@ -108,6 +108,10 @@ export function moveTabToEnd(tabs: AppTab[], draggedTabId: string): AppTab[] {
 }
 
 function sectionLabel(sectionId: SidebarSectionId) {
+  if (sectionId === "home") {
+    return "Home";
+  }
+
   if (sectionId === "monitor") {
     return "Process Monitor";
   }

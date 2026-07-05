@@ -27,6 +27,7 @@ button.primary {
 }
 
 .appShell {
+  position: relative;
   height: 100vh;
   display: grid;
   grid-template-rows: 48px 1fr;
@@ -46,13 +47,15 @@ button.primary {
 .appTabs {
   grid-column: 2;
   grid-row: 1;
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 22px 0 18px;
   border-bottom: 1px solid #d7dee9;
-  background: #fff;
+  background: #eaf3fb;
   min-width: 0;
+  overflow: visible;
 }
 
 .historyControls {
@@ -101,13 +104,26 @@ button.primary {
   cursor: default;
 }
 
+.tabStrip {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  overflow: visible;
+}
+
 .openTabs {
   display: flex;
   align-items: flex-end;
   gap: 0;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 100%;
   height: 100%;
-  overflow-x: auto;
+  overflow: hidden;
   scrollbar-width: none;
 }
 
@@ -119,9 +135,9 @@ button.primary {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-width: 136px;
-  max-width: 220px;
+  gap: 4px;
+  min-width: 168px;
+  max-width: 248px;
   height: 36px;
   min-height: 36px;
   padding: 0 30px 0 12px;
@@ -132,6 +148,54 @@ button.primary {
   color: #526071;
   font-size: 12px;
   font-weight: 600;
+}
+
+.tabLabelIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.tabLabelIcon .navIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.tabLabelIcon .navIcon-home,
+.tabOverflowItem .navIcon-home {
+  color: #476078;
+}
+
+.tabLabelIcon .navIcon-home {
+  width: 16px;
+  height: 16px;
+}
+
+.tabLabelIcon .navIcon-workflow {
+  width: 16px;
+  height: 16px;
+}
+
+.tabLabelIcon .navIcon-home .uiIconSvg,
+.tabOverflowItem .navIcon-home .uiIconSvg {
+  width: 16px;
+  height: 16px;
+}
+
+.tabLabelIcon .navIcon .uiIconSvg {
+  width: 13px;
+  height: 13px;
+}
+
+.tabLabelIcon .navIcon-workflow .uiIconSvg {
+  width: 13px;
+  height: 13px;
+}
+
+.tabLabelIcon .navIcon-home .uiIconSvg {
+  width: 16px;
+  height: 16px;
 }
 
 .openTab:not(:last-child)::after {
@@ -152,8 +216,24 @@ button.primary {
 
 .openTab.active {
   border-color: #d7dee9;
-  background: #eef5ff;
+  background: #fff;
   color: #1f4d82;
+}
+
+.openTab.pinned {
+  border-color: #aeb8c6;
+  background: transparent;
+  color: #526071;
+}
+
+.openTab.pinned.active {
+  border-color: #8f9baa;
+  background: #fff;
+  color: #1f4d82;
+}
+
+.openTab.pinned::before {
+  content: none;
 }
 
 .openTab.dragging {
@@ -184,6 +264,10 @@ button.primary {
   left: -4px;
 }
 
+.openTab:first-child.dragOverBefore::before {
+  left: 0;
+}
+
 .openTab.dragOverAfter::after {
   right: -4px;
 }
@@ -193,26 +277,48 @@ button.primary {
 }
 
 .openTabTitle {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .openTabMeta {
-  max-width: 88px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  max-width: 118px;
   overflow: hidden;
   padding: 2px 5px;
   border-radius: 4px;
   background: rgba(45, 95, 159, 0.1);
   color: #526071;
   font-size: 10px;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pinMark {
-  color: #2d5f9f;
-  font-size: 9px;
+.tabWorkStatus {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.78);
+}
+
+.tabWorkStatus.running {
+  background: #f59e0b;
+}
+
+.tabWorkStatus.done {
+  background: #22c55e;
+}
+
+.tabWorkStatus.error {
+  background: #ef4444;
 }
 
 .tabCloseButton {
@@ -239,7 +345,7 @@ button.primary {
 
 .newTabButton {
   position: relative;
-  align-self: flex-end;
+  align-self: center;
   display: grid;
   place-items: center;
   width: 32px;
@@ -248,13 +354,33 @@ button.primary {
   min-height: 32px;
   padding: 0;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: #526071;
   font-size: 20px;
   font-weight: 400;
 }
 
+.tabControlSlot {
+  position: relative;
+  align-self: flex-end;
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
+.tabControlSlot .newTabButton,
+.tabControlSlot .tabOverflowButton {
+  margin: 0;
+}
+
 .tabEndDropZone {
+  display: none;
   align-self: stretch;
   flex: 0 0 28px;
   min-width: 28px;
@@ -304,6 +430,7 @@ button.primary {
 }
 
 .topUtility {
+  position: relative;
   margin-left: auto;
   display: flex;
   align-items: center;
@@ -314,9 +441,42 @@ button.primary {
 .compactButton {
   min-height: 32px;
   padding: 0 11px;
-  color: #2d5f9f;
+  color: #334155;
   font-size: 12px;
   font-weight: 600;
+}
+
+.webViewButton {
+  min-height: 32px;
+  padding: 0 11px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.compactButton,
+.webViewButton {
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    transform 80ms ease;
+}
+
+.compactButton:hover,
+.compactButton:focus-visible,
+.webViewButton:hover,
+.webViewButton:focus-visible {
+  border-color: #b8c7dc;
+  background: #eef5ff;
+  color: #1f4d82;
+  outline: none;
+}
+
+.compactButton:active,
+.webViewButton:active {
+  background: rgba(83, 133, 196, 0.24);
+  transform: translateY(1px);
 }
 
 .connectionBadge {
@@ -331,6 +491,12 @@ button.primary {
   color: #334155;
   font-size: 12px;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.connectionBadge:hover {
+  border-color: #b8c7dc;
+  background: #eef5ff;
 }
 
 .statusDot {
@@ -359,6 +525,197 @@ button.primary {
   padding: 18px 14px;
   overflow: hidden;
   transition: width 160ms ease;
+}
+
+.tabOverflowButton {
+  position: relative;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #526071;
+  font-size: 20px;
+  font-weight: 400;
+  border-radius: 6px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    transform 80ms ease;
+}
+
+.newTabButton:hover,
+.newTabButton:focus-visible {
+  background: #eef5ff;
+  color: #1f4d82;
+  outline: none;
+}
+
+.newTabButton:active {
+  background: rgba(83, 133, 196, 0.24);
+  transform: translateY(1px);
+}
+
+.connectionNotice {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  max-width: 260px;
+  padding: 6px 9px;
+  border: 1px solid #c9d8ee;
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  white-space: nowrap;
+}
+
+.tabOverflowButton:hover,
+.tabOverflowButton.active {
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
+.tabOverflowMenu {
+  position: absolute;
+  z-index: 25;
+  top: calc(100% - 4px);
+  right: 10px;
+  display: grid;
+  width: 230px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid #d7dee9;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
+}
+
+.tabOverflowItem {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 42px;
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  color: #26364d;
+  text-align: left;
+}
+
+.tabOverflowItemLabel,
+.tabOverflowItem small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabOverflowItemLabel {
+  display: grid !important;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tabOverflowItemLabel .navIcon {
+  justify-self: center;
+}
+
+.tabOverflowItemMain {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabOverflowCloseButton {
+  display: grid !important;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: #6b7687;
+  font-size: 14px !important;
+  font-weight: 700;
+}
+
+.tabOverflowCloseButton:hover {
+  background: rgba(45, 95, 159, 0.12);
+  color: #1f4d82;
+}
+
+.tabOverflowItem .navIcon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.tabOverflowItem .navIcon .uiIconSvg {
+  width: 14px;
+  height: 14px;
+}
+
+.tabOverflowItem .navIcon-workflow {
+  width: 18px;
+  height: 18px;
+}
+
+.tabOverflowItem .navIcon-workflow .uiIconSvg {
+  width: 14px;
+  height: 14px;
+}
+
+.tabOverflowItem .navIcon-home .uiIconSvg {
+  width: 16px;
+  height: 16px;
+}
+
+.tabOverflowItem small {
+  color: #6b7687;
+  font-size: 10px;
+}
+
+.tabOverflowItem:hover,
+.tabOverflowItem.active {
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
+.tabOverflowItem.dragOverBefore {
+  box-shadow: inset 0 2px 0 #2d5f9f;
+}
+
+.tabOverflowItem.dragOverAfter {
+  box-shadow: inset 0 -2px 0 #2d5f9f;
+}
+
+.tabOverflowAddButton {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  margin-top: 6px;
+  border: 1px dashed #b8c7dc;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #2d5f9f;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.tabOverflowAddButton:hover {
+  background: #eef5ff;
 }
 
 .newTabButton::before {
@@ -455,6 +812,34 @@ button.primary {
   display: none;
 }
 
+.sidebarScrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-right: -4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.sidebarScrollArea::-webkit-scrollbar {
+  width: 7px;
+}
+
+.sidebarScrollArea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebarScrollArea::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+}
+
+.sidebarScrollArea:hover::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.72);
+}
+
 .brand {
   padding: 8px 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
@@ -469,13 +854,54 @@ button.primary {
   min-height: 28px;
 }
 
+.authSidebarButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 112px;
+  min-height: 22px;
+  padding: 0 9px;
+  border: 1px solid rgba(174, 185, 202, 0.34);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d8e2f0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.authSidebarButton:hover,
+.authSidebarButton:focus-visible {
+  border-color: rgba(203, 213, 225, 0.58);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  outline: none;
+}
+
+.authSidebarButton.signedIn {
+  border-color: rgba(94, 234, 212, 0.3);
+  background: rgba(45, 212, 191, 0.1);
+  color: #d5f5ef;
+}
+
+.brandMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  min-height: 24px;
+}
+
 .brand strong,
 .brandVersion {
   display: block;
 }
 
 .brandVersion {
-  margin-top: 4px;
   color: #aeb9ca;
   font-size: 12px;
 }
@@ -497,6 +923,15 @@ button.primary {
   text-align: left;
   background: transparent;
   color: #c8d1df;
+  cursor: pointer;
+}
+
+.navItem[draggable="true"] {
+  cursor: grab;
+}
+
+.navItem[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .navRow {
@@ -710,17 +1145,29 @@ button.primary {
   cursor: grab;
 }
 
-.submenuDragButton span {
-  display: block;
-  width: 12px;
-  height: 12px;
-  background:
-    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 0 0 / 6px 6px,
-    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 6px 0 / 6px 6px,
-    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 0 6px / 6px 6px,
-    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 6px 6px / 6px 6px;
-  font-size: 0;
-  line-height: 0;
+.submenuDragButton .submenuTypeIcon,
+.favoriteSubmenuIcon {
+  width: 16px;
+  height: 16px;
+  color: #9aa7ba;
+}
+
+.submenuDragButton .submenuTypeIcon .uiIconSvg,
+.favoriteSubmenuIcon .uiIconSvg {
+  width: 16px;
+  height: 16px;
+}
+
+.customToolDragButton .submenuTypeIcon,
+.favoriteSubmenuIcon.uiIcon-customTools {
+  color: #b9cdf0;
+}
+
+.submenuRow:hover .submenuTypeIcon,
+.submenuRow.active .submenuTypeIcon,
+.favoriteSubmenuButton:hover .favoriteSubmenuIcon,
+.favoriteSubmenuButton.active .favoriteSubmenuIcon {
+  color: #fff;
 }
 
 .submenuButton {
@@ -778,6 +1225,56 @@ button.primary {
   text-transform: uppercase;
 }
 
+.sidebarScrollArea > .sidebarLabel.navFull {
+  display: none;
+}
+
+.sidebarMenuHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0 7px;
+}
+
+.sidebarMenuHeader .sidebarLabel {
+  margin: 0 10px;
+}
+
+.sidebarMenuHeader .sidebarHomeButton {
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  margin: 0 8px 0 0;
+  padding: 0;
+  justify-content: center;
+}
+
+.sidebarMenuHeader .sidebarHomeButton.active {
+  border-color: transparent;
+  background: transparent;
+  color: #dbe7f7;
+}
+
+.sidebarMenuHeader .sidebarHomeButton.active:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.sidebarMenuHeader .navIcon-home {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebarMenuHeader .navIcon-home .uiIconSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebarCollapsedHomeButton {
+  display: none;
+}
+
 .navItem.favorite {
   color: #e0e7f1;
 }
@@ -818,9 +1315,9 @@ button.primary {
   font: inherit;
 }
 
-.favoriteSubmenuButton .submenuMiniIcon {
-  width: 12px;
-  height: 12px;
+.favoriteSubmenuButton .favoriteSubmenuIcon {
+  width: 16px;
+  height: 16px;
   justify-self: center;
   margin: 0;
 }
@@ -830,6 +1327,8 @@ button.primary {
   width: calc(100% - 14px);
   margin-left: 14px;
   padding: 0 10px;
+  min-height: 24px;
+  font-size: 11px;
 }
 
 .favoriteSubmenuButton:hover,
@@ -843,6 +1342,35 @@ button.primary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebarHomeButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  margin: 0 0 10px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #dbe7f7;
+  text-align: left;
+  font: inherit;
+  font-weight: 700;
+}
+
+.sidebarHomeButton:hover,
+.sidebarHomeButton.active {
+  background: rgba(75, 121, 180, 0.32);
+  color: #fff;
+}
+
+.sidebarHomeButton .navFull {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .recentSubmenuGroup {
@@ -860,7 +1388,44 @@ button.primary {
 }
 
 .recentSubmenuHeader .sidebarLabel {
+  display: none;
+}
+
+.recentSubmenuHeader .sidebarLabel::before {
+  content: "최근 사용";
+  color: #8fa7c7;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.recentSubmenuHeader:hover .sidebarLabel::before {
+  color: #dbe7f7;
+}
+
+.recentSubmenuHeader .sidebarLabel::before {
+  content: none;
+}
+
+.recentToggleButton {
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8fa7c7;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-size: 0;
+  font-weight: 700;
+}
+
+.recentToggleButton::before {
+  content: "\CD5C\ADFC \C0AC\C6A9";
+  font-size: 11px;
+}
+
+.recentSubmenuHeader:hover .recentToggleButton {
+  color: #dbe7f7;
 }
 
 .recentClearButton {
@@ -926,21 +1491,87 @@ button.primary {
   color: #fff;
 }
 
-.submenuMiniIcon {
-  display: block;
-  width: 12px;
-  height: 12px;
-  margin: 0 auto;
-  color: #8d9aab;
-  background:
-    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 0 0 / 6px 6px,
-    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 6px 0 / 6px 6px,
-    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 0 6px / 6px 6px,
-    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) 6px 6px / 6px 6px;
-}
-
 .navShort {
   display: none;
+}
+
+.uiIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: currentColor;
+  line-height: 1;
+}
+
+.uiIconSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.uiIconText {
+  fill: currentColor;
+  font-size: 15px;
+  font-weight: 900;
+  dominant-baseline: middle;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.navIcon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.navIcon .uiIconSvg {
+  width: 17px;
+  height: 17px;
+}
+
+.navIcon-home {
+  background: transparent;
+  color: #fff;
+  box-shadow: none;
+}
+
+.navIcon-home .uiIconSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.navIcon-servers {
+  background: linear-gradient(135deg, #d5252f, #8f1720);
+}
+
+.navIcon-workflow {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}
+
+.navIcon-workflow .uiIconSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.navIcon-revit {
+  background: linear-gradient(135deg, #2e66b7, #163f85);
+}
+
+.navIcon-excel {
+  background: linear-gradient(135deg, #107c41, #185c37);
+}
+
+.navIcon-tekla {
+  background: linear-gradient(135deg, #1f5fbf, #153c83);
 }
 
 .navItem.active {
@@ -949,26 +1580,30 @@ button.primary {
 }
 
 .sidebarMonitorButton,
-.sidebarSettingsButton {
+.sidebarSettingsButton,
+.sidebarMarketButton {
   width: 100%;
   min-height: 38px;
   border-color: rgba(226, 232, 240, 0.24);
   background: rgba(255, 255, 255, 0.04);
   color: #dbe4f0;
+  font-size: 12px;
+  font-weight: 700;
   text-align: left;
 }
 
-.sidebarMonitorButton {
+.sidebarMarketButton {
   position: relative;
   margin-top: auto;
   margin-bottom: 6px;
+  font-weight: 700;
 }
 
-.recentSubmenuGroup + .sidebarMonitorButton {
+.recentSubmenuGroup + .sidebarMarketButton {
   margin-top: 0;
 }
 
-.sidebarMonitorButton::before {
+.sidebarMarketButton::before {
   content: "";
   position: absolute;
   left: 0;
@@ -979,25 +1614,46 @@ button.primary {
   pointer-events: none;
 }
 
-.sidebarSettingsButton {
-  margin-top: 0;
+.sidebarUtilityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .sidebarMonitorButton .navFull,
-.sidebarSettingsButton .navFull {
+.sidebarSettingsButton .navFull,
+.sidebarMarketButton .navFull,
+.sidebarHomeButton .navFull {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
+.utilityIcon {
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+}
+
+.settingsGlyphSlot {
+  font-size: 0;
+}
+
+.settingsGlyphSlot .utilityIcon {
+  font-size: initial;
+}
+
 .sidebarMonitorButton:hover,
-.sidebarSettingsButton:hover {
+.sidebarSettingsButton:hover,
+.sidebarMarketButton:hover,
+.sidebarHomeButton:hover {
   border-color: rgba(226, 232, 240, 0.46);
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 
-.sidebarMonitorButton.active {
+.sidebarMonitorButton.active,
+.sidebarHomeButton.active {
   border-color: rgba(83, 133, 196, 0.62);
   background: rgba(83, 133, 196, 0.42);
   color: #fff;
@@ -1039,7 +1695,7 @@ button.primary {
   padding: 0;
 }
 
-.sidebarCollapsed .favoriteSubmenuButton .submenuMiniIcon {
+.sidebarCollapsed .favoriteSubmenuButton .favoriteSubmenuIcon {
   justify-self: center;
   margin: 0;
 }
@@ -1052,10 +1708,15 @@ button.primary {
 }
 
 .sidebarCollapsed .sidebarMonitorButton,
-.sidebarCollapsed .sidebarSettingsButton {
+.sidebarCollapsed .sidebarSettingsButton,
+.sidebarCollapsed .sidebarMarketButton {
   display: grid;
   place-items: center;
   padding: 0;
+}
+
+.sidebarCollapsed .sidebarUtilityGrid {
+  grid-template-columns: 1fr;
 }
 
 .sidebarCollapsed .navFull {
@@ -1063,8 +1724,58 @@ button.primary {
 }
 
 .sidebarCollapsed .navShort {
+  position: relative;
   display: inline;
   font-weight: 700;
+}
+
+.sidebarCollapsed .recentSubmenuGroup {
+  display: none;
+}
+
+.sidebarCollapsed .favoriteGroup .favoriteRow .navShort::after,
+.sidebarCollapsed .favoriteGroup .favoriteSubmenuButton .favoriteSubmenuIcon::after {
+  content: "★";
+  position: absolute;
+  left: -6px;
+  top: -8px;
+  color: #facc15;
+  font-size: 10px;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.4);
+}
+
+.sidebarCollapsed .favoriteGroup .favoriteSubmenuButton .favoriteSubmenuIcon {
+  position: relative;
+}
+
+.sidebarCollapsed .sidebarCollapsedHomeButton {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  margin: 10px auto 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #dbe7f7;
+}
+
+.sidebarCollapsed .sidebarCollapsedHomeButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.sidebarCollapsed .sidebarCollapsedHomeButton .navIcon-home {
+  width: 20px;
+  height: 20px;
+}
+
+.sidebarCollapsed .sidebarCollapsedHomeButton .navIcon-home .uiIconSvg {
+  width: 20px;
+  height: 20px;
 }
 
 .main {
@@ -1073,48 +1784,134 @@ button.primary {
   display: grid;
   grid-template-rows: 56px auto minmax(0, 1fr);
   min-width: 0;
+  background: #edf6ff;
   overflow: hidden;
+}
+
+.main.noMetrics {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.main.noMetrics .topbar {
+  min-height: 64px;
+  align-items: center;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 .compactMode {
   grid-template-columns: 56px 1fr;
-  grid-template-rows: 48px 1fr;
+  grid-template-rows: 1fr;
 }
 
 .compactMode .sidebar {
   grid-row: 1 / -1;
   display: flex;
-  padding: 52px 8px 14px;
+  padding: 8px 8px 14px;
 }
 
 .compactMode .appTabs {
+  display: flex;
   grid-column: 2;
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 4;
+  justify-content: flex-end;
+  min-height: 32px;
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
 }
 
 .compactMode .main {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
+  display: block;
   grid-template-rows: auto 1fr;
-  overflow: hidden;
+  min-height: 0;
+  height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .compactMode .brand,
+.compactMode .sidebarToggleCollapsed,
 .compactMode .sidebarLabel,
 .compactMode .navFull,
 .compactMode .navOrderButton,
 .compactMode .navExpandButton,
 .compactMode .navSubPanel,
-.compactMode .submenuList {
+.compactMode .submenuList,
+.compactMode .sidebarMarketButton,
+.compactMode .sidebarUtilityGrid {
   display: none;
+}
+
+.compactMode .sidebarMenuHeader {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 10px;
+}
+
+.compactMode .sidebarMenuHeader .sidebarHomeButton {
+  display: grid;
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  margin: 0;
+  padding: 0;
+}
+
+.compactMode .sidebarCollapsedHomeButton {
+  display: none;
+}
+
+.compactMode:not(.sidebarCollapsed) {
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+}
+
+.compactMode:not(.sidebarCollapsed) .sidebar {
+  padding: 18px 14px;
+}
+
+.compactMode:not(.sidebarCollapsed) .brand,
+.compactMode:not(.sidebarCollapsed) .sidebarLabel,
+.compactMode:not(.sidebarCollapsed) .navFull,
+.compactMode:not(.sidebarCollapsed) .navOrderButton,
+.compactMode:not(.sidebarCollapsed) .navExpandButton,
+.compactMode:not(.sidebarCollapsed) .navSubPanel,
+.compactMode:not(.sidebarCollapsed) .submenuList {
+  display: revert;
+}
+
+.compactMode:not(.sidebarCollapsed) .navRow {
+  grid-template-columns: 22px minmax(0, 1fr) 28px;
+}
+
+.compactMode:not(.sidebarCollapsed) .navItem,
+.compactMode:not(.sidebarCollapsed) .sidebarMonitorButton,
+.compactMode:not(.sidebarCollapsed) .sidebarSettingsButton,
+.compactMode:not(.sidebarCollapsed) .sidebarMarketButton {
+  display: flex;
+  justify-content: flex-start;
+  min-height: 36px;
+  padding: 0 8px;
 }
 
 .compactMode .navRow {
   grid-template-columns: 1fr;
 }
 
+.compactMode .sidebarHomeButton {
+  margin-bottom: 10px;
+}
+
 .compactMode .navItem,
 .compactMode .sidebarMonitorButton,
-.compactMode .sidebarSettingsButton {
+.compactMode .sidebarSettingsButton,
+.compactMode .sidebarMarketButton,
+.compactMode .sidebarHomeButton {
   display: grid;
   place-items: center;
   min-height: 40px;
@@ -1130,61 +1927,105 @@ button.primary {
   display: none;
 }
 
+.compactMode .toolLibrarySection .panelHeaderNote,
+.compactMode .toolLibrarySection .toolItem span {
+  display: none;
+}
+
+.compactMode .toolLibrarySection .toolStatusRow {
+  display: none !important;
+}
+
+.compactMode .toolLibrarySection .panelHeader {
+  min-height: 44px;
+  align-items: center;
+  padding: 0 12px;
+}
+
 .compactMode .contentGrid {
   grid-template-columns: 1fr;
   gap: 10px;
   padding: 10px;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .compactMode .topbar {
   position: relative;
-  height: auto;
-  min-height: 0;
+  min-height: 82px;
   align-items: flex-start;
   flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 14px;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 18px 128px 12px 14px;
 }
 
 .compactMode .historyControls {
-  position: absolute;
-  top: 18px;
-  right: 28px;
-  margin-right: 0;
+  display: none;
 }
 
 .compactMode .topbar h1 {
   font-size: 16px;
 }
 
+.compactMode .topbarTitle {
+  display: grid;
+  align-content: start;
+  width: 100%;
+  min-height: 50px;
+  padding-top: 0;
+}
+
+.compactMode .topbar p,
+.compactMode .topbarSubtitleField .editableValue,
+.compactMode .topbarSubtitleField textarea {
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
 .compactMode .appTabs {
-  min-height: 48px;
+  min-height: 32px;
   align-items: center;
   flex-direction: row;
   gap: 4px;
-  padding: 6px 8px;
-  overflow: hidden;
+  padding: 0;
+  overflow: visible;
 }
 
 .compactMode .openTabs {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: calc(100% - 104px);
+  max-width: none;
 }
 
 .compactMode .openTab {
-  min-width: 96px;
-  max-width: 128px;
-  height: 32px;
-  min-height: 32px;
-  padding: 0 28px 0 9px;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  min-width: 118px;
+  max-width: 148px;
+  height: 40px;
+  min-height: 40px;
+  padding: 3px 28px 3px 9px;
   font-size: 11px;
 }
 
 .compactMode .openTabMeta {
-  display: none;
+  display: inline-flex;
+  max-width: 70px;
+  padding: 1px 4px;
+  font-size: 9px;
+}
+
+.compactMode .openTabTitle {
+  width: 100%;
+  font-size: 10px;
+}
+
+.compactMode .tabLabelIcon .navIcon {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  font-size: 5px;
 }
 
 .compactMode .tabCloseButton {
@@ -1198,8 +2039,26 @@ button.primary {
   min-width: 28px;
 }
 
+.compactMode .tabOverflowButton {
+  display: grid;
+  width: 28px;
+  min-width: 28px;
+  height: 32px;
+  min-height: 32px;
+}
+
 .compactMode .tabEndDropZone {
   display: none;
+}
+
+.compactMode .openTabs,
+.compactMode .tabStrip,
+.compactMode .newTabButton,
+.compactMode .tabOverflowButton,
+.compactMode .sidebarMarketButton,
+.compactMode .sidebarUtilityGrid,
+.compactMode .tabEndDropZone {
+  display: none !important;
 }
 
 .compactMode .workspaceTabsInner {
@@ -1251,11 +2110,23 @@ button.primary {
   display: none;
 }
 
+.compactMode .notificationStack {
+  left: calc(64px + ((100vw - 64px) / 2));
+  width: min(520px, calc(100vw - 96px));
+  bottom: 14px;
+}
+
+.compactMode .appNotification {
+  min-height: 64px;
+  padding: 12px 12px 12px 14px;
+}
+
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px;
+  min-height: 56px;
+  padding: 8px 18px;
   background: #fff;
   border-bottom: 1px solid #dde4ee;
 }
@@ -1266,9 +2137,89 @@ button.primary {
 }
 
 .topbar p {
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   color: #617086;
   font-size: 12px;
+  line-height: 1.35;
+}
+
+.topbarTitle {
+  min-width: 0;
+}
+
+.topbarTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topbarTitleRow h1 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customToolMetaBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid #bdd5f2;
+  border-radius: 999px;
+  background: #e8f3ff;
+  color: #2d5f9f;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.topbarTitle.editable {
+  display: grid;
+  gap: 0;
+  max-width: min(720px, calc(100vw - 220px));
+  align-content: center;
+}
+
+.topbarTitleField > span,
+.topbarSubtitleField > span {
+  display: none;
+}
+
+.topbarTitleField .editableValue,
+.topbarTitleField input {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.topbarSubtitleField .editableValue,
+.topbarSubtitleField textarea {
+  min-height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #617086;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.topbarSubtitleField .editableValue.multiline {
+  min-height: 16px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.topbarTitleField .editableValue:hover,
+.topbarSubtitleField .editableValue:hover {
+  background: transparent;
+  color: #1f4d82;
 }
 
 .metrics {
@@ -1308,7 +2259,7 @@ button.primary {
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 12px;
   padding: 0 18px 16px;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .serverPanel {
@@ -1332,6 +2283,20 @@ button.primary {
   font-size: 15px;
 }
 
+.panelHeaderNote {
+  margin-left: 10px;
+  color: #7a8797;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.panelHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1349,6 +2314,34 @@ th {
   color: #617086;
   font-weight: 600;
   background: #fbfcfe;
+}
+
+.sortHeaderButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.sortHeaderButton:hover,
+.sortHeaderButton:focus-visible {
+  color: #1f4d82;
+  background: transparent;
+  outline: none;
+}
+
+.sortArrow {
+  min-width: 10px;
+  font-size: 11px;
+  line-height: 1;
 }
 
 tbody tr {
@@ -1395,7 +2388,207 @@ tbody tr {
   min-height: 0;
   display: grid;
   gap: 16px;
-  padding: 0 22px 22px;
+  padding: 14px 34px 28px 22px;
+  background: #edf6ff;
+  overflow: auto;
+}
+
+.submenuPage {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.submenuLayout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.78fr) minmax(420px, 1.22fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.submenuWorkPanel,
+.submenuConfigPanel {
+  min-height: 420px;
+}
+
+.submenuLayout .panelHeader {
+  min-height: 66px;
+  align-items: flex-start;
+  padding: 12px 14px;
+}
+
+.submenuLayout .panelHeader > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.submenuLayout .panelHeaderNote {
+  margin-left: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.principleList,
+.configForm {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.principleList div {
+  min-height: 68px;
+  padding: 12px;
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.principleList strong,
+.principleList span {
+  display: block;
+}
+
+.principleList strong {
+  color: #172033;
+  font-size: 13px;
+}
+
+.principleList span {
+  margin-top: 8px;
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.submenuEditor {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.submenuToolGrid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+}
+
+.editableText {
+  display: grid;
+  gap: 6px;
+}
+
+.editableText > span {
+  color: #617086;
+  font-size: 12px;
+}
+
+.editableValue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #172033;
+  text-align: left;
+  font-weight: 600;
+}
+
+.editableValue:hover {
+  border-color: #d9e1ec;
+  background: #f9fbfe;
+}
+
+.editableValue.multiline {
+  min-height: 72px;
+  align-items: flex-start;
+  color: #526071;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.editableText input,
+.editableText textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid #d9e1ec;
+  border-radius: 6px;
+  background: #f9fbfe;
+  color: #172033;
+  font: inherit;
+}
+
+.editableText textarea {
+  min-height: 72px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.topbarSubtitleField textarea {
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  resize: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.submenuTitleField .editableValue,
+.submenuTitleField input {
+  min-height: 42px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.submenuToolPanel {
+  min-height: 0;
+}
+
+.toolWorkspaceView {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.toolWorkspaceGrid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.toolCatalogPanel,
+.relatedServerPanel {
+  min-height: 0;
+}
+
+.relatedServerList {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.relatedServerItem {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.relatedServerItem strong,
+.relatedServerItem span {
+  display: block;
+}
+
+.relatedServerItem span {
+  color: #617086;
+  font-size: 12px;
 }
 
 .workflowRail {
@@ -1471,6 +2664,415 @@ tbody tr {
   line-height: 1.5;
 }
 
+.customFlowView {
+  height: calc(100vh - 146px);
+  min-height: 560px;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  background: #eaf4ff;
+}
+
+.flowNodeHeader small,
+.flowNodeDetails p {
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.flowCanvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(#dbe9f8 1px, transparent 1px),
+    linear-gradient(90deg, #dbe9f8 1px, transparent 1px),
+    #eaf4ff;
+  background-position:
+    var(--flow-grid-x, 0) var(--flow-grid-y, 0),
+    var(--flow-grid-x, 0) var(--flow-grid-y, 0),
+    0 0;
+  background-size:
+    var(--flow-grid-size, 26px) var(--flow-grid-size, 26px),
+    var(--flow-grid-size, 26px) var(--flow-grid-size, 26px),
+    auto;
+  box-shadow: inset 0 0 0 1px #d4e3f4;
+  cursor: default;
+}
+
+.flowCanvas.panning,
+.flowCanvas.panning * {
+  cursor: grabbing !important;
+}
+
+.flowCanvasWorld {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 10000px;
+  height: 7000px;
+  transform-origin: 0 0;
+  background: transparent;
+}
+
+.flowNode {
+  position: absolute;
+  width: 348px;
+  border: 1px solid #bfd4ed;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 14px 30px rgba(45, 95, 159, 0.11),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  overflow: visible;
+}
+
+.flowGroupBox {
+  position: absolute;
+  z-index: 0;
+  border: 1px solid rgba(59, 130, 246, 0.32);
+  border-radius: 16px;
+  background: rgba(191, 219, 254, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+}
+
+.flowGroupBox span {
+  position: absolute;
+  left: 14px;
+  top: 8px;
+  padding: 2px 8px;
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #2d5f9f;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.flowSelectionBox {
+  position: absolute;
+  z-index: 8;
+  border: 1px solid rgba(37, 99, 235, 0.7);
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.14);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.62) inset;
+  pointer-events: none;
+}
+
+.flowConnectionLayer {
+  position: absolute;
+  inset: 0;
+  width: 10000px;
+  height: 7000px;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.flowConnectionLayer path {
+  fill: none;
+  stroke: #4f7fbd;
+  stroke-width: 3;
+  stroke-linecap: round;
+  pointer-events: stroke;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(45, 95, 159, 0.18));
+}
+
+.flowConnectionLayer path.pendingConnectionPath {
+  stroke: #f59e0b;
+  stroke-dasharray: 8 8;
+  pointer-events: none;
+}
+
+.flowConnectionLayer path.warningConnectionPath {
+  stroke: #d97706;
+  stroke-dasharray: 5 5;
+}
+
+.flowNode.expanded {
+  border-color: #7da9dc;
+}
+
+.flowNode.selected {
+  border-color: #5d8fd0;
+  box-shadow:
+    0 0 0 3px rgba(93, 143, 208, 0.16),
+    0 12px 28px rgba(45, 95, 159, 0.12);
+}
+
+.flowNode.dragging {
+  z-index: 4 !important;
+  box-shadow: 0 18px 34px rgba(45, 95, 159, 0.18);
+}
+
+.flowNodeHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 10px 9px 12px;
+  border: 0;
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.flowNodeHeader:active {
+  cursor: grabbing;
+}
+
+.flowNodeHeader:hover,
+.flowNodeHeader:focus-visible {
+  background: #eef5ff;
+  outline: none;
+}
+
+.flowNodeNumber {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #d3e1f2;
+  border-radius: 999px;
+  background: #f5f9ff;
+  color: #5f7592;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.flowNodeProgramIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+}
+
+.flowNodeProgramIcon.uiIcon-cad {
+  background: linear-gradient(135deg, #d5252f, #8f1720);
+}
+
+.flowNodeProgramIcon.uiIcon-revit {
+  background: linear-gradient(135deg, #2e66b7, #163f85);
+}
+
+.flowNodeProgramIcon.uiIcon-excel {
+  background: linear-gradient(135deg, #107c41, #185c37);
+}
+
+.flowNodeProgramIcon.uiIcon-tekla {
+  background: linear-gradient(135deg, #1f5fbf, #153c83);
+}
+
+.flowNodeProgramIcon.uiIcon-workflow,
+.flowNodeProgramIcon.uiIcon-customTools {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.flowNodeProgramIcon .uiIconSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.flowNodeHeader strong,
+.flowNodeHeader small {
+  display: block;
+}
+
+.flowNodeTitleBlock {
+  min-width: 0;
+}
+
+.flowNodeHeader strong {
+  overflow: hidden;
+  color: #10203a;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flowNodeHeader small {
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flowNodeChevron {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #6d7b8d;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.flowNodeChevron:hover,
+.flowNodeChevron:focus-visible {
+  border-color: #c6d8ee;
+  background: #e8f2ff;
+  color: #2d5f9f;
+  outline: none;
+}
+
+.flowNodeBody {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+  border-top: 1px solid #e5edf7;
+}
+
+.flowNodeBody.compact {
+  border-top-color: transparent;
+}
+
+.flowPortColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.flowPorts,
+.flowNodeDetails {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.flowPorts strong,
+.flowNodeDetails strong {
+  color: #172033;
+  font-size: 12px;
+}
+
+.flowPortRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #2e435f;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: crosshair;
+  user-select: none;
+  transition:
+    border-color 0.14s ease,
+    background-color 0.14s ease,
+    box-shadow 0.14s ease,
+    transform 0.08s ease;
+}
+
+.flowPortRow span:not(.flowPortConnector) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flowPortRow:hover,
+.flowPortRow:focus-visible,
+.flowPortRow.pending {
+  border-color: #efd49b;
+  background: rgba(255, 247, 230, 0.72);
+  box-shadow: none;
+  outline: none;
+}
+
+.flowPortRow:active {
+  transform: translateY(1px);
+}
+
+.flowPortRow.connected {
+  border-color: #c8dcf4;
+  background: rgba(237, 245, 255, 0.76);
+}
+
+.outputPortRow {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.flowPortConnector {
+  position: absolute;
+  top: 50%;
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  background: #2d5f9f;
+  box-shadow: 0 0 0 2px #8fb4e6;
+  transform: translateY(-50%);
+}
+
+.inputPortRow .flowPortConnector {
+  left: -19px;
+}
+
+.outputPortRow .flowPortConnector {
+  right: -19px;
+}
+
+.flowPorts .uiIcon,
+.flowPorts .uiIconSvg {
+  width: 16px;
+  height: 16px;
+}
+
+.flowNodeDetails {
+  min-height: 74px;
+  padding: 11px;
+  border: 1px solid #e0e8f2;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.flowNodeDetails p {
+  margin: 0;
+}
+
+.flowCanvasHint {
+  position: absolute;
+  left: 18px;
+  bottom: 16px;
+  z-index: 5;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #637287;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.flowNodeContextMenu {
+  width: 130px;
+}
+
 .monitorTile span {
   color: #617086;
   font-size: 12px;
@@ -1482,7 +3084,7 @@ tbody tr {
 }
 
 .monitorView {
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .logList {
@@ -1499,6 +3101,21 @@ tbody tr {
   background: #f8fafc;
   color: #475569;
   font-size: 12px;
+}
+
+.errorReportPanel .logList p {
+  display: grid;
+  gap: 7px;
+}
+
+.errorReportPanel .logList strong {
+  color: #102036;
+  font-size: 13px;
+}
+
+.errorReportPanel .logList span {
+  color: #526071;
+  line-height: 1.5;
 }
 
 .details {
@@ -1526,9 +3143,103 @@ tbody tr {
   overflow-wrap: anywhere;
 }
 
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid #d9e1ec;
+  border-radius: 6px;
+  background: #f9fbfe;
+  color: #172033;
+  font: inherit;
+}
+
+.field textarea {
+  min-height: 70px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
 .field .multilineValue {
   min-height: 52px;
   line-height: 1.45;
+}
+
+.serverEditor {
+  align-content: start;
+}
+
+.serverEditorActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.secondaryAction,
+.dangerAction {
+  min-height: 32px;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.08s ease;
+}
+
+.secondaryAction:hover,
+.secondaryAction:focus-visible {
+  border-color: #9fb3ce;
+  background: #eef5ff;
+  color: #1f4d82;
+  outline: none;
+}
+
+.secondaryAction:active,
+.dangerAction:active,
+.primaryAction:active,
+.tableActionButton:active,
+.licenseStatusButton:active {
+  transform: translateY(1px);
+}
+
+.dangerAction {
+  border-color: #f1b4b4;
+  color: #a33b3b;
+}
+
+.dangerAction:hover,
+.dangerAction:focus-visible {
+  border-color: #e08484;
+  background: #fff1f1;
+  color: #8f2d2d;
+  outline: none;
+}
+
+.dangerAction:disabled {
+  opacity: 0.45;
+}
+
+.formError {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #f0c2c2;
+  border-radius: 6px;
+  background: #fff5f5;
+  color: #a33b3b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.formWarning {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #ead29a;
+  border-radius: 6px;
+  background: #fff8e6;
+  color: #8a5f0a;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .buttonStack {
@@ -1541,6 +3252,404 @@ tbody tr {
   grid-column: 1 / -1;
 }
 
+.toolWorkspaceView > .toolWorkspaceGrid,
+.toolWorkspaceView > .workflowBoard,
+.submenuPage > .submenuToolGrid {
+  display: none;
+}
+
+.toolLibraryPanel,
+.toolLibrarySection {
+  overflow: hidden;
+}
+
+.toolLibrarySection .panelHeader {
+  min-height: 66px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  gap: 10px;
+}
+
+.toolLibrarySection .panelHeader > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.panelHeaderIcon {
+  width: 28px;
+  height: 28px;
+  margin-top: 1px;
+  border: 1px solid #c7dbf5;
+  border-radius: 7px;
+  background: #eef6ff;
+  color: #2d5f9f;
+}
+
+.panelHeaderIcon .uiIconSvg {
+  width: 16px;
+  height: 16px;
+}
+
+.toolLibrarySection .panelHeaderNote {
+  margin-left: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.toolLibraryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.homeDashboard {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px;
+  padding: 14px 18px 16px;
+  overflow: auto;
+}
+
+.homePanel {
+  min-height: 280px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.homePanel .panelHeader {
+  min-height: 72px;
+  align-items: flex-start;
+  padding: 14px 16px;
+}
+
+.homePanel .panelHeader > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.homePanel .panelHeaderNote {
+  margin-left: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.homeList {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.homeList::-webkit-scrollbar {
+  width: 7px;
+}
+
+.homeList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.homeList::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+}
+
+.homeList:hover::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.72);
+}
+
+.homeListItem {
+  display: grid;
+  gap: 8px;
+  min-height: 92px;
+  padding: 16px;
+  border: 1px solid #d9e6f5;
+  border-radius: 8px;
+  background: #f3f8ff;
+}
+
+.homeActionItem {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.homeActionItem:hover,
+.homeActionItem:focus-visible {
+  border-color: #b8c7dc;
+  background: #e9f3ff;
+  outline: none;
+}
+
+.homeActionItem:active {
+  background: #dcecff;
+  transform: translateY(1px);
+}
+
+.homeToolSaveItem {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.homeToolSaveItem > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.homeDownloadButton {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  color: #2d5f9f;
+}
+
+.homeDownloadButton .uiIcon,
+.homeDownloadButton .uiIconSvg {
+  width: 18px;
+  height: 18px;
+}
+
+.homeDownloadButton:hover,
+.homeDownloadButton:focus-visible {
+  border-color: #b8c7dc;
+  background: #eef5ff;
+  outline: none;
+}
+
+.homeListItem strong {
+  color: #102036;
+  font-size: 14px;
+}
+
+.homeListItem span {
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.notificationStack {
+  position: fixed;
+  left: calc(var(--sidebar-width, 248px) + ((100vw - var(--sidebar-width, 248px)) / 2));
+  bottom: 22px;
+  z-index: 45;
+  display: grid;
+  gap: 10px;
+  width: min(640px, calc(100vw - var(--sidebar-width, 248px) - 72px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.appNotification {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  padding: 14px 14px 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(12, 14, 18, 0.84);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.28);
+}
+
+.appNotification strong,
+.appNotification span {
+  display: block;
+}
+
+.appNotification strong {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.appNotification span {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.notificationCloseButton {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.notificationCloseButton:hover,
+.notificationCloseButton:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  outline: none;
+}
+
+.notificationCloseButton:active {
+  transform: translateY(1px);
+}
+
+.sidebarCollapsed .notificationStack {
+  left: calc(64px + ((100vw - 64px) / 2));
+  width: min(640px, calc(100vw - 120px));
+}
+
+.homeListItem.muted {
+  background: #f8fafc;
+}
+
+.toolLibraryPanel .toolLibraryGrid {
+  padding: 10px;
+}
+
+.toolLibrarySection .toolList {
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 14px;
+}
+
+.squareAction {
+  margin-left: auto;
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.customToolList {
+  padding: 10px;
+}
+
+.pinnedToolItem {
+  border-color: #9fbce8;
+  background: #eef5ff;
+}
+
+.customToolItemTitle {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 0 !important;
+}
+
+.customToolItemTitle strong {
+  display: inline-block !important;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customToolItemTitle small {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: #2d5f9f;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.toolVersionSelect {
+  min-height: 28px;
+  padding: 3px 24px 3px 8px;
+  border: 1px solid #c9d8ee;
+  border-radius: 6px;
+  background: #f8fbff;
+  color: #2d5f9f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.toolVersionSelect.compact {
+  min-height: 22px;
+  padding: 1px 20px 1px 7px;
+  font-size: 11px;
+}
+
+.customToolCard {
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid #dde4ee;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.customToolCard.pinned {
+  border-color: #9fbce8;
+  background: #eef5ff;
+}
+
+.customToolCard strong,
+.customToolCard span,
+.customToolCard small {
+  display: block;
+}
+
+.customToolCard strong {
+  color: #172033;
+  font-size: 13px;
+}
+
+.customToolCard span {
+  margin-top: 7px;
+  color: #526071;
+  font-size: 11px;
+}
+
+.customToolCard small {
+  margin-top: 6px;
+  color: #2d5f9f;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.compactEmptyState {
+  margin: 0;
+  padding: 10px;
+}
+
+.centeredEmptyState {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  text-align: center;
+}
+
 .toolList {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1549,11 +3658,56 @@ tbody tr {
 }
 
 .toolItem {
-  min-height: 62px;
-  padding: 10px;
+  min-height: 76px;
+  padding: 14px;
   border: 1px solid #dde4ee;
   border-radius: 8px;
   background: #f8fafc;
+  text-align: left;
+}
+
+.toolItemButton {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.toolItemButton:hover {
+  border-color: #b8c7dc;
+  background: #eef5ff;
+}
+
+.toolItemButton.suspectToolItem {
+  border-color: #ead29a;
+  background: #fff8e6;
+}
+
+.toolItemButton.suspectToolItem:hover {
+  border-color: #d9b76b;
+  background: #fff1cc;
+}
+
+.toolItemButton:disabled,
+.toolItemButton.disabledToolItem {
+  border-color: #d5dce6;
+  background: #eef2f6;
+  color: #7b8796;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.toolItemButton:disabled:hover,
+.toolItemButton.disabledToolItem:hover {
+  border-color: #d5dce6;
+  background: #eef2f6;
+}
+
+.toolItemButton:disabled strong,
+.toolItemButton:disabled span,
+.toolItemButton.disabledToolItem strong,
+.toolItemButton.disabledToolItem span {
+  color: #7b8796;
 }
 
 .toolItem strong,
@@ -1566,11 +3720,78 @@ tbody tr {
   font-size: 13px;
 }
 
+.toolItemTitleLine {
+  display: inline-flex !important;
+  align-items: baseline;
+  gap: 7px;
+  max-width: 100%;
+}
+
+.toolItemTitleLine > span {
+  display: inline !important;
+  min-width: 0;
+  margin-top: 0 !important;
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+}
+
 .toolItem span {
-  margin-top: 7px;
+  margin-top: 9px;
   color: #526071;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.toolItemMeta {
+  display: inline-block;
+  margin-top: 0;
+  color: #637185;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.toolStatusRow {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.toolItem .toolStatusPill {
+  display: inline-flex !important;
+  align-items: center;
+  min-height: 20px;
+  margin-top: 0 !important;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10px !important;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.toolItem .toolStatusPill.blue {
+  background: #e8f1ff;
+  color: #2d5f9f;
+}
+
+.toolItem .toolStatusPill.green {
+  background: #e8f7ee;
+  color: #197047;
+}
+
+.toolItem .toolStatusPill.red {
+  background: #fff1f1;
+  color: #a33b3b;
+}
+
+.toolItem .toolStatusPill.amber {
+  background: #fff7df;
+  color: #95650a;
 }
 
 .compactMode .toolPanel {
@@ -1581,10 +3802,19 @@ tbody tr {
   grid-template-columns: 1fr;
 }
 
+.compactMode .toolWorkspaceGrid,
+.compactMode .submenuToolGrid,
+.compactMode .toolLibraryGrid,
+.compactMode .submenuLayout {
+  grid-template-columns: 1fr;
+}
+
 .compactMode .overviewGrid,
 .compactMode .workflowRail,
 .compactMode .workflowBoardGrid,
-.compactMode .monitorStatus {
+.compactMode .flowNodeBody,
+.compactMode .monitorStatus,
+.compactMode .homeDashboard {
   grid-template-columns: 1fr;
 }
 
@@ -1596,8 +3826,30 @@ tbody tr {
 }
 
 .compactMode .overviewCard,
-.compactMode .toolItem {
+.compactMode .toolItem,
+.compactMode .homePanel {
   min-height: auto;
+}
+
+.compactMode .homeDashboard {
+  height: auto;
+  overflow: visible;
+}
+
+.compactMode .homePanel {
+  max-height: none;
+}
+
+.compactMode .homeList {
+  overflow: visible;
+}
+
+.compactMode .flowNode {
+  transform: none;
+}
+
+.compactMode .flowPorts.right span {
+  justify-self: start;
 }
 
 .emptyState {
@@ -1613,6 +3865,16 @@ tbody tr {
   place-items: center;
   padding: 22px;
   background: rgba(15, 23, 42, 0.28);
+}
+
+.nestedDialogBackdrop {
+  z-index: 12;
+  background: rgba(15, 23, 42, 0.36);
+}
+
+.authDialogBackdrop {
+  z-index: 40;
+  background: rgba(15, 23, 42, 0.36);
 }
 
 .registryDialog {
@@ -1636,7 +3898,7 @@ tbody tr {
 
 .dialogHeader h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .dialogHeader span {
@@ -1704,7 +3966,23 @@ tbody tr {
   background: transparent;
   text-align: left;
   color: #475569;
+  font-size: 13px;
   font-weight: 600;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.08s ease;
+}
+
+.dialogNavItem:hover,
+.dialogNavItem:focus-visible {
+  background: #eef5ff;
+  color: #1f4d82;
+  outline: none;
+}
+
+.dialogNavItem:active {
+  transform: translateY(1px);
 }
 
 .dialogNavItem.active {
@@ -1726,6 +4004,762 @@ tbody tr {
   width: min(760px, 100%);
 }
 
+.customToolDialog {
+  width: min(860px, 100%);
+}
+
+.customToolFormDialog {
+  width: min(560px, 100%);
+}
+
+.authDialog {
+  width: min(520px, 100%);
+}
+
+.authDialogContent {
+  padding: 18px;
+}
+
+.authStartPanel,
+.authForm {
+  display: grid;
+  gap: 12px;
+}
+
+.githubLoginButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #101828;
+  border-radius: 7px;
+  background: #101828;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.githubLoginButton:hover,
+.githubLoginButton:focus-visible {
+  background: #1d2939;
+  outline: none;
+}
+
+.githubLoginButton:disabled {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.githubMark {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  color: #101828;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.authSignupButton {
+  width: 100%;
+  min-height: 38px;
+}
+
+.authHint {
+  margin: 0;
+  color: #617086;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.authDevicePanel {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 12px;
+  border: 1px solid #d7e2ef;
+  border-radius: 7px;
+  background: #f4f9ff;
+}
+
+.authDevicePanel span {
+  color: #617086;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.authDevicePanel strong {
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: #fff;
+  color: #172033;
+  font-size: 20px;
+  letter-spacing: 1px;
+}
+
+.authDevicePanel small {
+  color: #617086;
+  font-size: 11px;
+}
+
+.authProfilePreview {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #d7e2ef;
+  border-radius: 7px;
+  background: #f4f9ff;
+}
+
+.authProfilePreview strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.authProfilePreview span {
+  color: #617086;
+  font-size: 12px;
+}
+
+.primaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid #2d5f9f;
+  border-radius: 6px;
+  background: #2d5f9f;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.primaryAction:hover,
+.primaryAction:focus-visible {
+  border-color: #234d82;
+  background: #234d82;
+  outline: none;
+}
+
+.primaryAction:disabled {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.customToolFormContent {
+  display: grid;
+  gap: 14px;
+}
+
+.segmentedControl {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #d7dee9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.segmentedControl button {
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.08s ease;
+}
+
+.segmentedControl button:hover,
+.segmentedControl button:focus-visible {
+  background: #edf4ff;
+  color: #1f4d82;
+  outline: none;
+}
+
+.segmentedControl button:active {
+  transform: translateY(1px);
+}
+
+.segmentedControl button.active {
+  background: #fff;
+  color: #1f4d82;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.customToolFormGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.customToolDescriptionInput {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.filePickerRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.field .filePickerRow {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dialogFooterActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.registerToolButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px 1px;
+  line-height: 1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dialogHeaderButtonLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  line-height: 1.1;
+}
+
+.customToolToolbar {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 0;
+}
+
+.customToolToolbarRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.customToolToolbar input {
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid #d9e1ec;
+  border-radius: 6px;
+  background: #f9fbfe;
+  color: #172033;
+  font: inherit;
+  font-size: 12px;
+}
+
+.customToolToolbar input:focus {
+  border-color: #9fb3ce;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(45, 95, 159, 0.12);
+}
+
+.githubRefreshButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  height: 34px;
+  padding: 0 12px;
+  line-height: 1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.iconOnlyAction {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+
+.githubToolStatus {
+  min-height: 28px;
+  padding: 7px 10px;
+  border: 1px solid #d8e5f5;
+  border-radius: 6px;
+  background: #f2f8ff;
+  color: #536276;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.githubToolStatus.syncing {
+  color: #2d5f9f;
+}
+
+.customToolTable {
+  width: calc(100% - 28px);
+  margin: 14px;
+}
+
+.compactCustomToolTable {
+  table-layout: fixed;
+}
+
+.compactCustomToolTable th,
+.compactCustomToolTable td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compactCustomToolTable.allCustomToolTable th:nth-child(4),
+.compactCustomToolTable.allCustomToolTable th:nth-child(5),
+.compactCustomToolTable.allCustomToolTable td:nth-child(4),
+.compactCustomToolTable.allCustomToolTable td:nth-child(5),
+.compactCustomToolTable.scopedCustomToolTable th:nth-child(3),
+.compactCustomToolTable.scopedCustomToolTable th:nth-child(4),
+.compactCustomToolTable.scopedCustomToolTable td:nth-child(3),
+.compactCustomToolTable.scopedCustomToolTable td:nth-child(4) {
+  display: none;
+}
+
+.compactCustomToolTable.allCustomToolTable th:nth-child(1),
+.compactCustomToolTable.allCustomToolTable td:nth-child(1) {
+  width: 72px;
+}
+
+.compactCustomToolTable th:last-child,
+.compactCustomToolTable td:last-child {
+  width: 58px;
+  text-align: center;
+}
+
+.customToolTable tbody tr {
+  cursor: pointer;
+}
+
+.customToolNameCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+}
+
+.toolRiskBadge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 34px;
+  min-height: 22px;
+  padding: 0 6px;
+  border: 1px solid #d99d28;
+  border-radius: 4px;
+  background: #fff3cd;
+  color: #8a5a00;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toolApprovalBadge {
+  display: inline-grid;
+  place-items: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid #b9c7d8;
+  border-radius: 4px;
+  background: #eef3f8;
+  color: #536276;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+button.toolRiskBadge:hover,
+button.toolRiskBadge:focus-visible {
+  border-color: #bd7d12;
+  background: #ffe3a3;
+  outline: none;
+}
+
+.inlineRiskBadge {
+  margin-left: 7px;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.toolRiskReasons {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #ead29a;
+  border-radius: 6px;
+  background: #fff8e6;
+  color: #6f4b00;
+}
+
+.toolRiskReasons strong {
+  color: #6f4b00;
+  font-size: 12px;
+}
+
+.toolRiskReasons span {
+  color: #6f4b00;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.customToolTable tbody tr.pinnedToolRow {
+  background: #eef5ff;
+}
+
+.customToolTable tbody tr.registeredToolRow {
+  background: #effaf3;
+}
+
+.customToolTable tbody tr.registeredToolRow.pinnedToolRow {
+  background: #ecf8f6;
+}
+
+.customToolTable tbody tr.expandedToolRow {
+  background: #f4f8ff;
+}
+
+.customToolTable tbody tr.registeredToolRow.expandedToolRow {
+  background: #e8f7ee;
+}
+
+.customToolDescriptionRow td {
+  padding: 10px 12px 14px;
+  border-top: 0;
+  background: #f8fbff;
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.favoriteToolButton {
+  min-height: 28px;
+  padding: 0 10px;
+  color: #2d5f9f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tableActionButton {
+  min-height: 28px;
+  padding: 0 10px;
+  color: #2d5f9f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tableActionButton:hover,
+.tableActionButton:focus-visible {
+  border-color: #9fb3ce;
+  background: #eef5ff;
+  outline: none;
+}
+
+.tableActionButton.danger {
+  border-color: #f1b4b4;
+  color: #a33b3b;
+}
+
+.tableActionButton.danger:hover,
+.tableActionButton.danger:focus-visible {
+  border-color: #e08484;
+  background: #fff1f1;
+  color: #8f2d2d;
+}
+
+.tableActionButton.registerAction {
+  border-color: #2f9f62;
+  background: #2f9f62;
+  color: #fff;
+}
+
+.tableActionButton.registerAction:hover,
+.tableActionButton.registerAction:focus-visible {
+  border-color: #25824f;
+  background: #25824f;
+  color: #fff;
+}
+
+.tableActionButton.unregisterAction {
+  border-color: #d84b4b;
+  background: #d84b4b;
+  color: #fff;
+}
+
+.tableActionButton.unregisterAction:hover,
+.tableActionButton.unregisterAction:focus-visible {
+  border-color: #b93c3c;
+  background: #b93c3c;
+  color: #fff;
+}
+
+.licenseStatusButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.licenseStatusButton.active {
+  border-color: #2f9f62;
+  background: #2f9f62;
+  color: #fff;
+}
+
+.licenseStatusButton.inactive {
+  border-color: #c6ced9;
+  background: #e5e9ef;
+  color: #5b6675;
+}
+
+.licenseStatusButton:hover,
+.licenseStatusButton:focus-visible {
+  outline: none;
+  filter: brightness(0.96);
+}
+
+.licenseStatusButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.emptyTableCell {
+  padding: 24px 12px;
+  color: #617086;
+  text-align: center;
+}
+
+.accountSettingsPanel {
+  display: grid;
+  gap: 14px;
+}
+
+.accountInfoGrid,
+.adminPolicyGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.adminPolicyGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-bottom: 0;
+}
+
+.accountInfoCard,
+.adminPolicyCard,
+.accountLockedPanel {
+  display: grid;
+  gap: 5px;
+  min-height: 78px;
+  padding: 10px;
+  border: 1px solid #d7e2ef;
+  border-radius: 7px;
+  background: #f4f9ff;
+}
+
+.accountInfoCard strong,
+.adminPolicyCard strong,
+.accountLockedPanel strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.accountInfoCard span,
+.adminPolicyCard span,
+.accountLockedPanel span {
+  color: #617086;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.accountSettingsActions {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.adminSegmentedControl {
+  width: 100%;
+  margin-top: 2px;
+}
+
+.adminSegmentedControl button {
+  min-height: 28px;
+  font-size: 11px;
+}
+
+.toolApprovalBadge.prBadge {
+  border-color: #b8c7dc;
+  background: #eef4fb;
+  color: #325a84;
+}
+
+.toolApprovalBadge.prBadge.merged {
+  border-color: #a7d7b9;
+  background: #e9f8ef;
+  color: #227044;
+}
+
+.toolApprovalBadge.prBadge.closed {
+  border-color: #e3b6b6;
+  background: #fff0f0;
+  color: #9a3434;
+}
+
+.toolReviewLink {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 8px;
+  color: #2d66a8;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.toolReviewLink:hover,
+.toolReviewLink:focus-visible {
+  color: #184d87;
+  text-decoration: underline;
+  outline: none;
+}
+
+.mdPreviewPanel {
+  border: 1px solid #d9e4f1;
+  border-radius: 8px;
+  background: #f8fbff;
+  overflow: hidden;
+}
+
+.mdPreviewPanel pre {
+  max-height: 220px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: #233149;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.previewRiskReasons {
+  margin: 10px 12px 0;
+}
+
+.previewSafeNote {
+  margin: 10px 12px 0;
+  color: #327a4b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pendingToolList {
+  margin-top: 0;
+}
+
+.accountUserList {
+  margin: 0 14px 14px;
+  border: 1px solid #edf1f6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.compactPanelHeader {
+  border-bottom: 1px solid #edf1f6;
+  background: #fbfcfe;
+}
+
+.accountTableActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tableActionButton:disabled {
+  border-color: #d7dee9;
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.dialogNavItem:disabled {
+  color: #aeb9ca;
+  cursor: not-allowed;
+}
+
+.licenseGate {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(238, 245, 255, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.licenseGatePanel {
+  display: grid;
+  gap: 10px;
+  width: min(420px, 100%);
+  padding: 20px;
+  border: 1px solid #c9d8ee;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+}
+
+.licenseGatePanel strong {
+  color: #172033;
+  font-size: 18px;
+}
+
+.licenseGatePanel span {
+  color: #617086;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .monitorDialog .sectionView {
   padding: 14px;
 }
@@ -1739,7 +4773,7 @@ tbody tr {
 
 .dialogServerGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -1753,6 +4787,27 @@ tbody tr {
 
 .dialogPanel .details {
   padding: 14px;
+}
+
+.inlineServerDetail {
+  margin: 14px;
+  border: 1px solid #edf1f6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.inlineServerDetail .panelHeader {
+  background: #fbfcfe;
+}
+
+.inlineServerDetail .serverEditor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inlineServerDetail .serverEditor .field:nth-last-of-type(1),
+.inlineServerDetail .serverEditor .formError,
+.inlineServerDetail .serverEditor .serverEditorActions {
+  grid-column: 1 / -1;
 }
 
 .contextMenu {
@@ -1803,6 +4858,23 @@ tbody tr {
   min-height: 70px;
   padding: 12px;
   text-align: left;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.08s ease;
+}
+
+.displayModeOption:hover,
+.displayModeOption:focus-visible {
+  border-color: #b8cbe4;
+  background: #f4f9ff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  outline: none;
+}
+
+.displayModeOption:active {
+  transform: translateY(1px);
 }
 
 .displayModeOption.active {
@@ -1880,8 +4952,15 @@ tbody tr {
 }
 
 .darkMode .main,
+.darkMode .sectionView,
 .darkMode .dialogContent {
   background: #0f131a;
+}
+
+.darkMode .customToolMetaBadge {
+  border-color: #36557c;
+  background: #16263a;
+  color: #bcd6ff;
 }
 
 .darkMode .sidebar {
@@ -1916,15 +4995,24 @@ tbody tr {
 
 .darkMode .navRow:hover,
 .darkMode .favoriteSubmenuButton:hover,
-.darkMode .recentSubmenuButton:hover {
+.darkMode .recentSubmenuButton:hover,
+.darkMode .sidebarMarketButton:hover,
+.darkMode .sidebarMonitorButton:hover,
+.darkMode .sidebarSettingsButton:hover,
+.darkMode .sidebarHomeButton:hover {
   background: #202838;
+  border-color: rgba(148, 163, 184, 0.34);
+  color: #f4f7fb;
 }
 
 .darkMode .navRow.active,
 .darkMode .favoriteSubmenuButton.active,
 .darkMode .recentSubmenuButton.active,
-.darkMode .submenuRow.active {
+.darkMode .submenuRow.active,
+.darkMode .sidebarMonitorButton.active,
+.darkMode .sidebarHomeButton.active {
   background: #2b3850;
+  border-color: rgba(148, 163, 184, 0.42);
   color: #fff;
 }
 
@@ -1959,7 +5047,6 @@ tbody tr {
 .darkMode .navOrderButton,
 .darkMode .navExpandButton,
 .darkMode .submenuDragButton,
-.darkMode .submenuMiniIcon,
 .darkMode .recentClearButton {
   color: #9aa7ba;
 }
@@ -1995,12 +5082,34 @@ tbody tr {
   color: #f4f7fb;
 }
 
+.darkMode .openTab.pinned {
+  border-color: #5b6574;
+  background: transparent;
+}
+
+.darkMode .openTab.pinned.active {
+  border-color: #7b8797;
+  background: #25334a;
+}
+
+.darkMode .tabWorkStatus {
+  box-shadow: 0 0 0 2px rgba(23, 27, 34, 0.9);
+}
+
 .darkMode .newTabButton,
-.darkMode .historyControls button {
+.darkMode .historyControls button,
+.darkMode .compactButton,
+.darkMode .webViewButton {
   color: #9aa7ba;
 }
 
 .darkMode .newTabButton:hover,
+.darkMode .compactButton:hover,
+.darkMode .compactButton:focus-visible,
+.darkMode .webViewButton:hover,
+.darkMode .webViewButton:focus-visible,
+.darkMode .tabOverflowButton:hover,
+.darkMode .tabOverflowButton.active,
 .darkMode .historyControls button:not(:disabled):hover,
 .darkMode .historyControls button:not(:disabled):focus-visible {
   background: #202838;
@@ -2018,23 +5127,76 @@ tbody tr {
   color: #f4f7fb;
 }
 
+.darkMode .dialogNavItem:hover,
+.darkMode .dialogNavItem:focus-visible,
+.darkMode .segmentedControl button:hover,
+.darkMode .segmentedControl button:focus-visible,
+.darkMode .displayModeOption:hover,
+.darkMode .displayModeOption:focus-visible {
+  border-color: #3a5e92;
+  background: #202838;
+  color: #f4f7fb;
+  outline: none;
+}
+
+.darkMode .segmentedControl {
+  border-color: #2a2f36;
+  background: #14171c;
+}
+
+.darkMode .segmentedControl button.active {
+  background: #25334a;
+  color: #f4f7fb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+
+.darkMode .displayModeOption:hover,
+.darkMode .displayModeOption:focus-visible {
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.24);
+}
+
 .darkMode .workspaceTab.active::after {
   background: #7aa7e8;
 }
 
 .darkMode .topbar p,
 .darkMode .connectionBadge,
+.darkMode .connectionNotice,
 .darkMode .contextMenu,
+.darkMode .editableValue:hover,
 .darkMode .field div,
+.darkMode .field input,
+.darkMode .field select,
+.darkMode .field textarea,
+.darkMode .editableText input,
+.darkMode .editableText textarea,
 .darkMode .toolItem,
 .darkMode .overviewCard,
 .darkMode .workflowStep,
 .darkMode .workflowBoardGrid div,
 .darkMode .monitorTile,
+.darkMode .homeListItem,
 .darkMode .logList p {
   border-color: #343a42;
   background: #20242b;
   color: #dde1e6;
+}
+
+.darkMode .homeActionItem:hover,
+.darkMode .homeActionItem:focus-visible {
+  border-color: #4f6f9d;
+  background: #243049;
+  color: #f4f7fb;
+}
+
+.darkMode .homeListItem strong,
+.darkMode .errorReportPanel .logList strong {
+  color: #f4f7fb;
+}
+
+.darkMode .homeListItem span,
+.darkMode .errorReportPanel .logList span {
+  color: #b8c0cb;
 }
 
 .darkMode .openTabMeta {
@@ -2045,6 +5207,426 @@ tbody tr {
 .darkMode .contextMenu button:hover {
   background: #143735;
   color: #d5f5ef;
+}
+
+.darkMode .tabOverflowMenu {
+  border-color: #343a42;
+  background: #171b22;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+}
+
+.darkMode .tabOverflowItem {
+  color: #dde1e6;
+}
+
+.darkMode .editableValue {
+  color: #e8edf5;
+}
+
+.darkMode .panelHeaderNote {
+  color: #9aa1ab;
+}
+
+.darkMode .panelHeaderIcon {
+  border-color: #34435a;
+  background: #1b2534;
+  color: #9ec5ff;
+}
+
+.darkMode .toolStatusPill.blue {
+  background: rgba(96, 165, 250, 0.14);
+  color: #9ec5ff;
+}
+
+.darkMode .toolStatusPill.green {
+  background: rgba(74, 222, 128, 0.13);
+  color: #9ee6b8;
+}
+
+.darkMode .toolStatusPill.red {
+  background: rgba(248, 113, 113, 0.14);
+  color: #ffb4b4;
+}
+
+.darkMode .toolStatusPill.amber {
+  background: rgba(251, 191, 36, 0.14);
+  color: #f8d789;
+}
+
+.darkMode .toolItemButton:disabled,
+.darkMode .toolItemButton.disabledToolItem,
+.darkMode .toolItemButton:disabled:hover,
+.darkMode .toolItemButton.disabledToolItem:hover {
+  border-color: #303744;
+  background: #1a1f27;
+  color: #747f90;
+}
+
+.darkMode .toolItemButton:disabled strong,
+.darkMode .toolItemButton:disabled span,
+.darkMode .toolItemButton.disabledToolItem strong,
+.darkMode .toolItemButton.disabledToolItem span {
+  color: #747f90;
+}
+
+.darkMode .toolItemButton.suspectToolItem,
+.darkMode .toolItemButton.suspectToolItem:hover {
+  border-color: #6f5b2a;
+  background: #2a2417;
+  color: #e8d19a;
+}
+
+.darkMode .toolItemButton.suspectToolItem strong,
+.darkMode .toolItemButton.suspectToolItem span {
+  color: #e8d19a;
+}
+
+.darkMode .toolRiskBadge {
+  border-color: #7a5a1d;
+  background: #332714;
+  color: #f8d789;
+}
+
+.darkMode button.toolRiskBadge:hover,
+.darkMode button.toolRiskBadge:focus-visible {
+  border-color: #a97920;
+  background: #46351a;
+  color: #ffe0a3;
+}
+
+.darkMode .toolRiskReasons {
+  border-color: #6f5b2a;
+  background: #2a2417;
+  color: #e8d19a;
+}
+
+.darkMode .toolRiskReasons strong,
+.darkMode .toolRiskReasons span {
+  color: #e8d19a;
+}
+
+.darkMode .flowNodeDetails {
+  border-color: #303948;
+  background: #151a22;
+}
+
+.darkMode .flowNode {
+  border-color: #303948;
+  background: #1c222c;
+}
+
+.darkMode .flowGroupBox {
+  border-color: rgba(122, 167, 232, 0.32);
+  background: rgba(37, 99, 235, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(122, 167, 232, 0.08);
+}
+
+.darkMode .flowGroupBox span {
+  border-color: rgba(122, 167, 232, 0.2);
+  background: rgba(20, 26, 36, 0.74);
+  color: #cfe1fb;
+}
+
+.darkMode .flowSelectionBox {
+  border-color: rgba(122, 167, 232, 0.74);
+  background: rgba(59, 130, 246, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.6);
+}
+
+.darkMode .flowNodeHeader strong {
+  color: #f4f7fb;
+}
+
+.darkMode .flowNodeNumber {
+  border-color: #364358;
+  background: #202a38;
+  color: #aebbd0;
+}
+
+.darkMode .flowNode.expanded {
+  border-color: #5d7fab;
+}
+
+.darkMode .flowCanvas {
+  box-shadow: inset 0 0 0 1px #243247;
+  background:
+    linear-gradient(#233149 1px, transparent 1px),
+    linear-gradient(90deg, #233149 1px, transparent 1px),
+    #111824;
+  background-position:
+    var(--flow-grid-x, 0) var(--flow-grid-y, 0),
+    var(--flow-grid-x, 0) var(--flow-grid-y, 0),
+    0 0;
+  background-size:
+    var(--flow-grid-size, 26px) var(--flow-grid-size, 26px),
+    var(--flow-grid-size, 26px) var(--flow-grid-size, 26px),
+    auto;
+}
+
+.darkMode .flowCanvasWorld {
+  background: transparent;
+}
+
+.darkMode .flowConnectionLayer path {
+  stroke: #7aa7e8;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.28));
+}
+
+.darkMode .flowConnectionLayer path.pendingConnectionPath {
+  stroke: #fbbf24;
+}
+
+.darkMode .flowConnectionLayer path.warningConnectionPath {
+  stroke: #f59e0b;
+}
+
+.darkMode .flowNode.selected {
+  border-color: #7aa7e8;
+  box-shadow:
+    0 0 0 3px rgba(122, 167, 232, 0.18),
+    0 18px 34px rgba(0, 0, 0, 0.24);
+}
+
+.darkMode .flowNodeHeader:hover,
+.darkMode .flowNodeHeader:focus-visible {
+  background: #253348;
+}
+
+.darkMode .flowNodeChevron:hover,
+.darkMode .flowNodeChevron:focus-visible {
+  border-color: #40516c;
+  background: #28364d;
+  color: #dbeafe;
+}
+
+.darkMode .flowNodeBody {
+  border-color: #2c3442;
+}
+
+.darkMode .flowPortRow {
+  border-color: #364358;
+  background: #1e2836;
+  color: #d9e5f6;
+}
+
+.darkMode .flowPortRow:hover,
+.darkMode .flowPortRow:focus-visible,
+.darkMode .flowPortRow.pending {
+  border-color: #b7791f;
+  background: #302617;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16);
+}
+
+.darkMode .flowPortRow.connected {
+  border-color: #496b98;
+  background: #1b2b42;
+}
+
+.darkMode .flowPortConnector {
+  border-color: #1c222c;
+  background: #7aa7e8;
+  box-shadow: 0 0 0 2px #3b5f8f;
+}
+
+.darkMode .flowCanvasHint {
+  border-color: rgba(93, 127, 171, 0.36);
+  background: rgba(20, 26, 36, 0.76);
+  color: #a8b5c8;
+}
+
+.darkMode .flowPaletteHeader strong,
+.darkMode .flowPorts strong,
+.darkMode .flowNodeDetails strong {
+  color: #e8edf5;
+}
+
+.darkMode .formWarning {
+  border-color: #6f5b2a;
+  background: #2a2417;
+  color: #e8d19a;
+}
+
+.darkMode .tabOverflowItem small {
+  color: #9aa1ab;
+}
+
+.darkMode .tabOverflowItem:hover,
+.darkMode .tabOverflowItem.active {
+  background: #243049;
+  color: #f4f7fb;
+}
+
+.darkMode .customToolToolbar input {
+  border-color: #343a42;
+  background: #11151b;
+  color: #e8edf5;
+}
+
+.darkMode .customToolToolbar input:focus {
+  border-color: #4f6f9d;
+  box-shadow: 0 0 0 3px rgba(83, 133, 196, 0.18);
+}
+
+.darkMode .authHint,
+.darkMode .authDevicePanel span,
+.darkMode .authDevicePanel small,
+.darkMode .authProfilePreview span {
+  color: #b8c0cb;
+}
+
+.darkMode .authDevicePanel,
+.darkMode .authProfilePreview {
+  border-color: #314155;
+  background: #141d2a;
+}
+
+.darkMode .authDevicePanel strong,
+.darkMode .authProfilePreview strong {
+  color: #f4f7fb;
+}
+
+.darkMode .authDevicePanel strong {
+  background: #202838;
+}
+
+.darkMode .accountInfoCard,
+.darkMode .adminPolicyCard,
+.darkMode .accountLockedPanel,
+.darkMode .licenseGatePanel {
+  border-color: #314155;
+  background: #141d2a;
+}
+
+.darkMode .accountInfoCard strong,
+.darkMode .adminPolicyCard strong,
+.darkMode .accountLockedPanel strong,
+.darkMode .licenseGatePanel strong {
+  color: #f4f7fb;
+}
+
+.darkMode .accountInfoCard span,
+.darkMode .adminPolicyCard span,
+.darkMode .accountLockedPanel span,
+.darkMode .licenseGatePanel span {
+  color: #b8c0cb;
+}
+
+.darkMode .accountUserList,
+.darkMode .compactPanelHeader {
+  border-color: #343a42;
+  background: #171f2d;
+}
+
+.darkMode .licenseGate {
+  background: rgba(8, 12, 18, 0.78);
+}
+
+.darkMode .dialogNavItem:disabled,
+.darkMode .tableActionButton:disabled {
+  color: #747f90;
+}
+
+.darkMode .tableActionButton:disabled {
+  border-color: #303744;
+  background: #1a1f27;
+}
+
+.darkMode .primaryAction:disabled {
+  border-color: #303744;
+  background: #1a1f27;
+  color: #747f90;
+}
+
+.darkMode .githubToolStatus {
+  border-color: #314155;
+  background: #141d2a;
+  color: #b9c3d2;
+}
+
+.darkMode .githubToolStatus.syncing {
+  color: #9fc7ff;
+}
+
+.darkMode .customToolTable tbody tr.expandedToolRow {
+  background: #202838;
+}
+
+.darkMode .customToolTable tbody tr.registeredToolRow {
+  background: #163126;
+}
+
+.darkMode .customToolTable tbody tr.registeredToolRow.pinnedToolRow {
+  background: #173638;
+}
+
+.darkMode .customToolTable tbody tr.registeredToolRow.expandedToolRow {
+  background: #1b3a2c;
+}
+
+.darkMode .customToolDescriptionRow td {
+  background: #171f2d;
+  color: #b8c0cb;
+}
+
+.darkMode .tableActionButton {
+  border-color: #343a42;
+  background: #171b22;
+  color: #bcd6ff;
+}
+
+.darkMode .tableActionButton:hover,
+.darkMode .tableActionButton:focus-visible {
+  border-color: #4f6f9d;
+  background: #243049;
+  color: #f4f7fb;
+}
+
+.darkMode .tableActionButton.danger {
+  border-color: #5a3030;
+  color: #f0b4b4;
+}
+
+.darkMode .tableActionButton.danger:hover,
+.darkMode .tableActionButton.danger:focus-visible {
+  border-color: #7b3f3f;
+  background: #2a181a;
+  color: #ffd1d1;
+}
+
+.darkMode .tableActionButton.registerAction {
+  border-color: #2f9f62;
+  background: #2f9f62;
+  color: #fff;
+}
+
+.darkMode .tableActionButton.unregisterAction {
+  border-color: #d84b4b;
+  background: #d84b4b;
+  color: #fff;
+}
+
+.darkMode .toolApprovalBadge {
+  border-color: #4b5c70;
+  background: #1f2937;
+  color: #cbd5e1;
+}
+
+.darkMode .licenseStatusButton.active {
+  border-color: #46b979;
+  background: #46b979;
+  color: #07111f;
+}
+
+.darkMode .licenseStatusButton.inactive {
+  border-color: #4b5563;
+  background: #273241;
+  color: #cbd5e1;
+}
+
+.darkMode .toolVersionSelect {
+  border-color: #36557c;
+  background: #16263a;
+  color: #bcd6ff;
 }
 
 .darkMode .dialogNav,
@@ -2087,4 +5669,37 @@ tbody tr {
 
 .darkMode .compactButton {
   color: #5eead4;
+}
+
+.darkMode .connectionBadge:hover {
+  border-color: #4d617d;
+  background: #27344d;
+}
+
+.darkMode .secondaryAction:hover,
+.darkMode .secondaryAction:focus-visible {
+  border-color: #4f6f9d;
+  background: #243049;
+  color: #f4f7fb;
+  outline: none;
+}
+
+.darkMode .dangerAction {
+  border-color: #704044;
+  background: #211a1d;
+  color: #f1b4b4;
+}
+
+.darkMode .dangerAction:hover,
+.darkMode .dangerAction:focus-visible {
+  border-color: #8c4b52;
+  background: #2b1d22;
+  color: #ffd1d1;
+  outline: none;
+}
+
+.darkMode .formError {
+  border-color: #704044;
+  background: #211a1d;
+  color: #f1b4b4;
 }

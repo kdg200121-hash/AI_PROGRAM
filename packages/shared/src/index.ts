@@ -1,4 +1,4 @@
-export type McpTarget = "cad" | "revit";
+export type McpTarget = "cad" | "revit" | "other";
 
 export type McpConnectionType = "stdio" | "http" | "sse";
 

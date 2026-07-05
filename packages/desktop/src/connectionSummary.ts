@@ -7,16 +7,19 @@ export interface ConnectionSummary {
   label: string;
 }
 
-export function getConnectionSummary(servers: McpServerRecord[]): ConnectionSummary {
+export function getConnectionSummary(
+  servers: McpServerRecord[],
+  scopeLabel = "MCP"
+): ConnectionSummary {
   if (servers.length === 0) {
-    return { tone: "offline", label: "연결 없음" };
+    return { tone: "offline", label: `${scopeLabel} 연결 없음` };
   }
 
   const runningCount = servers.filter((server) => server.status === "running").length;
 
   if (runningCount === servers.length) {
-    return { tone: "online", label: "MCP 연결됨" };
+    return { tone: "online", label: `${scopeLabel} 연결됨` };
   }
 
-  return { tone: "offline", label: "MCP 미연결" };
+  return { tone: "offline", label: `${scopeLabel} 미연결` };
 }

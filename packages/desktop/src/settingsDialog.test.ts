@@ -2,9 +2,19 @@ import { describe, expect, it } from "vitest";
 import { colorModeOptions, settingsSections } from "./settingsDialog";
 
 describe("settingsSections", () => {
-  it("starts with MCP server controls and then display mode controls", () => {
-    expect(settingsSections.map((section) => section.id)).toEqual(["servers", "display"]);
-    expect(settingsSections.map((section) => section.label)).toEqual(["MCP 서버", "화면 모드"]);
+  it("orders setup, display, account, and admin controls", () => {
+    expect(settingsSections.map((section) => section.id)).toEqual([
+      "servers",
+      "display",
+      "account",
+      "management"
+    ]);
+    expect(settingsSections.map((section) => section.label)).toEqual([
+      "MCP 서버",
+      "화면 모드",
+      "계정 정보",
+      "관리"
+    ]);
   });
 
   it("offers normal mode and dark mode as display modes", () => {

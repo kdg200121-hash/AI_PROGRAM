@@ -11,11 +11,11 @@ import {
 } from "./tabModel";
 
 describe("tabModel", () => {
-  it("creates a blank tab from the plus button", () => {
+  it("creates a blank tab from the plus button as Home", () => {
     const tab = createBlankTab("tab-1");
 
-    expect(tab.title).toBe("새 탭");
-    expect(tab.sectionId).toBe("servers");
+    expect(tab.title).toBe("Home");
+    expect(tab.sectionId).toBe("home");
     expect(tab.workspaceTabId).toBe("cad");
     expect(tab.sidebarSource).toBe("menu");
     expect(tab.submenuKey).toBeNull();
@@ -24,7 +24,7 @@ describe("tabModel", () => {
   it("opens a sidebar section in a new tab", () => {
     const tab = createSectionTab("tab-2", "workflow", "revit");
 
-    expect(tab.title).toBe("CAD ↔ Revit");
+    expect(tab.title).toBe("Custom Flow");
     expect(tab.sectionId).toBe("workflow");
     expect(tab.workspaceTabId).toBe("revit");
     expect(tab.sidebarSource).toBe("menu");

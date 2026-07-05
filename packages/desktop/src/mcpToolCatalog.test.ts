@@ -18,11 +18,11 @@ describe("getToolsForWorkspace", () => {
     ]);
   });
 
-  it("shows bridge tools on the CAD ↔ REVIT tab", () => {
+  it("shows custom flow tools on the workflow tab", () => {
     expect(getToolsForWorkspace("workflow").map((tool) => tool.name)).toEqual([
-      "CAD 정보 변환",
-      "Revit 실행 큐",
-      "동기화 결과 확인"
+      "노드 입력 연결",
+      "결과값 전달",
+      "플로우 실행"
     ]);
   });
 });

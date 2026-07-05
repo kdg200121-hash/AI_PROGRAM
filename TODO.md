@@ -7,4 +7,30 @@
 - [ ] B 컴퓨터에서 `pnpm install`, `pnpm test`, `pnpm typecheck` 확인
 - [x] 깨진 `README.md` 한글 문장 복구
 - [x] 앱 소스의 깨진 한글 UI 문자열 복구
+- [x] 설정 창에서 MCP 서버 추가/수정/삭제 기능 연결
+- [x] 기본 실행을 웹 미리보기가 아니라 Electron 프로그램 창 기준으로 정리
+- [x] Windows 포터블 exe 패키징 스크립트 추가
+- [x] 배포 실행 시 registry 저장 위치를 Windows 사용자 데이터 폴더로 이동
+- [x] 우측 상단 MCP 연결상태 버튼에서 자동 서버 감지 실행
+- [x] 좌측 메뉴에 Revit 추가 및 CAD/Revit 메뉴 분리
+- [x] 메뉴 본문을 MCP 툴 정리 페이지 기준으로 재구성
+- [x] 소메뉴 페이지 추가 및 소메뉴 생성/제목/설명 수정 지원
+- [x] 탭 표시 순서/아이콘/오버플로 목록 동작 정리
+- [x] Custom Tools의 MD 파일 선택, 복사, 버전 입력을 Electron IPC로 실제 파일 흐름에 연결
+- [x] Custom Tools 리스트 경로에서 기존 MD 파일들을 읽어 목록으로 자동 동기화
+- [x] Custom Tools / More Tools에서 GitHub 저장소 `tools/` 폴더의 MD 툴 목록 읽기
+- [x] 로그인/회원가입/회원정보 UI와 닉네임 기반 제작자 기본값 연결
+- [x] 기존 localStorage 로컬 MD 동기화 툴 목록 숨김
+- [x] GitHub OAuth Device Flow 로그인 연결
+- [x] Settings 계정 정보/관리 화면 추가
+- [x] 관리자 전용 회원가입/라이선스 정책 UI 추가
+- [x] GitHub OAuth App client_id 발급 및 배포 환경 설정
+- [ ] GitHub 계정 기반 툴 업로드 권한 흐름 구현
+- [ ] 계정/라이선스 정책을 GitHub 또는 서버에 동기화해 여러 컴퓨터에서 중앙 강제
+- [ ] Google 로그인 또는 GitHub 로그인 중 앱 계정 시스템 방식 결정
+- [ ] 실행/중지 버튼을 실제 프로세스 관리 기능과 연결
+- [ ] Process Monitor에 실행 로그와 상태 갱신 연결
+- [ ] MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장
+- [ ] Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결
+- [ ] Custom Flow 저장 그래프의 포트 호환성/누락 입력 검증 UI 추가
 

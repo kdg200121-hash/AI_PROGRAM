@@ -6,5 +6,5 @@
     "rootDir": "../..",
     "types": ["node"]
   },
-  "include": ["src", "electron", "vite.config.ts"]
+  "include": ["src", "electron", "vite.config.ts", "vite.electron.config.ts"]
 }

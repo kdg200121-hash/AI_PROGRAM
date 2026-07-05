@@ -2,10 +2,14 @@
   "name": "@mcp-registry/desktop",
   "version": "0.1.0",
   "type": "module",
-  "main": "dist-electron/main.js",
+  "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc -p tsconfig.json && vite build",
+    "dev": "node scripts/dev-electron.mjs",
+    "dev:web": "vite --host 127.0.0.1",
+    "build:electron": "vite build --config vite.electron.config.ts",
+    "build:web": "vite build",
+    "build": "tsc -p tsconfig.json && pnpm run build:electron && pnpm run build:web",
+    "package:win": "pnpm run build && node scripts/package-win.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

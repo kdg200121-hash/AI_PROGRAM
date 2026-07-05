@@ -47,8 +47,8 @@ describe("filterServersByWorkspace", () => {
     expect(workspaceTabs.map((tab) => tab.id)).toEqual(["cad", "revit", "workflow"]);
   });
 
-  it("uses a bidirectional arrow symbol for the workflow tab label", () => {
-    expect(workspaceTabs.find((tab) => tab.id === "workflow")?.label).toBe("CAD ↔ REVIT");
+  it("uses the custom flow label for the workflow tab", () => {
+    expect(workspaceTabs.find((tab) => tab.id === "workflow")?.label).toBe("Custom Flow");
   });
 
   it("cycles compact tab navigation through the primary tabs", () => {

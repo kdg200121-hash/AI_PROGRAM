@@ -30,6 +30,7 @@ dist/
 dist-electron/
 build/
 out/
+release/
 .vite/
 .DS_Store
 Thumbs.db

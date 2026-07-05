@@ -12,7 +12,7 @@ export const registryWorkspaceTab: WorkspaceTab = { id: "registry", label: "MCP 
 export const workspaceTabs: WorkspaceTab[] = [
   { id: "cad", label: "CAD" },
   { id: "revit", label: "REVIT" },
-  { id: "workflow", label: "CAD ↔ REVIT" }
+  { id: "workflow", label: "Custom Flow" }
 ];
 
 export function getAdjacentWorkspaceTab(

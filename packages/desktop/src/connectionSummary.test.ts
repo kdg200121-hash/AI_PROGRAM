@@ -38,6 +38,13 @@ describe("getConnectionSummary", () => {
   });
 
   it("shows no connection when the registry is empty", () => {
-    expect(getConnectionSummary([])).toEqual({ tone: "offline", label: "연결 없음" });
+    expect(getConnectionSummary([])).toEqual({ tone: "offline", label: "MCP 연결 없음" });
+  });
+
+  it("uses the active page label for scoped connection state", () => {
+    expect(getConnectionSummary([{ ...baseServer, target: "cad", status: "running" }], "CAD MCP")).toEqual({
+      tone: "online",
+      label: "CAD MCP 연결됨"
+    });
   });
 });

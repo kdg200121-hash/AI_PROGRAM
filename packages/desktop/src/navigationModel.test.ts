@@ -5,13 +5,15 @@ describe("navigationModel", () => {
   it("defines the left navigation as screen sections, not target tabs", () => {
     expect(sidebarSections.map((section) => section.id)).toEqual([
       "servers",
+      "revit",
       "workflow",
       "excel",
       "tekla"
     ]);
     expect(sidebarSections.map((section) => section.label)).toEqual([
       "CAD",
-      "CAD ↔ Revit",
+      "Revit",
+      "Custom Flow",
       "Excel",
       "Tekla"
     ]);
@@ -25,11 +27,11 @@ describe("navigationModel", () => {
     ]);
   });
 
-  it("documents the CAD to Revit workflow stages", () => {
+  it("documents the custom flow stages", () => {
     expect(workflowSteps.map((step) => step.title)).toEqual([
-      "CAD 정보 읽기",
-      "데이터 변환",
-      "Revit 실행"
+      "툴 선택",
+      "노드 연결",
+      "자동 실행"
     ]);
   });
 });

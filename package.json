@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @mcp-registry/desktop dev",
+    "dev:web": "pnpm --filter @mcp-registry/desktop dev:web",
     "build": "pnpm -r build",
+    "package:win": "pnpm --filter @mcp-registry/desktop package:win",
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck"
   },
