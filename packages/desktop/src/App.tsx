@@ -6946,7 +6946,6 @@ function WorkflowView() {
                             } as CSSProperties}
                           >
                             <span className="flowPortConnector" aria-hidden="true" />
-                            <AppIcon name={port.iconName} />
                             <span>{port.label}</span>
                           </div>
                             );
@@ -6981,7 +6980,6 @@ function WorkflowView() {
                             } as CSSProperties}
                           >
                             <span>{port.label}</span>
-                            <AppIcon name={port.iconName} />
                             <span className="flowPortConnector" aria-hidden="true" />
                           </div>
                             );

@@ -358,7 +358,7 @@ export function isFlowTypeCompatible(output?: FlowPort, input?: FlowPort) {
 export function flowPortLocalY(node: FlowNode, direction: "input" | "output", portId: string) {
   const ports = direction === "input" ? node.inputs : node.outputs;
   const index = Math.max(0, ports.findIndex((port) => port.id === portId));
-  return 104 + index * 36;
+  return 92 + index * 36;
 }
 
 const flowPortConnectorCenterOffset = 2;

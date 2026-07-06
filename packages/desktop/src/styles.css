@@ -2996,11 +2996,10 @@ tbody tr {
 .flowPortRow {
   position: relative;
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 5px;
   min-height: 28px;
-  padding: 0 7px;
+  padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -3042,7 +3041,7 @@ tbody tr {
 }
 
 .outputPortRow {
-  grid-template-columns: minmax(0, 1fr) 14px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .outputPortRow span:not(.flowPortConnector) {
@@ -3098,23 +3097,6 @@ tbody tr {
 
 .outputPortRow .flowPortConnector {
   right: -17px;
-}
-
-.flowPortRow .uiIcon {
-  display: inline-grid;
-  place-items: center;
-  width: 14px;
-  height: 14px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--flow-port-color, #2d5f9f);
-  opacity: 0.86;
-}
-
-.flowPorts .uiIconSvg {
-  width: 13px;
-  height: 13px;
 }
 
 .flowNodeDetails {
@@ -5642,12 +5624,6 @@ button.toolRiskBadge:focus-visible {
   border-color: #1c222c;
   background: var(--flow-port-color, #7aa7e8);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--flow-port-ring, #3b5f8f) 70%, #111824);
-}
-
-.darkMode .flowPortRow .uiIcon {
-  border-color: transparent;
-  background: transparent;
-  color: color-mix(in srgb, var(--flow-port-color, #7aa7e8) 86%, #ffffff);
 }
 
 .darkMode .flowCanvasHint {

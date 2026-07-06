@@ -22,11 +22,11 @@ describe("customFlowModel", () => {
 
     expect(flowConnectionEndpoint(node, "input", "cad-source")).toEqual({
       x: node.x + 2,
-      y: node.y + 104
+      y: node.y + 92
     });
     expect(flowConnectionEndpoint(node, "output", "objects")).toEqual({
       x: node.x + flowNodeWidth - 2,
-      y: node.y + 104
+      y: node.y + 92
     });
   });
 });
