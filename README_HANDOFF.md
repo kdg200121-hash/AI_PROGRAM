@@ -147,6 +147,7 @@ logs
 - Custom Flow에서 노드 헤더를 `Shift`를 누른 상태로 드래그하면 Smart Guides가 활성화됩니다. 다른 노드의 left/center/right, top/middle/bottom 기준에 가까우면 위치가 자동으로 붙고, 세 노드가 나란히 있을 때 같은 간격 위치도 스냅합니다. 같은 간격 스냅에는 `60px` 같은 치수 라벨이 함께 표시됩니다.
 - Smart Guides 계산은 `packages/desktop/src/customFlowSmartGuides.ts`에 있으며, UI 표시선은 `.flowSmartGuideLayer`/`.flowSmartGuide` CSS가 담당합니다.
 - Custom Flow 노드 우클릭 메뉴는 단축키를 함께 표시합니다. 그룹 만들기는 `Ctrl+G`, 복제는 `Ctrl+C` 후 `Ctrl+V`, 삭제는 `Del`입니다.
+- Custom Flow에서 그룹에 포함된 노드를 우클릭하면 `그룹에서 제거` 메뉴가 추가로 나타납니다. 이 기능은 노드를 삭제하지 않고 그룹 소속만 해제합니다.
 - Custom Flow 빈 캔버스 우클릭 또는 더블클릭으로 메모를 만들 수 있습니다. 메모는 localStorage `mcp-registry:custom-flow-graph`의 `notes`에 저장됩니다.
 - Custom Flow 메모는 상단 헤더를 잡고 이동합니다. 본문 textarea는 텍스트 입력 전용이며, 메모 박스는 오른쪽 아래 resize로 가로/세로 크기를 조절할 수 있습니다.
 - Custom Flow 메모 색상은 헤더 오른쪽의 색상 점을 클릭해 팔레트에서 선택합니다. 메모의 텍스트, 위치, 폭, 높이, 색상은 `notes`에 저장됩니다.
@@ -156,6 +157,8 @@ logs
 - Custom Flow 그룹 헤더에서는 그룹 이름과 배경색을 바로 수정할 수 있습니다. 그룹 색상은 현재 색상 점을 클릭하면 팔레트가 펼쳐지는 방식입니다. 그룹 이름, 색상, 포함 노드 정보는 localStorage `mcp-registry:custom-flow-graph`의 `groups`에 저장됩니다.
 - Custom Flow에서 노드를 그룹 박스 안으로 드래그하면 그룹이 추가 대상처럼 강조되고, 그 상태에서 놓으면 해당 그룹에 포함됩니다.
 - Custom Flow 오른쪽 위 도구막대의 `기본도구` 버튼은 기본 보조 도구 창을 엽니다. 창은 `툴`과 `인풋/아웃풋 도구` 탭으로 나뉩니다.
+- Custom Flow 오른쪽 위 도구막대는 기본도구, 뒤로가기, 되돌릴 위치 선택, 앞으로가기, 실행, 실행 설정 화살표 순서입니다. 실행 설정은 톱니바퀴가 아니라 실행 버튼 옆 작은 화살표입니다.
+- Custom Flow 앞으로가기는 도구막대 버튼 또는 `Ctrl+Y`로 실행합니다.
 - 기본도구의 `툴` 탭에는 결과 미리보기, 경로 지정, 활성 파일, 커스텀 창 기본 노드가 있습니다. 항목을 클릭하거나 캔버스에 드롭하면 노드가 추가됩니다.
 - 기본도구의 `인풋/아웃풋 도구` 탭 항목은 노드 위에 드롭하면 커스텀 포트를 추가합니다. 커스텀 포트는 점선 스타일이며, `×` 버튼으로 제거하면 연결선도 함께 정리됩니다.
 - Custom Flow 노드는 왼쪽/상단 음수 좌표로도 이동할 수 있습니다. 연결선 SVG는 `overflow: visible` 구조를 전제로 하므로, 다시 좌표 clamp를 넣으면 좌상단 이동이 막힐 수 있습니다.

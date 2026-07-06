@@ -84,8 +84,30 @@ import {
   type ServerProcessResult
 } from "./processMonitor";
 
-const flowGroupColorOptions = ["#60a5fa", "#34d399", "#fbbf24", "#f87171", "#a78bfa", "#94a3b8"];
-const flowNoteColorOptions = ["#fff7c7", "#dff7ff", "#e8f8e8", "#f3e8ff", "#ffe4e6", "#f1f5f9"];
+const flowGroupColorOptions = [
+  "#60a5fa",
+  "#34d399",
+  "#fbbf24",
+  "#f87171",
+  "#a78bfa",
+  "#fb7185",
+  "#22d3ee",
+  "#94a3b8",
+  "#f97316",
+  "#84cc16"
+];
+const flowNoteColorOptions = [
+  "#fff7c7",
+  "#dff7ff",
+  "#e8f8e8",
+  "#f3e8ff",
+  "#ffe4e6",
+  "#f1f5f9",
+  "#ffedd5",
+  "#dcfce7",
+  "#e0e7ff",
+  "#fef3c7"
+];
 const flowBasicTools: FlowTool[] = [
   {
     id: "basic-result-preview",
@@ -6286,6 +6308,27 @@ function WorkflowView() {
     ]);
   }
 
+  function removeFlowNodesFromGroups(nodeIds: string[]) {
+    const validNodeIds = nodeIds.filter((id) =>
+      flowGroups.some((group) => group.nodeIds.includes(id))
+    );
+    if (validNodeIds.length === 0) {
+      return;
+    }
+
+    rememberFlowState();
+    const removeSet = new Set(validNodeIds);
+    setFlowGroups((groups) =>
+      groups
+        .map((group) => ({
+          ...group,
+          nodeIds: group.nodeIds.filter((nodeId) => !removeSet.has(nodeId))
+        }))
+        .filter((group) => group.nodeIds.length > 0)
+    );
+    setFlowNodeMenu(null);
+  }
+
   function deleteSelectedFlowNodes() {
     const ids = selectedNodeIds.filter((id) => flowNodes.some((node) => node.nodeId === id));
     if (ids.length === 0) {
@@ -6395,6 +6438,7 @@ function WorkflowView() {
     setIsFlowRunMenuOpen(false);
     setIsBasicToolsOpen(false);
     setIsHistoryMenuOpen(false);
+    setIsFlowValidationPinned(false);
     setExpandedGroupColorId("");
     setExpandedNoteColorId("");
     setSelectionBox(null);
@@ -6562,6 +6606,7 @@ function WorkflowView() {
       const target = event.target instanceof Element ? event.target : null;
       if (
         target?.closest(".flowCanvasToolbar") ||
+        target?.closest(".flowValidationPanel") ||
         target?.closest(".flowGroupColorMenu") ||
         target?.closest(".flowNoteColorMenu")
       ) {
@@ -6573,6 +6618,7 @@ function WorkflowView() {
       setIsFlowRunMenuOpen(false);
       setIsBasicToolsOpen(false);
       setIsHistoryMenuOpen(false);
+      setIsFlowValidationPinned(false);
       setExpandedGroupColorId("");
       setExpandedNoteColorId("");
     };
@@ -6619,6 +6665,12 @@ function WorkflowView() {
         return;
       }
 
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        restoreNextFlowState();
+        return;
+      }
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
         const selectedNode = flowNodes.find((node) => node.nodeId === selectedNodeId);
         if (selectedNode) {
@@ -6655,7 +6707,9 @@ function WorkflowView() {
   }, [
     copiedNode,
     flowConnections,
+    flowFuture,
     flowGroups,
+    flowHistory,
     flowNodes,
     flowNotes,
     selectedNodeId,
@@ -7433,6 +7487,16 @@ function WorkflowView() {
       setExpandedNodeId(nextNodeIds[0]);
     }
   };
+  const flowNodeMenuNodeIds = flowNodeMenu
+    ? selectedNodeIds.includes(flowNodeMenu.nodeId)
+      ? selectedNodeIds
+      : [flowNodeMenu.nodeId]
+    : [];
+  const flowNodeMenuHasGroup =
+    flowNodeMenuNodeIds.length > 0 &&
+    flowGroups.some((group) => group.nodeIds.some((nodeId) => flowNodeMenuNodeIds.includes(nodeId)));
+  const isFlowToolbarActive =
+    isBasicToolsOpen || isHistoryMenuOpen || isFlowRunMenuOpen;
 
   return (
     <section className="sectionView customFlowView">
@@ -7895,6 +7959,15 @@ function WorkflowView() {
               <span>그룹 만들기</span>
               <kbd>Ctrl+G</kbd>
             </button>
+            {flowNodeMenuHasGroup ? (
+              <button
+                type="button"
+                onClick={() => removeFlowNodesFromGroups(flowNodeMenuNodeIds)}
+              >
+                <span>그룹에서 제거</span>
+                <kbd>Ctrl+G 해제</kbd>
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -7934,7 +8007,9 @@ function WorkflowView() {
           </div>
         ) : null}
         <div
-          className="flowCanvasToolbar"
+          className={["flowCanvasToolbar", isFlowToolbarActive ? "menuOpen" : ""]
+            .filter(Boolean)
+            .join(" ")}
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
         >
@@ -8062,24 +8137,25 @@ function WorkflowView() {
           >
             ↷
           </button>
-          <button
-            className="flowRunButton"
-            type="button"
-            onClick={runFlow}
-            disabled={flowNodes.length === 0}
-            aria-label="실행"
-            title={flowRunMode === "step" ? "단계별 실행" : "일괄 실행"}
-          >
-            ▶
-          </button>
           <div className="flowToolbarSplit">
             <button
+              className="flowRunButton"
+              type="button"
+              onClick={runFlow}
+              disabled={flowNodes.length === 0}
+              aria-label="실행"
+              title={flowRunMode === "step" ? "단계별 실행" : "일괄 실행"}
+            >
+              ▶
+            </button>
+            <button
+              className="flowToolbarArrow"
               type="button"
               onClick={() => setIsFlowRunMenuOpen((current) => !current)}
               aria-label="실행 설정"
               title="실행 설정"
             >
-              ⚙
+              ▾
             </button>
             {isFlowRunMenuOpen ? (
               <div className="flowToolbarMenu runMenu">
