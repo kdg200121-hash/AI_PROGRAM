@@ -1388,6 +1388,18 @@ export function App() {
   );
 
   useEffect(() => {
+    if (isRegistryDialogOpen && activeSettingsSection === "servers") {
+      if (registry.servers.length === 0) {
+        setSelectedId("");
+        return;
+      }
+
+      if (!registry.servers.some((server) => server.id === selectedId)) {
+        setSelectedId(registry.servers[0].id);
+      }
+      return;
+    }
+
     if (visibleServers.length === 0) {
       setSelectedId("");
       return;
@@ -1396,7 +1408,7 @@ export function App() {
     if (!visibleServers.some((server) => server.id === selectedId)) {
       setSelectedId(visibleServers[0].id);
     }
-  }, [selectedId, visibleServers]);
+  }, [activeSettingsSection, isRegistryDialogOpen, registry.servers, selectedId, visibleServers]);
 
   const selected = useMemo<McpServerRecord | undefined>(
     () => visibleServers.find((server) => server.id === selectedId),
@@ -6968,8 +6980,8 @@ function WorkflowView() {
                               "--flow-port-ring": portPalette.border
                             } as CSSProperties}
                           >
-                            <AppIcon name={port.iconName} />
                             <span>{port.label}</span>
+                            <AppIcon name={port.iconName} />
                             <span className="flowPortConnector" aria-hidden="true" />
                           </div>
                             );

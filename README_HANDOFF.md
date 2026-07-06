@@ -153,6 +153,8 @@ logs
 - Electron main/preload는 `dist-electron/main.cjs`, `dist-electron/preload.cjs`로 빌드합니다. `type: module` 프로젝트라 `.js` CommonJS 번들은 main process 오류가 납니다.
 - 실행/중지 버튼은 Electron main의 MCP 프로세스 IPC와 연결되어 있습니다. 등록 서버의 `launchCommand`, `workingDirectory`, `environment`로 child process를 실행하고 stdout/stderr/오류/종료 로그를 Process Monitor에 표시합니다.
 - 현재 프로세스 관리는 이 앱이 실행한 child process 기준입니다. 이미 외부에서 실행 중인 MCP 서버를 OS 프로세스 기준으로 찾아 중지하는 기능은 아직 없습니다.
+- Settings의 MCP 서버 목록은 전체 서버를 보여주며, 이 창이 열려 있을 때 서버 선택도 전체 목록 기준으로 유지합니다. 일반 화면의 서버 상세 선택은 계속 현재 작업공간 필터 기준으로 동작합니다.
+- Custom Flow 입력/출력 포트의 작은 아이콘은 타입을 보조로 알려주는 인라인 표시입니다. 연결 네모와 연결선 색상이 주된 타입 구분 신호이므로 아이콘을 다시 배지처럼 키우면 좁은 노드에서 텍스트가 밀릴 수 있습니다.
 - 다음 우선순위는 MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장하고, Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결하는 작업입니다.
 - `App.tsx`는 여전히 큽니다. 이번에는 `MonitorView`, Process Monitor 타입, Custom Flow 검증 로직을 먼저 분리했습니다. 이후에는 `WorkflowView`, `ToolMarketDialog`, `TabStrip`, Settings 세부 패널 순서로 계속 분리하는 것이 좋습니다.
 - `node_modules` 안에 100MB 이상 Electron 실행 파일이 있으나 Git 제외 대상입니다.
