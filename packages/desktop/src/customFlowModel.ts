@@ -42,16 +42,25 @@ export interface FlowGroup {
   nodeIds: string[];
 }
 
+export interface FlowNote {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+}
+
 export interface FlowSnapshot {
   nodes: FlowNode[];
   connections: FlowConnection[];
   groups: FlowGroup[];
+  notes: FlowNote[];
 }
 
 export interface StoredFlowGraph {
   nodes: FlowNode[];
   connections: FlowConnection[];
   groups?: FlowGroup[];
+  notes?: FlowNote[];
   scale: number;
   pan: { x: number; y: number };
 }
@@ -336,6 +345,16 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
               nodeIds: Array.isArray(group.nodeIds) ? group.nodeIds.map(String) : []
             }))
             .filter((group) => group.nodeIds.length > 0)
+        : [],
+      notes: Array.isArray(parsed.notes)
+        ? parsed.notes
+            .map((note, index) => ({
+              id: String(note.id ?? `stored-note-${index}`),
+              text: String(note.text ?? "메모"),
+              x: Number(note.x ?? defaultFlowNodePosition(index).x),
+              y: Number(note.y ?? defaultFlowNodePosition(index).y)
+            }))
+            .filter((note) => Number.isFinite(note.x) && Number.isFinite(note.y))
         : [],
       scale: Number(parsed.scale ?? 1),
       pan: {

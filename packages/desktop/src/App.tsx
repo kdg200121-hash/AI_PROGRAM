@@ -63,6 +63,7 @@ import {
   serializeFlowToolForDrag,
   type FlowConnection,
   type FlowGroup,
+  type FlowNote,
   type FlowNode,
   type FlowPort,
   type FlowPortType,
@@ -81,6 +82,8 @@ import {
   type ProcessSnapshot,
   type ServerProcessResult
 } from "./processMonitor";
+
+const flowGroupColorOptions = ["#60a5fa", "#34d399", "#fbbf24", "#f87171", "#a78bfa", "#94a3b8"];
 
 const pinnedTabsStorageKey = "mcp-registry:pinned-tabs";
 const favoriteSectionsStorageKey = "mcp-registry:favorite-sections";
@@ -5902,6 +5905,7 @@ function ServersView({
 function WorkflowView() {
   const flowCanvasRef = useRef<HTMLDivElement | null>(null);
   const lastMiddleClickAtRef = useRef(0);
+  const suppressNextInputClickRef = useRef(false);
   const initialFlowGraphRef = useRef<StoredFlowGraph | null | undefined>(undefined);
   if (initialFlowGraphRef.current === undefined) {
     initialFlowGraphRef.current = loadStoredFlowGraph();
@@ -5914,6 +5918,7 @@ function WorkflowView() {
     initialFlowGraph?.connections.length ? initialFlowGraph.connections : defaultFlowConnections()
   );
   const [flowGroups, setFlowGroups] = useState<FlowGroup[]>(() => initialFlowGraph?.groups ?? []);
+  const [flowNotes, setFlowNotes] = useState<FlowNote[]>(() => initialFlowGraph?.notes ?? []);
   const [flowHistory, setFlowHistory] = useState<FlowSnapshot[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState(flowNodes[0]?.nodeId ?? "");
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(() =>
@@ -5925,6 +5930,13 @@ function WorkflowView() {
     x: number;
     y: number;
   } | null>(null);
+  const [flowCanvasMenu, setFlowCanvasMenu] = useState<{
+    x: number;
+    y: number;
+    worldX: number;
+    worldY: number;
+  } | null>(null);
+  const [isFlowValidationPinned, setIsFlowValidationPinned] = useState(false);
   const [flowScale, setFlowScale] = useState(initialFlowGraph?.scale ?? 1);
   const [flowPan, setFlowPan] = useState(initialFlowGraph?.pan ?? { x: 0, y: 0 });
   const [expandedNodeId, setExpandedNodeId] = useState(flowNodes[0]?.nodeId ?? "");
@@ -5980,7 +5992,8 @@ function WorkflowView() {
         groups: flowGroups.map((group) => ({
           ...group,
           nodeIds: [...group.nodeIds]
-        }))
+        })),
+        notes: flowNotes.map((note) => ({ ...note }))
       }
     ]);
   };
@@ -6002,6 +6015,7 @@ function WorkflowView() {
         ...group,
         nodeIds: [...group.nodeIds]
       })));
+      setFlowNotes(previous.notes.map((note) => ({ ...note })));
       setSelectedNodeId(previous.nodes[0]?.nodeId ?? "");
       setSelectedNodeIds(previous.nodes[0]?.nodeId ? [previous.nodes[0].nodeId] : []);
       setExpandedNodeId((current) =>
@@ -6157,7 +6171,7 @@ function WorkflowView() {
       {
         id: `group-${Date.now()}`,
         name: `Group ${groups.length + 1}`,
-        color: flowTypePalette.any.group,
+        color: flowGroupColorOptions[0],
         nodeIds: validNodeIds
       }
     ]);
@@ -6264,8 +6278,46 @@ function WorkflowView() {
     setPendingConnection(null);
   };
 
+  const cancelFlowInteraction = () => {
+    setPendingConnection(null);
+    setConnectionDrag(null);
+    setFlowNodeMenu(null);
+    setFlowCanvasMenu(null);
+    setSelectionBox(null);
+    setDraggingNode(null);
+    setDraggingGroup(null);
+    setPanningCanvas(null);
+    setSmartGuides([]);
+    setSelectedNodeId("");
+    setSelectedNodeIds([]);
+  };
+
+  const createFlowNote = (position: { x: number; y: number }) => {
+    rememberFlowState();
+    const noteId = `note-${Date.now()}`;
+    setFlowNotes((notes) => [
+      ...notes,
+      {
+        id: noteId,
+        text: "메모",
+        x: position.x,
+        y: position.y
+      }
+    ]);
+    setFlowCanvasMenu(null);
+  };
+
+  const updateFlowNoteText = (noteId: string, text: string) => {
+    setFlowNotes((notes) =>
+      notes.map((note) => (note.id === noteId ? { ...note, text } : note))
+    );
+  };
+
   useEffect(() => {
-    const closeFlowNodeMenu = () => setFlowNodeMenu(null);
+    const closeFlowNodeMenu = () => {
+      setFlowNodeMenu(null);
+      setFlowCanvasMenu(null);
+    };
     window.addEventListener("click", closeFlowNodeMenu);
     return () => window.removeEventListener("click", closeFlowNodeMenu);
   }, []);
@@ -6277,11 +6329,12 @@ function WorkflowView() {
         nodes: flowNodes,
         connections: flowConnections,
         groups: flowGroups,
+        notes: flowNotes,
         scale: flowScale,
         pan: flowPan
       })
     );
-  }, [flowConnections, flowGroups, flowNodes, flowPan, flowScale]);
+  }, [flowConnections, flowGroups, flowNodes, flowNotes, flowPan, flowScale]);
 
   useEffect(() => {
     const handleFlowKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -6293,6 +6346,12 @@ function WorkflowView() {
         target?.isContentEditable;
 
       if (isTyping) {
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        cancelFlowInteraction();
         return;
       }
 
@@ -6335,7 +6394,15 @@ function WorkflowView() {
 
     window.addEventListener("keydown", handleFlowKeyDown);
     return () => window.removeEventListener("keydown", handleFlowKeyDown);
-  }, [copiedNode, flowConnections, flowGroups, flowNodes, selectedNodeId, selectedNodeIds]);
+  }, [
+    copiedNode,
+    flowConnections,
+    flowGroups,
+    flowNodes,
+    flowNotes,
+    selectedNodeId,
+    selectedNodeIds
+  ]);
 
   useEffect(() => {
     if (!panningCanvas) {
@@ -6380,7 +6447,15 @@ function WorkflowView() {
 
         const selectionRect = normalizeRect(current);
         const selectedIds = flowNodes
-          .filter((node) => rectsIntersect(selectionRect, flowNodeBounds(node)))
+          .filter((node) => {
+            const bounds = flowNodeBounds(node);
+            return rectsIntersect(selectionRect, {
+              left: bounds.left - 10,
+              top: bounds.top - 10,
+              right: bounds.right + 10,
+              bottom: bounds.bottom + 10
+            });
+          })
           .map((node) => node.nodeId);
         setSelectedNodeIds(selectedIds);
         setSelectedNodeId(selectedIds[0] ?? "");
@@ -6534,6 +6609,9 @@ function WorkflowView() {
       const inputPortId = target
         ?.closest("[data-flow-input-port]")
         ?.getAttribute("data-flow-input-port");
+      const outputNodeId = target
+        ?.closest("[data-flow-output-node]")
+        ?.getAttribute("data-flow-output-node");
 
       if (inputNodeId && inputPortId) {
         connectFlowPorts(
@@ -6542,9 +6620,15 @@ function WorkflowView() {
           inputNodeId,
           inputPortId
         );
+        suppressNextInputClickRef.current = true;
+        setConnectionDrag(null);
+        return;
       }
 
-      setConnectionDrag(null);
+      if (!outputNodeId) {
+        setConnectionDrag(null);
+        setPendingConnection(null);
+      }
     };
 
     window.addEventListener("pointermove", moveConnection);
@@ -6632,6 +6716,7 @@ function WorkflowView() {
 
       lastMiddleClickAtRef.current = now;
       setFlowNodeMenu(null);
+      setFlowCanvasMenu(null);
       setPanningCanvas({
         startClientX: event.clientX,
         startClientY: event.clientY,
@@ -6647,6 +6732,12 @@ function WorkflowView() {
 
     event.preventDefault();
     setFlowNodeMenu(null);
+    setFlowCanvasMenu(null);
+    if (pendingConnection || connectionDrag) {
+      setPendingConnection(null);
+      setConnectionDrag(null);
+      return;
+    }
     const point = canvasPointFromPointer(event.clientX, event.clientY);
     setSelectionBox({
       startX: point.x,
@@ -6654,6 +6745,35 @@ function WorkflowView() {
       currentX: point.x,
       currentY: point.y
     });
+  };
+
+  const handleFlowCanvasContextMenu = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(".flowNode") || target?.closest(".flowNote")) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const point = canvasPointFromPointer(event.clientX, event.clientY);
+    setFlowNodeMenu(null);
+    setFlowCanvasMenu({
+      x: event.clientX,
+      y: event.clientY,
+      worldX: point.x,
+      worldY: point.y
+    });
+  };
+
+  const handleFlowCanvasDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(".flowNode") || target?.closest(".flowNote")) {
+      return;
+    }
+
+    event.preventDefault();
+    const point = canvasPointFromPointer(event.clientX, event.clientY);
+    createFlowNote({ x: point.x, y: point.y });
   };
 
   const handleFlowNodePointerDown = (event: PointerEvent<HTMLDivElement>, nodeId: string) => {
@@ -6733,6 +6853,10 @@ function WorkflowView() {
     portId: string
   ) => {
     event.stopPropagation();
+    if (suppressNextInputClickRef.current) {
+      suppressNextInputClickRef.current = false;
+      return;
+    }
     if (!pendingConnection || pendingConnection.nodeId === nodeId) {
       rememberFlowState();
       setFlowConnections((connections) =>
@@ -6886,6 +7010,8 @@ function WorkflowView() {
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleFlowDrop}
         onPointerDown={handleFlowCanvasPointerDown}
+        onContextMenu={handleFlowCanvasContextMenu}
+        onDoubleClick={handleFlowCanvasDoubleClick}
         onWheel={handleFlowWheel}
       >
         <div
@@ -7000,15 +7126,34 @@ function WorkflowView() {
                   onPointerDown={(event) => event.stopPropagation()}
                   aria-label="그룹 이름"
                 />
-                <input
-                  className="flowGroupColorInput"
-                  type="color"
-                  value={group.color}
-                  onChange={(event) => updateFlowGroupColor(group.id, event.target.value)}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  aria-label="그룹 배경색"
-                />
+                <div className="flowGroupColorChoices" onPointerDown={(event) => event.stopPropagation()}>
+                  {flowGroupColorOptions.map((color) => (
+                    <button
+                      className={color === group.color ? "selected" : ""}
+                      key={color}
+                      type="button"
+                      onClick={() => updateFlowGroupColor(group.id, color)}
+                      style={{ "--group-choice-color": color } as CSSProperties}
+                      aria-label={`그룹 색상 ${color}`}
+                    />
+                  ))}
+                </div>
               </div>
+            </div>
+          ))}
+          {flowNotes.map((note) => (
+            <div
+              className="flowNote"
+              key={note.id}
+              style={{ left: note.x, top: note.y } as CSSProperties}
+              onPointerDown={(event) => event.stopPropagation()}
+              onContextMenu={(event) => event.stopPropagation()}
+            >
+              <textarea
+                value={note.text}
+                onChange={(event) => updateFlowNoteText(note.id, event.target.value)}
+                aria-label="메모"
+              />
             </div>
           ))}
           {flowNodes.map((node) => {
@@ -7125,6 +7270,8 @@ function WorkflowView() {
                               .filter(Boolean)
                               .join(" ")}
                             key={port.id}
+                            data-flow-output-node={node.nodeId}
+                            data-flow-output-port={port.id}
                             onPointerDown={(event) => startConnectionDrag(event, node.nodeId, port.id)}
                             title={`출력 포트: ${port.label}`}
                             aria-label={`${node.name} ${port.label} 출력 포트`}
@@ -7184,7 +7331,8 @@ function WorkflowView() {
                 setFlowNodeMenu(null);
               }}
             >
-              그룹 만들기
+              <span>그룹 만들기</span>
+              <kbd>Ctrl+G</kbd>
             </button>
             <button
               type="button"
@@ -7196,47 +7344,83 @@ function WorkflowView() {
                 setFlowNodeMenu(null);
               }}
             >
-              복제
+              <span>복제</span>
+              <kbd>Ctrl+C / V</kbd>
             </button>
             <button
               className="danger"
               type="button"
               onClick={() => deleteFlowNode(flowNodeMenu.nodeId)}
             >
-              삭제
+              <span>삭제</span>
+              <kbd>Del</kbd>
             </button>
           </div>
         ) : null}
-        <aside className={`flowValidationPanel ${flowValidationTone}`} aria-label="Custom Flow 실행 전 검증">
-          <div className="flowValidationHeader">
-            <strong>실행 전 검증</strong>
-            <span>
-              오류 {flowValidationErrorCount} / 경고 {flowValidationWarningCount}
-            </span>
+        {flowCanvasMenu ? (
+          <div
+            className="contextMenu flowNodeContextMenu"
+            style={{ left: flowCanvasMenu.x, top: flowCanvasMenu.y } as CSSProperties}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => createFlowNote({ x: flowCanvasMenu.worldX, y: flowCanvasMenu.worldY })}
+            >
+              <span>메모 만들기</span>
+              <kbd>Double Click</kbd>
+            </button>
           </div>
-          <div className="flowValidationList">
-            {flowValidationIssues.length > 0 ? (
-              flowValidationIssues.slice(0, 5).map((issue) => (
-                <button
-                  key={issue.id}
-                  type="button"
-                  className={`flowValidationItem ${issue.severity}`}
-                  onClick={() => {
-                    if (!issue.nodeId) {
-                      return;
-                    }
-                    setSelectedNodeId(issue.nodeId);
-                    setSelectedNodeIds([issue.nodeId]);
-                    setExpandedNodeId(issue.nodeId);
-                  }}
-                >
-                  <strong>{issue.title}</strong>
-                  <span>{issue.message}</span>
-                </button>
-              ))
-            ) : (
-              <p className="flowValidationReady">실행 전 검증을 통과했습니다.</p>
-            )}
+        ) : null}
+        <aside
+          className={[
+            "flowValidationPanel",
+            flowValidationTone,
+            isFlowValidationPinned ? "pinned" : ""
+          ].join(" ")}
+          aria-label="Custom Flow 실행 전 검증"
+        >
+          <button
+            className="flowValidationToggle"
+            type="button"
+            onClick={() => setIsFlowValidationPinned((current) => !current)}
+            aria-label="실행 전 검증 보기"
+          >
+            <span className="flowValidationIcon">
+              {flowValidationTone === "ready" ? "✓" : flowValidationTone === "warning" ? "!" : "×"}
+            </span>
+          </button>
+          <div className="flowValidationPopover">
+            <div className="flowValidationHeader">
+              <strong>실행 전 검증</strong>
+              <span>
+                오류 {flowValidationErrorCount} / 경고 {flowValidationWarningCount}
+              </span>
+            </div>
+            <div className="flowValidationList">
+              {flowValidationIssues.length > 0 ? (
+                flowValidationIssues.slice(0, 5).map((issue) => (
+                  <button
+                    key={issue.id}
+                    type="button"
+                    className={`flowValidationItem ${issue.severity}`}
+                    onClick={() => {
+                      if (!issue.nodeId) {
+                        return;
+                      }
+                      setSelectedNodeId(issue.nodeId);
+                      setSelectedNodeIds([issue.nodeId]);
+                      setExpandedNodeId(issue.nodeId);
+                    }}
+                  >
+                    <strong>{issue.title}</strong>
+                    <span>{issue.message}</span>
+                  </button>
+                ))
+              ) : (
+                <p className="flowValidationReady">실행 전 검증을 통과했습니다.</p>
+              )}
+            </div>
           </div>
         </aside>
       </div>

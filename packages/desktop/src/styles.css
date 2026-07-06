@@ -2754,52 +2754,79 @@ tbody tr {
   left: 14px;
   top: 7px;
   display: inline-grid;
-  grid-template-columns: minmax(72px, auto) 22px;
+  grid-template-columns: minmax(96px, auto) auto;
   align-items: center;
   gap: 6px;
   max-width: calc(100% - 28px);
-  padding: 2px 5px 2px 8px;
+  padding: 4px 6px 4px 10px;
   border: 1px solid color-mix(in srgb, var(--flow-group-color, #3b82f6) 34%, transparent);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
 }
 
 .flowGroupNameInput {
-  width: 104px;
+  width: 132px;
   min-width: 0;
   border: 0;
   background: transparent;
   color: #2d5f9f;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
   outline: none;
 }
 
-.flowGroupColorInput {
-  width: 18px;
-  height: 18px;
+.flowGroupColorChoices {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.flowGroupColorChoices button {
+  width: 16px;
+  height: 16px;
   padding: 0;
-  border: 1px solid rgba(45, 95, 159, 0.24);
+  border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 50%;
-  background: transparent;
+  background: var(--group-choice-color);
+  box-shadow: 0 0 0 1px rgba(45, 95, 159, 0.18);
   cursor: pointer;
 }
 
-.flowGroupColorInput::-webkit-color-swatch-wrapper {
-  padding: 2px;
+.flowGroupColorChoices button.selected {
+  box-shadow:
+    0 0 0 2px rgba(45, 95, 159, 0.42),
+    0 0 0 4px rgba(255, 255, 255, 0.84);
 }
 
-.flowGroupColorInput::-webkit-color-swatch {
+.flowNote {
+  position: absolute;
+  z-index: 6;
+  width: 190px;
+  min-height: 112px;
+  padding: 10px;
+  border: 1px solid #e5c86d;
+  border-radius: 8px;
+  background: #fff7c7;
+  box-shadow: 0 12px 24px rgba(120, 93, 16, 0.13);
+}
+
+.flowNote textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
   border: 0;
-  border-radius: 50%;
+  background: transparent;
+  color: #5f4712;
+  font: 700 12px/1.45 "Segoe UI", Arial, sans-serif;
+  outline: none;
 }
 
 .flowSelectionBox {
   position: absolute;
   z-index: 8;
-  border: 1px solid rgba(37, 99, 235, 0.7);
+  border: 2px solid rgba(37, 99, 235, 0.72);
   border-radius: 8px;
-  background: rgba(59, 130, 246, 0.14);
+  background: rgba(59, 130, 246, 0.18);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.62) inset;
   pointer-events: none;
 }
@@ -3103,8 +3130,8 @@ tbody tr {
   position: absolute;
   top: 50%;
   display: block;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border: 2px solid #fff;
   border-radius: 4px;
   background: var(--flow-port-color, #2d5f9f);
@@ -3113,7 +3140,7 @@ tbody tr {
 }
 
 .inputPortRow:hover {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'%3E%3Cpath d='M4 4L14 14M14 4L4 14' stroke='%2310203a' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") 9 9, pointer;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M6 6L18 18M18 6L6 18' stroke='%2310203a' stroke-width='2.8' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, pointer;
 }
 
 .inputPortRow .flowPortConnector::before,
@@ -3142,11 +3169,11 @@ tbody tr {
 }
 
 .inputPortRow .flowPortConnector {
-  left: -17px;
+  left: -18px;
 }
 
 .outputPortRow .flowPortConnector {
-  right: -17px;
+  right: -18px;
 }
 
 .flowNodeDetails {
@@ -3179,28 +3206,78 @@ tbody tr {
   position: absolute;
   right: 16px;
   bottom: 16px;
-  z-index: 12;
+  z-index: 30;
+}
+
+.flowValidationToggle {
   display: grid;
-  gap: 9px;
-  width: min(360px, calc(100% - 32px));
-  max-height: min(320px, calc(100% - 32px));
-  padding: 12px;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border: 1px solid #cbd9ea;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.16);
+  color: #2d5f9f;
+  cursor: pointer;
   backdrop-filter: blur(8px);
 }
 
-.flowValidationPanel.ready {
+.flowValidationIcon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.flowValidationPanel.ready .flowValidationIcon {
+  background: #16a34a;
+}
+
+.flowValidationPanel.warning .flowValidationIcon {
+  background: #d97706;
+}
+
+.flowValidationPanel.error .flowValidationIcon {
+  background: #dc2626;
+}
+
+.flowValidationPopover {
+  position: absolute;
+  right: 0;
+  bottom: 52px;
+  display: none;
+  gap: 9px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(320px, calc(100vh - 104px));
+  padding: 12px;
+  border: 1px solid #cbd9ea;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(8px);
+}
+
+.flowValidationPanel:hover .flowValidationPopover,
+.flowValidationPanel.pinned .flowValidationPopover {
+  display: grid;
+}
+
+.flowValidationPanel.ready .flowValidationPopover {
   border-color: #b9dbc4;
 }
 
-.flowValidationPanel.warning {
+.flowValidationPanel.warning .flowValidationPopover {
   border-color: #efd49b;
 }
 
-.flowValidationPanel.error {
+.flowValidationPanel.error .flowValidationPopover {
   border-color: #f0b4b4;
 }
 
@@ -3271,7 +3348,7 @@ tbody tr {
 }
 
 .flowNodeContextMenu {
-  width: 130px;
+  width: 184px;
 }
 
 .monitorTile span {
@@ -4092,10 +4169,13 @@ tbody tr {
 }
 
 .compactMode .flowValidationPanel {
-  left: 10px;
+  left: auto;
   right: 10px;
   bottom: 10px;
-  width: auto;
+}
+
+.compactMode .flowValidationPopover {
+  width: min(320px, calc(100vw - 20px));
   max-height: 220px;
 }
 
@@ -5073,6 +5153,10 @@ button.toolRiskBadge:focus-visible {
 }
 
 .contextMenu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
   width: 100%;
   min-height: 32px;
   padding: 0 10px;
@@ -5081,6 +5165,12 @@ button.toolRiskBadge:focus-visible {
   text-align: left;
   color: #26364d;
   font-size: 12px;
+}
+
+.contextMenu kbd {
+  color: #7a8798;
+  font: 700 11px/1 "Segoe UI", Arial, sans-serif;
+  white-space: nowrap;
 }
 
 .contextMenu button:hover {
@@ -5682,10 +5772,21 @@ button.toolRiskBadge:focus-visible {
   color: #a8b5c8;
 }
 
-.darkMode .flowValidationPanel {
+.darkMode .flowValidationToggle,
+.darkMode .flowValidationPopover {
   border-color: #37465d;
   background: rgba(20, 26, 36, 0.9);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+}
+
+.darkMode .flowNote {
+  border-color: #6b5d28;
+  background: #332b14;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+
+.darkMode .flowNote textarea {
+  color: #f8e7a1;
 }
 
 .darkMode .flowValidationHeader strong,
