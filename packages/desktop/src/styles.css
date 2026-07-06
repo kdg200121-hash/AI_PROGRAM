@@ -2757,6 +2757,13 @@ tbody tr {
     inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
+.flowGroupBox.selected {
+  border-color: color-mix(in srgb, var(--flow-group-color, #3b82f6) 82%, #10203a);
+  box-shadow:
+    0 0 0 4px rgba(45, 95, 159, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
 .flowNode.promptAttachTarget {
   border-color: #14b8a6;
   box-shadow:
@@ -2859,6 +2866,12 @@ tbody tr {
 
 .flowNote:active {
   cursor: grabbing;
+}
+
+.flowNote.selected {
+  box-shadow:
+    0 0 0 3px rgba(45, 95, 159, 0.22),
+    0 12px 24px rgba(120, 93, 16, 0.13);
 }
 
 .flowNoteColorMenu {
@@ -3505,6 +3518,10 @@ tbody tr {
   font-size: 11px !important;
 }
 
+.flowBasicToolsSplit {
+  order: 99;
+}
+
 .flowToolbarMenu {
   position: absolute;
   right: 0;
@@ -3525,10 +3542,12 @@ tbody tr {
 }
 
 .flowToolbarMenu.basicToolsMenu {
-  left: 0;
-  right: auto;
+  left: auto;
+  right: 0;
   min-width: 312px;
   max-width: 336px;
+  max-height: min(520px, calc(100vh - 78px));
+  overflow: auto;
 }
 
 .basicToolsTabs {
@@ -3684,15 +3703,17 @@ tbody tr {
   right: 0;
   top: 44px;
   display: none;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 9px;
   width: min(360px, calc(100vw - 32px));
-  max-height: min(320px, calc(100vh - 104px));
+  max-height: min(300px, calc(100vh - 92px));
   padding: 12px;
   border: 1px solid #cbd9ea;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
   backdrop-filter: blur(8px);
+  overflow: hidden;
 }
 
 .flowValidationPanel:hover .flowValidationPopover,
@@ -3732,7 +3753,10 @@ tbody tr {
 .flowValidationList {
   display: grid;
   gap: 7px;
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
 }
 
 .flowValidationItem {
@@ -6098,6 +6122,13 @@ button.toolRiskBadge:focus-visible {
   box-shadow: inset 0 0 0 1px rgba(122, 167, 232, 0.08);
 }
 
+.darkMode .flowGroupBox.selected {
+  border-color: color-mix(in srgb, var(--flow-group-color, #7aa7e8) 78%, #dbeafe);
+  box-shadow:
+    0 0 0 4px rgba(122, 167, 232, 0.14),
+    inset 0 0 0 1px rgba(122, 167, 232, 0.16);
+}
+
 .darkMode .flowGroupHeader {
   border-color: rgba(122, 167, 232, 0.2);
   background: rgba(20, 26, 36, 0.74);
@@ -6314,6 +6345,12 @@ button.toolRiskBadge:focus-visible {
   border-color: color-mix(in srgb, var(--flow-note-color, #6b5d28) 42%, #6b5d28);
   background: color-mix(in srgb, var(--flow-note-color, #332b14) 28%, #332b14);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+
+.darkMode .flowNote.selected {
+  box-shadow:
+    0 0 0 3px rgba(122, 167, 232, 0.2),
+    0 12px 24px rgba(0, 0, 0, 0.24);
 }
 
 .darkMode .flowNote textarea {

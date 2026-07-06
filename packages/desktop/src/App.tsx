@@ -6000,6 +6000,8 @@ function WorkflowView() {
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(() =>
     flowNodes[0]?.nodeId ? [flowNodes[0].nodeId] : []
   );
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [copiedNode, setCopiedNode] = useState<FlowNode | null>(null);
   const [flowNodeMenu, setFlowNodeMenu] = useState<{
     nodeId: string;
@@ -6015,7 +6017,9 @@ function WorkflowView() {
   const [isFlowValidationPinned, setIsFlowValidationPinned] = useState(false);
   const [flowScale, setFlowScale] = useState(initialFlowGraph?.scale ?? 1);
   const [flowPan, setFlowPan] = useState(initialFlowGraph?.pan ?? { x: 0, y: 0 });
-  const [expandedNodeId, setExpandedNodeId] = useState(flowNodes[0]?.nodeId ?? "");
+  const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>(() =>
+    flowNodes[0]?.nodeId ? [flowNodes[0].nodeId] : []
+  );
   const [pendingConnection, setPendingConnection] = useState<{
     nodeId: string;
     portId: string;
@@ -6109,8 +6113,10 @@ function WorkflowView() {
     setFlowNotes(next.notes);
     setSelectedNodeId(next.nodes[0]?.nodeId ?? "");
     setSelectedNodeIds(next.nodes[0]?.nodeId ? [next.nodes[0].nodeId] : []);
-    setExpandedNodeId((current) =>
-      next.nodes.some((node) => node.nodeId === current) ? current : next.nodes[0]?.nodeId ?? ""
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
+    setExpandedNodeIds((current) =>
+      current.filter((nodeId) => next.nodes.some((node) => node.nodeId === nodeId))
     );
   };
 
@@ -6230,11 +6236,11 @@ function WorkflowView() {
 
       return nextCenters;
     });
-  }, [expandedNodeId, flowNodes, flowPan.x, flowPan.y, flowScale]);
+  }, [expandedNodeIds, flowNodes, flowPan.x, flowPan.y, flowScale]);
 
   const estimateFlowNodeHeight = (node: FlowNode) => {
     const portRows = Math.max(1, node.inputs.length, node.outputs.length);
-    const detailsHeight = expandedNodeId === node.nodeId ? 104 : 0;
+    const detailsHeight = expandedNodeIds.includes(node.nodeId) ? 104 : 0;
     return 102 + portRows * 36 + detailsHeight;
   };
 
@@ -6244,6 +6250,14 @@ function WorkflowView() {
     top: node.y,
     right: node.x + flowNodeWidth,
     bottom: node.y + estimateFlowNodeHeight(node)
+  });
+
+  const flowNoteBounds = (note: FlowNote) => ({
+    id: note.id,
+    left: note.x,
+    top: note.y,
+    right: note.x + (note.width ?? 220),
+    bottom: note.y + (note.height ?? 140)
   });
 
   const boundsFromRects = (rects: SmartGuideRect[]): SmartGuideRect | null => {
@@ -6326,6 +6340,23 @@ function WorkflowView() {
 
     rememberFlowState();
     const removeSet = new Set(validNodeIds);
+    const nodeMoveTargets = new Map<string, { x: number; y: number }>();
+    flowGroups.forEach((group) => {
+      const removedIds = group.nodeIds.filter((nodeId) => removeSet.has(nodeId));
+      if (removedIds.length === 0) {
+        return;
+      }
+      const bounds = groupBounds(group.nodeIds);
+      if (!bounds) {
+        return;
+      }
+      removedIds.forEach((nodeId, index) => {
+        nodeMoveTargets.set(nodeId, {
+          x: bounds.right + 34,
+          y: bounds.top + 24 + index * 42
+        });
+      });
+    });
     setFlowGroups((groups) =>
       groups
         .map((group) => ({
@@ -6334,17 +6365,27 @@ function WorkflowView() {
         }))
         .filter((group) => group.nodeIds.length > 0)
     );
+    setFlowNodes((nodes) =>
+      nodes.map((node) => {
+        const target = nodeMoveTargets.get(node.nodeId);
+        return target ? { ...node, ...target } : node;
+      })
+    );
     setFlowNodeMenu(null);
   }
 
-  function deleteSelectedFlowNodes() {
+  function deleteSelectedFlowItems() {
     const ids = selectedNodeIds.filter((id) => flowNodes.some((node) => node.nodeId === id));
-    if (ids.length === 0) {
+    const groupIds = selectedGroupIds.filter((id) => flowGroups.some((group) => group.id === id));
+    const noteIds = selectedNoteIds.filter((id) => flowNotes.some((note) => note.id === id));
+    if (ids.length === 0 && groupIds.length === 0 && noteIds.length === 0) {
       return;
     }
 
     rememberFlowState();
     const idSet = new Set(ids);
+    const groupIdSet = new Set(groupIds);
+    const noteIdSet = new Set(noteIds);
     setFlowNodes((items) =>
       items
         .filter((node) => !idSet.has(node.nodeId))
@@ -6361,15 +6402,19 @@ function WorkflowView() {
     );
     setFlowGroups((groups) =>
       groups
+        .filter((group) => !groupIdSet.has(group.id))
         .map((group) => ({
           ...group,
           nodeIds: group.nodeIds.filter((nodeId) => !idSet.has(nodeId))
         }))
         .filter((group) => group.nodeIds.length > 0)
     );
+    setFlowNotes((notes) => notes.filter((note) => !noteIdSet.has(note.id)));
     setSelectedNodeId("");
     setSelectedNodeIds([]);
-    setExpandedNodeId((current) => (idSet.has(current) ? "" : current));
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
+    setExpandedNodeIds((current) => current.filter((nodeId) => !idSet.has(nodeId)));
     setFlowNodeMenu(null);
   }
 
@@ -6468,6 +6513,8 @@ function WorkflowView() {
     setSmartGuides([]);
     setSelectedNodeId("");
     setSelectedNodeIds([]);
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
   };
 
   const createFlowNote = (position: { x: number; y: number }) => {
@@ -6496,6 +6543,10 @@ function WorkflowView() {
     event.preventDefault();
     event.stopPropagation();
     rememberFlowState();
+    setSelectedNodeId("");
+    setSelectedNodeIds([]);
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([note.id]);
     const rect = flowCanvasRef.current.getBoundingClientRect();
     setDraggingNote({
       noteId: note.id,
@@ -6582,7 +6633,7 @@ function WorkflowView() {
           : node
       )
     );
-    setExpandedNodeId(nodeId);
+    setExpandedNodeIds((ids) => (ids.includes(nodeId) ? ids : [...ids, nodeId]));
   };
 
   const removeCustomFlowPort = (
@@ -6734,9 +6785,9 @@ function WorkflowView() {
       }
 
       if (event.key === "Delete" || event.key === "Backspace") {
-        if (selectedNodeIds.length > 0) {
+        if (selectedNodeIds.length > 0 || selectedGroupIds.length > 0 || selectedNoteIds.length > 0) {
           event.preventDefault();
-          deleteSelectedFlowNodes();
+          deleteSelectedFlowItems();
         }
       }
     };
@@ -6752,7 +6803,9 @@ function WorkflowView() {
     flowNodes,
     flowNotes,
     selectedNodeId,
-    selectedNodeIds
+    selectedNodeIds,
+    selectedGroupIds,
+    selectedNoteIds
   ]);
 
   useEffect(() => {
@@ -6808,8 +6861,19 @@ function WorkflowView() {
             });
           })
           .map((node) => node.nodeId);
+        const selectedNotes = flowNotes
+          .filter((note) => rectsIntersect(selectionRect, flowNoteBounds(note)))
+          .map((note) => note.id);
+        const selectedGroups = flowGroups
+          .filter((group) => {
+            const bounds = groupBounds(group.nodeIds);
+            return bounds ? rectsIntersect(selectionRect, bounds) : false;
+          })
+          .map((group) => group.id);
         setSelectedNodeIds(selectedIds);
         setSelectedNodeId(selectedIds[0] ?? "");
+        setSelectedNoteIds(selectedNotes);
+        setSelectedGroupIds(selectedGroups);
         return null;
       });
     };
@@ -6823,7 +6887,7 @@ function WorkflowView() {
       window.removeEventListener("pointerup", stopSelection);
       window.removeEventListener("pointercancel", stopSelection);
     };
-  }, [selectionBox, flowNodes, flowPan.x, flowPan.y, flowScale]);
+  }, [selectionBox, flowGroups, flowNodes, flowNotes, flowPan.x, flowPan.y, flowScale]);
 
   useEffect(() => {
     if (!draggingNode) {
@@ -7158,9 +7222,11 @@ function WorkflowView() {
       ...items,
       { ...nextTool, ...nodeDefaults, nodeId, ...(position ?? defaultFlowNodePosition(items.length)) }
     ]);
-    setExpandedNodeId(nodeId);
+    setExpandedNodeIds((ids) => [...ids.filter((id) => id !== nodeId), nodeId]);
     setSelectedNodeId(nodeId);
     setSelectedNodeIds([nodeId]);
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
   };
 
   const handleFlowDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -7246,7 +7312,7 @@ function WorkflowView() {
     const worldX = (pointerX - flowPan.x) / flowScale;
     const worldY = (pointerY - flowPan.y) / flowScale;
     const zoomStep = event.deltaY < 0 ? 0.08 : -0.08;
-    const nextScale = Math.min(1.8, Math.max(0.55, Number((flowScale + zoomStep).toFixed(2))));
+    const nextScale = Math.min(1.8, Math.max(0.28, Number((flowScale + zoomStep).toFixed(2))));
 
     setFlowScale(nextScale);
     setFlowPan({
@@ -7255,27 +7321,37 @@ function WorkflowView() {
     });
   };
 
+  const startCanvasPan = (event: PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const now = Date.now();
+    if (now - lastMiddleClickAtRef.current < 320) {
+      lastMiddleClickAtRef.current = 0;
+      setPanningCanvas(null);
+      fitFlowToNodes();
+      return;
+    }
+
+    lastMiddleClickAtRef.current = now;
+    setFlowNodeMenu(null);
+    setFlowCanvasMenu(null);
+    setPanningCanvas({
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: flowPan.x,
+      startY: flowPan.y
+    });
+  };
+
+  const handleFlowCanvasPointerDownCapture = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button === 1) {
+      startCanvasPan(event);
+    }
+  };
+
   const handleFlowCanvasPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
     if (event.button === 1) {
-      event.preventDefault();
-      const now = Date.now();
-      if (now - lastMiddleClickAtRef.current < 320) {
-        lastMiddleClickAtRef.current = 0;
-        setPanningCanvas(null);
-        fitFlowToNodes();
-        return;
-      }
-
-      lastMiddleClickAtRef.current = now;
-      setFlowNodeMenu(null);
-      setFlowCanvasMenu(null);
-      setPanningCanvas({
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        startX: flowPan.x,
-        startY: flowPan.y
-      });
       return;
     }
 
@@ -7286,6 +7362,8 @@ function WorkflowView() {
     event.preventDefault();
     setFlowNodeMenu(null);
     setFlowCanvasMenu(null);
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
     if (pendingConnection || connectionDrag) {
       setPendingConnection(null);
       setConnectionDrag(null);
@@ -7302,7 +7380,7 @@ function WorkflowView() {
 
   const handleFlowCanvasContextMenu = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest(".flowNode") || target?.closest(".flowNote")) {
+    if (target?.closest(".flowNode") || target?.closest(".flowNote") || target?.closest(".flowGroupBox")) {
       return;
     }
 
@@ -7320,7 +7398,7 @@ function WorkflowView() {
 
   const handleFlowCanvasDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest(".flowNode") || target?.closest(".flowNote")) {
+    if (target?.closest(".flowNode") || target?.closest(".flowNote") || target?.closest(".flowGroupBox")) {
       return;
     }
 
@@ -7335,6 +7413,8 @@ function WorkflowView() {
     }
 
     event.stopPropagation();
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
       setSelectedNodeIds((ids) => {
         const next = ids.includes(nodeId)
@@ -7382,6 +7462,8 @@ function WorkflowView() {
     rememberFlowState();
     setSelectedNodeId(nodeId);
     setSelectedNodeIds(uniqueSelection);
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
     setDraggingNode({
       nodeId,
       nodeIds: uniqueSelection,
@@ -7479,7 +7561,7 @@ function WorkflowView() {
         }))
         .filter((group) => group.nodeIds.length > 0)
     );
-    setExpandedNodeId((current) => (current === nodeId ? "" : current));
+    setExpandedNodeIds((ids) => ids.filter((id) => id !== nodeId));
     setFlowNodeMenu(null);
   };
 
@@ -7506,12 +7588,12 @@ function WorkflowView() {
   };
 
   const startGroupDrag = (event: PointerEvent<HTMLElement>, group: FlowGroup) => {
-    event.preventDefault();
-    event.stopPropagation();
     if (event.button !== 0 || !flowCanvasRef.current) {
       return;
     }
 
+    event.preventDefault();
+    event.stopPropagation();
     const validNodeIds = group.nodeIds.filter((id) => flowNodes.some((node) => node.nodeId === id));
     const origins = flowNodes
       .filter((node) => validNodeIds.includes(node.nodeId))
@@ -7525,8 +7607,10 @@ function WorkflowView() {
     const startWorldY = (event.clientY - rect.top - flowPan.y) / flowScale;
     rememberFlowState();
     setFlowNodeMenu(null);
-    setSelectedNodeId(validNodeIds[0] ?? "");
-    setSelectedNodeIds(validNodeIds);
+    setSelectedNodeId("");
+    setSelectedNodeIds([]);
+    setSelectedNoteIds([]);
+    setSelectedGroupIds([group.id]);
     setDraggingGroup({
       groupId: group.id,
       nodeIds: validNodeIds,
@@ -7598,7 +7682,11 @@ function WorkflowView() {
     if (nextNodeIds[0]) {
       setSelectedNodeId(nextNodeIds[0]);
       setSelectedNodeIds(nextNodeIds);
-      setExpandedNodeId(nextNodeIds[0]);
+      setSelectedGroupIds([]);
+      setSelectedNoteIds([]);
+      setExpandedNodeIds((ids) =>
+        ids.includes(nextNodeIds[0]) ? ids : [...ids, nextNodeIds[0]]
+      );
     }
   };
   const flowNodeMenuNodeIds = flowNodeMenu
@@ -7620,6 +7708,7 @@ function WorkflowView() {
         style={flowCanvasStyle}
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleFlowDrop}
+        onPointerDownCapture={handleFlowCanvasPointerDownCapture}
         onPointerDown={handleFlowCanvasPointerDown}
         onContextMenu={handleFlowCanvasContextMenu}
         onDoubleClick={handleFlowCanvasDoubleClick}
@@ -7732,7 +7821,8 @@ function WorkflowView() {
               className={[
                 "flowGroupBox",
                 draggingGroup?.groupId === group.id ? "dragging" : "",
-                activeGroupDropId === group.id ? "dropTarget" : ""
+                activeGroupDropId === group.id ? "dropTarget" : "",
+                selectedGroupIds.includes(group.id) ? "selected" : ""
               ]
                 .filter(Boolean)
                 .join(" ")}
@@ -7752,10 +7842,21 @@ function WorkflowView() {
                   className="flowGroupNameInput"
                   value={group.name}
                   onChange={(event) => updateFlowGroupName(group.id, event.target.value)}
-                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => {
+                    if (event.button === 0) {
+                      event.stopPropagation();
+                    }
+                  }}
                   aria-label="그룹 이름"
                 />
-                <div className="flowGroupColorMenu" onPointerDown={(event) => event.stopPropagation()}>
+                <div
+                  className="flowGroupColorMenu"
+                  onPointerDown={(event) => {
+                    if (event.button === 0) {
+                      event.stopPropagation();
+                    }
+                  }}
+                >
                   <button
                     className="flowGroupColorCurrent"
                     type="button"
@@ -7786,7 +7887,9 @@ function WorkflowView() {
           ))}
           {flowNotes.map((note) => (
             <div
-              className="flowNote"
+              className={["flowNote", selectedNoteIds.includes(note.id) ? "selected" : ""]
+                .filter(Boolean)
+                .join(" ")}
               key={note.id}
               style={{
                 left: note.x,
@@ -7809,7 +7912,14 @@ function WorkflowView() {
                 updateFlowNoteSize(note.id, rect.width / flowScale, rect.height / flowScale);
               }}
             >
-              <div className="flowNoteColorMenu" onPointerDown={(event) => event.stopPropagation()}>
+              <div
+                className="flowNoteColorMenu"
+                onPointerDown={(event) => {
+                  if (event.button === 0) {
+                    event.stopPropagation();
+                  }
+                }}
+              >
                 <button
                   className="flowNoteColorCurrent"
                   type="button"
@@ -7839,13 +7949,21 @@ function WorkflowView() {
                 className="flowNoteTextArea"
                 value={note.text}
                 onChange={(event) => updateFlowNoteText(note.id, event.target.value)}
-                onPointerDown={(event) => event.stopPropagation()}
+                onPointerDown={(event) => {
+                  if (event.button === 0) {
+                    event.stopPropagation();
+                    setSelectedNodeId("");
+                    setSelectedNodeIds([]);
+                    setSelectedGroupIds([]);
+                    setSelectedNoteIds([note.id]);
+                  }
+                }}
                 aria-label="메모"
               />
             </div>
           ))}
           {flowNodes.map((node) => {
-              const isExpanded = expandedNodeId === node.nodeId;
+              const isExpanded = expandedNodeIds.includes(node.nodeId);
               const nodePalette = flowPaletteForType(flowTypeForNode(node));
               const incomingPortIds = new Set(
                 flowConnections
@@ -7897,7 +8015,13 @@ function WorkflowView() {
                       onClick={(event) => {
                         event.stopPropagation();
                         setSelectedNodeId(node.nodeId);
-                        setExpandedNodeId(isExpanded ? "" : node.nodeId);
+                        setSelectedGroupIds([]);
+                        setSelectedNoteIds([]);
+                        setExpandedNodeIds((ids) =>
+                          ids.includes(node.nodeId)
+                            ? ids.filter((id) => id !== node.nodeId)
+                            : [...ids, node.nodeId]
+                        );
                       }}
                       onPointerDown={(event) => event.stopPropagation()}
                       aria-label={`${node.name} ${isExpanded ? "접기" : "펼치기"}`}
@@ -8203,7 +8327,7 @@ function WorkflowView() {
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
         >
-          <div className="flowToolbarSplit">
+          <div className="flowToolbarSplit flowBasicToolsSplit">
             <button
               className="flowBasicToolsButton"
               type="button"
@@ -8409,7 +8533,7 @@ function WorkflowView() {
             </div>
             <div className="flowValidationList">
               {flowValidationIssues.length > 0 ? (
-                flowValidationIssues.slice(0, 5).map((issue) => (
+                flowValidationIssues.map((issue) => (
                   <button
                     key={issue.id}
                     type="button"
