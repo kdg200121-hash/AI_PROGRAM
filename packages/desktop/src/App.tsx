@@ -7979,9 +7979,15 @@ function WorkflowView() {
       ? selectedNodeIds
       : [flowNodeMenu.nodeId]
     : [];
+  const flowNodeMenuGroupedNodeIds = flowNodeMenuNodeIds.filter((nodeId) =>
+    flowGroups.some((group) => group.nodeIds.includes(nodeId))
+  );
   const flowNodeMenuHasGroup =
-    flowNodeMenuNodeIds.length > 0 &&
-    flowGroups.some((group) => group.nodeIds.some((nodeId) => flowNodeMenuNodeIds.includes(nodeId)));
+    flowNodeMenuGroupedNodeIds.length > 0 ||
+    Boolean(
+      flowNodeMenu &&
+        flowGroups.some((group) => group.nodeIds.includes(flowNodeMenu.nodeId))
+    );
   const isFlowToolbarActive =
     isBasicToolsOpen || isHistoryMenuOpen || isFlowRunMenuOpen || isFlowSearchOpen;
 
@@ -8653,7 +8659,15 @@ function WorkflowView() {
             {flowNodeMenuHasGroup ? (
               <button
                 type="button"
-                onClick={() => removeFlowNodesFromGroups(flowNodeMenuNodeIds)}
+                onClick={() =>
+                  removeFlowNodesFromGroups(
+                    flowNodeMenuGroupedNodeIds.length > 0
+                      ? flowNodeMenuGroupedNodeIds
+                      : flowNodeMenu
+                        ? [flowNodeMenu.nodeId]
+                        : []
+                  )
+                }
               >
                 <span>그룹에서 제거</span>
                 <kbd>Ctrl+G 해제</kbd>

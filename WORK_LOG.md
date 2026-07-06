@@ -1173,3 +1173,10 @@
 - 노드 검색 버튼 문구를 `노드 검색`으로 바꿔 기능 위치가 더 명확히 보이게 했다.
 - 흐름 점검 팝오버와 항목에 `min-width`, `overflow-x: hidden`, 강제 줄바꿈을 보강해 긴 내용이 창 밖으로 튀어나오지 않게 했다.
 - 기본도구 창 폭을 화면 폭 기준으로 제한해 좁은 창에서 잘릴 가능성을 줄였다.
+
+## 2026-07-06 추가 147
+
+- 그룹 안의 노드를 우클릭했을 때 선택 상태 갱신 타이밍 때문에 `그룹에서 제거`가 누락될 수 있어, 선택 노드 목록뿐 아니라 우클릭한 노드 자체도 그룹 포함 여부 검사와 제거 대상에 포함했다.
+- `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`는 Electron 기본 실행 파일을 복사해 만드는 구조라 수정된 앱 코드가 들어가도 파일 시간이 오래된 것처럼 보일 수 있었다. 패키징 후 exe의 수정 시간을 현재 시간으로 갱신하도록 `package-win.mjs`를 보정했다.
+- 최신 코드로 `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win`을 통과했고, `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`와 `release\AI_PROGRAM-win32-x64-latest.zip`을 다시 생성했다.
+- 브라우저 확인용 개발 서버도 `127.0.0.1:5173`에서 다시 실행했다.

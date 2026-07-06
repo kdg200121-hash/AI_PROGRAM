@@ -1,4 +1,4 @@
-import { cp, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, rename, rm, utimes, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,6 +15,7 @@ await rm(packageDir, { recursive: true, force: true });
 await mkdir(releaseDir, { recursive: true });
 await cp(electronDist, packageDir, { recursive: true });
 await rename(join(packageDir, "electron.exe"), join(packageDir, `${appName}.exe`));
+await utimes(join(packageDir, `${appName}.exe`), new Date(), new Date());
 
 await mkdir(appDir, { recursive: true });
 await cp(join(desktopDir, "dist"), join(appDir, "dist"), { recursive: true });

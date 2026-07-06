@@ -41,6 +41,8 @@ pnpm package:win
 
 생성물은 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`입니다. 다른 사람에게 전달할 때는 exe 단일 파일이 아니라 `AI_PROGRAM-win32-x64` 폴더 전체를 전달합니다.
 
+개발 서버(`pnpm dev` 또는 `pnpm dev:web`)에서 보이는 화면과 `release` 폴더의 exe는 별개입니다. 소스 수정 후 실제 exe에도 반영하려면 반드시 `pnpm package:win`을 다시 실행해야 합니다.
+
 ## 다른 컴퓨터에서 이어받기
 
 1. GitHub 저장소를 clone합니다.
