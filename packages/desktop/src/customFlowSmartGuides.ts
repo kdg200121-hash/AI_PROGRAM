@@ -12,6 +12,9 @@ export interface SmartGuideLine {
   position: number;
   start: number;
   end: number;
+  label?: string;
+  labelX?: number;
+  labelY?: number;
 }
 
 export interface SmartGuideSnapInput {
@@ -133,6 +136,7 @@ function spacingSnapX(moving: SmartGuideRect, stationary: SmartGuideRect[], thre
       }
 
       const targetLeft = left.right + (available - width(moving)) / 2;
+      const gap = (available - width(moving)) / 2;
       const delta = targetLeft - moving.left;
       const distance = Math.abs(delta);
       if (distance > threshold) {
@@ -147,7 +151,10 @@ function spacingSnapX(moving: SmartGuideRect, stationary: SmartGuideRect[], thre
           type: "spacing",
           position: targetLeft,
           start: Math.min(left.top, moving.top, right.top),
-          end: Math.max(left.bottom, moving.bottom, right.bottom)
+          end: Math.max(left.bottom, moving.bottom, right.bottom),
+          label: `${Math.round(gap)}px`,
+          labelX: left.right + gap / 2,
+          labelY: (Math.min(left.top, moving.top, right.top) + Math.max(left.bottom, moving.bottom, right.bottom)) / 2
         }]
       });
     }
@@ -171,6 +178,7 @@ function spacingSnapY(moving: SmartGuideRect, stationary: SmartGuideRect[], thre
       }
 
       const targetTop = top.bottom + (available - height(moving)) / 2;
+      const gap = (available - height(moving)) / 2;
       const delta = targetTop - moving.top;
       const distance = Math.abs(delta);
       if (distance > threshold) {
@@ -185,7 +193,10 @@ function spacingSnapY(moving: SmartGuideRect, stationary: SmartGuideRect[], thre
           type: "spacing",
           position: targetTop,
           start: Math.min(top.left, moving.left, bottom.left),
-          end: Math.max(top.right, moving.right, bottom.right)
+          end: Math.max(top.right, moving.right, bottom.right),
+          label: `${Math.round(gap)}px`,
+          labelX: (Math.min(top.left, moving.left, bottom.left) + Math.max(top.right, moving.right, bottom.right)) / 2,
+          labelY: top.bottom + gap / 2
         }]
       });
     }

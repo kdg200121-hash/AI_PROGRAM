@@ -41,13 +41,14 @@ describe("customFlowSmartGuides", () => {
     });
 
     expect(result.deltaX).toBe(6);
-    expect(result.guides).toContainEqual({
+    expect(result.guides).toContainEqual(expect.objectContaining({
       axis: "x",
       type: "spacing",
       position: 200,
       start: 40,
-      end: 120
-    });
+      end: 120,
+      label: "60px"
+    }));
   });
 
   it("snaps a dragged node into the same vertical gap between two nodes", () => {
@@ -58,12 +59,13 @@ describe("customFlowSmartGuides", () => {
     });
 
     expect(result.deltaY).toBe(6);
-    expect(result.guides).toContainEqual({
+    expect(result.guides).toContainEqual(expect.objectContaining({
       axis: "y",
       type: "spacing",
       position: 180,
       start: 40,
-      end: 140
-    });
+      end: 140,
+      label: "60px"
+    }));
   });
 });

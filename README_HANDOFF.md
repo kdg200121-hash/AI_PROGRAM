@@ -139,18 +139,22 @@ logs
 - Custom Flow 노드는 내부 좌우 포트 행에 입력/출력 아이콘과 텍스트를 표시하고, 연결선은 해당 포트 행 중앙 높이에 맞춰 붙습니다. 포트 행은 `button`이 아니라 일반 행 요소로 렌더링해 버튼처럼 보이지 않게 유지해야 합니다.
 - Custom Flow 노드 배경, 입력/출력 커넥터, 연결선은 `App.tsx`의 프로그램/포트 타입 색상표를 사용합니다. 연결선 색상은 출발 출력 포트 타입을 기준으로 합니다.
 - Custom Flow 입력 포트 커넥터는 hover 시 X 표시를 보여 클릭하면 연결을 끊을 수 있음을 알려줍니다.
-- Custom Flow 캔버스 오른쪽 아래에는 실행 전 검증 패널이 있습니다. `packages/desktop/src/customFlowValidation.ts`에서 없는 노드/포트, 포트 타입 불일치, 연결되지 않은 입력을 검사합니다.
+- Custom Flow 캔버스 오른쪽 위에는 `흐름 점검` 아이콘 위젯이 있습니다. `packages/desktop/src/customFlowValidation.ts`에서 없는 노드/포트, 포트 타입 불일치, 연결되지 않은 입력을 검사합니다.
+- 흐름 점검 아이콘은 정상/경고/오류 상태별로 색이 다르고, 경고/오류가 있으면 왼쪽 위 배지에 개수를 표시합니다. 항목을 클릭하면 관련 연결선이나 노드가 붉은색 계열로 하이라이트됩니다.
+- Custom Flow 캔버스 오른쪽 위에는 뒤로가기, 되돌릴 위치 선택, 앞으로가기, 실행, 실행 설정 도구막대가 있습니다. 평소에는 반투명이고 hover/focus 시 선명해집니다.
+- 실행 설정에서는 `일괄 실행`과 `단계별 실행`을 고를 수 있습니다. 현재는 실제 MCP 실행 엔진 연결 전 UI 단계라 실행 중인 노드 강조 상태만 표시합니다.
 - Custom Flow에서는 빈 캔버스를 드래그해 여러 노드를 박스 선택할 수 있고, 선택된 노드 하나를 드래그하면 선택 묶음이 함께 이동합니다. `Ctrl/Shift` 클릭은 노드 선택을 토글합니다.
-- Custom Flow에서 노드 헤더를 `Shift`를 누른 상태로 드래그하면 Smart Guides가 활성화됩니다. 다른 노드의 left/center/right, top/middle/bottom 기준에 가까우면 위치가 자동으로 붙고, 세 노드가 나란히 있을 때 같은 간격 위치도 스냅합니다.
+- Custom Flow에서 노드 헤더를 `Shift`를 누른 상태로 드래그하면 Smart Guides가 활성화됩니다. 다른 노드의 left/center/right, top/middle/bottom 기준에 가까우면 위치가 자동으로 붙고, 세 노드가 나란히 있을 때 같은 간격 위치도 스냅합니다. 같은 간격 스냅에는 `60px` 같은 치수 라벨이 함께 표시됩니다.
 - Smart Guides 계산은 `packages/desktop/src/customFlowSmartGuides.ts`에 있으며, UI 표시선은 `.flowSmartGuideLayer`/`.flowSmartGuide` CSS가 담당합니다.
 - Custom Flow 노드 우클릭 메뉴는 단축키를 함께 표시합니다. 그룹 만들기는 `Ctrl+G`, 복제는 `Ctrl+C` 후 `Ctrl+V`, 삭제는 `Del`입니다.
 - Custom Flow 빈 캔버스 우클릭 또는 더블클릭으로 메모를 만들 수 있습니다. 메모는 localStorage `mcp-registry:custom-flow-graph`의 `notes`에 저장됩니다.
 - Custom Flow 실행 전 검증은 오른쪽 아래 고정 아이콘 위젯입니다. hover하면 상세가 보이고, 클릭하면 상세가 고정되며 다시 클릭하면 접힙니다.
 - Custom Flow에서 `Esc`는 선택, 선택 박스, 연결 대기, 우클릭 메뉴, 드래그/패닝 임시 상태를 취소합니다.
 - Custom Flow에서 선택된 노드를 우클릭해 `그룹 만들기`를 누르거나 `Ctrl+G`를 누르면 그룹 박스를 생성합니다. 그룹 박스를 드래그하면 포함된 노드들이 함께 이동합니다.
-- Custom Flow 그룹 헤더에서는 그룹 이름과 배경색을 바로 수정할 수 있습니다. 그룹 이름, 색상, 포함 노드 정보는 localStorage `mcp-registry:custom-flow-graph`의 `groups`에 저장됩니다.
+- Custom Flow 그룹 헤더에서는 그룹 이름과 배경색을 바로 수정할 수 있습니다. 그룹 색상은 현재 색상 점을 클릭하면 팔레트가 펼쳐지는 방식입니다. 그룹 이름, 색상, 포함 노드 정보는 localStorage `mcp-registry:custom-flow-graph`의 `groups`에 저장됩니다.
+- Custom Flow에서 노드를 그룹 박스 안으로 드래그하면 그룹이 추가 대상처럼 강조되고, 그 상태에서 놓으면 해당 그룹에 포함됩니다.
 - Custom Flow 노드는 왼쪽/상단 음수 좌표로도 이동할 수 있습니다. 연결선 SVG는 `overflow: visible` 구조를 전제로 하므로, 다시 좌표 clamp를 넣으면 좌상단 이동이 막힐 수 있습니다.
-- Custom Flow 캔버스에서 마우스 휠 버튼을 빠르게 두 번 누르면 전체 노드가 보이도록 자동 fit 됩니다.
+- Custom Flow 캔버스에서 마우스 휠 버튼을 누르고 드래그하면 패닝합니다. 노드 위에서 휠 버튼을 눌러도 노드를 선택하지 않고 캔버스를 이동합니다. 휠 버튼을 빠르게 두 번 누르면 전체 노드가 보이도록 자동 fit 됩니다.
 - Custom Flow의 포트/노드/저장/드래그 직렬화 모델은 `packages/desktop/src/customFlowModel.ts`로 분리되어 있습니다. UI 렌더링은 아직 `App.tsx`의 `WorkflowView`에 남아 있습니다.
 - 상단 탭이 공간을 넘치면 `+` 대신 `...` 버튼이 나타나며, 화면에 보이지 않는 탭만 목록에 표시하고 목록 하단에서 새 탭을 만들 수 있습니다.
 - 새 탭 `+`는 Home 페이지를 엽니다. Home 페이지에는 공지사항, 신규 커스텀 툴, Other Tools 카드가 있습니다.
