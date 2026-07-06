@@ -3,6 +3,7 @@ import {
   defaultFlowNodes,
   flowConnectionEndpoint,
   flowNodeWidth,
+  parseDraggedFlowTool,
   flowToolPalette
 } from "./customFlowModel";
 
@@ -28,5 +29,21 @@ describe("customFlowModel", () => {
       x: node.x + flowNodeWidth - 2,
       y: node.y + 92
     });
+  });
+
+  it("preserves explicit empty input and output port lists from dragged tools", () => {
+    const parsed = parseDraggedFlowTool(
+      JSON.stringify({
+        id: "basic-result-preview",
+        programIcon: "customTools",
+        name: "결과 미리보기",
+        description: "결과를 노드 안에서 확인합니다.",
+        inputs: [{ id: "result", label: "결과", type: "any", iconName: "customTools" }],
+        outputs: []
+      })
+    );
+
+    expect(parsed?.inputs).toHaveLength(1);
+    expect(parsed?.outputs).toEqual([]);
   });
 });

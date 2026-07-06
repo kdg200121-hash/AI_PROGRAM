@@ -26,6 +26,8 @@ export interface FlowNode extends FlowTool {
   nodeId: string;
   x: number;
   y: number;
+  promptText?: string;
+  attachedToNodeId?: string;
 }
 
 export interface FlowConnection {
@@ -241,10 +243,10 @@ export function parseDraggedFlowTool(raw: string): FlowTool | null {
       programIcon: parsed.programIcon ?? "customTools",
       name: String(parsed.name),
       description: String(parsed.description ?? ""),
-      inputs: Array.isArray(parsed.inputs) && parsed.inputs.length > 0
+      inputs: Array.isArray(parsed.inputs)
         ? parsed.inputs.map((port, index) => normalizeFlowPort(port, `input-${index}`))
         : [makeFlowPort("input", "입력", "any")],
-      outputs: Array.isArray(parsed.outputs) && parsed.outputs.length > 0
+      outputs: Array.isArray(parsed.outputs)
         ? parsed.outputs.map((port, index) => normalizeFlowPort(port, `output-${index}`))
         : [makeFlowPort("result", "결과", "any")]
     };
@@ -330,7 +332,10 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
           ),
           nodeId: String(node.nodeId ?? `stored-node-${index}`),
           x: Number(node.x ?? defaultFlowNodePosition(index).x),
-          y: Number(node.y ?? defaultFlowNodePosition(index).y)
+          y: Number(node.y ?? defaultFlowNodePosition(index).y),
+          promptText: typeof node.promptText === "string" ? node.promptText : undefined,
+          attachedToNodeId:
+            typeof node.attachedToNodeId === "string" ? node.attachedToNodeId : undefined
         };
       }),
       connections: parsed.connections

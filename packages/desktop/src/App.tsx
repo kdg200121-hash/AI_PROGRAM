@@ -113,9 +113,9 @@ const flowBasicTools: FlowTool[] = [
     id: "basic-result-preview",
     programIcon: "customTools",
     name: "결과 미리보기",
-    description: "앞 노드의 결과를 별도 창에서 확인할 준비를 합니다.",
+    description: "앞 노드의 결과를 이 노드 안에서 바로 확인합니다.",
     inputs: [{ id: "result", label: "결과", type: "any", iconName: "customTools" }],
-    outputs: [{ id: "preview", label: "미리보기", type: "any", iconName: "customTools" }]
+    outputs: []
   },
   {
     id: "basic-path-select",
@@ -136,26 +136,29 @@ const flowBasicTools: FlowTool[] = [
   {
     id: "basic-custom-prompt",
     programIcon: "customTools",
-    name: "커스텀 창",
-    description: "메모처럼 입력한 문장을 노드 프롬프트 보조값으로 연결합니다.",
+    name: "프롬프트",
+    description: "노드 아래에 붙여 실행 프롬프트에 문장을 추가합니다.",
     inputs: [],
-    outputs: [{ id: "prompt", label: "프롬프트", type: "text", iconName: "textData" }]
+    outputs: []
   }
 ];
 
+type FlowBasicPortDirection = "input" | "output" | "both";
+
 const flowBasicPortTools: Array<{
   id: string;
-  direction: "input" | "output";
+  direction: FlowBasicPortDirection;
   label: string;
   type: FlowPortType;
   description: string;
 }> = [
-  { id: "input-text", direction: "input", label: "텍스트 입력", type: "text", description: "노드에 텍스트 입력 포트를 추가합니다." },
-  { id: "input-path", direction: "input", label: "경로 입력", type: "text", description: "노드에 파일/폴더 경로 입력 포트를 추가합니다." },
-  { id: "input-active", direction: "input", label: "활성파일 입력", type: "any", description: "현재 열린 파일을 받을 입력 포트를 추가합니다." },
-  { id: "output-text", direction: "output", label: "텍스트 출력", type: "text", description: "노드에 텍스트 출력 포트를 추가합니다." },
-  { id: "output-result", direction: "output", label: "결과 출력", type: "any", description: "노드에 범용 결과 출력 포트를 추가합니다." }
+  { id: "text", direction: "both", label: "텍스트", type: "text", description: "텍스트 값을 입력 또는 출력 포트로 추가합니다." },
+  { id: "path", direction: "input", label: "경로", type: "text", description: "파일/폴더 경로를 받을 입력 포트를 추가합니다." },
+  { id: "active-file", direction: "input", label: "활성파일", type: "any", description: "현재 열린 파일을 받을 입력 포트를 추가합니다." },
+  { id: "result", direction: "output", label: "결과", type: "any", description: "다음 노드로 보낼 결과 출력 포트를 추가합니다." }
 ];
+
+type FlowBasicPortTool = (typeof flowBasicPortTools)[number];
 
 const pinnedTabsStorageKey = "mcp-registry:pinned-tabs";
 const favoriteSectionsStorageKey = "mcp-registry:favorite-sections";
@@ -6036,7 +6039,12 @@ function WorkflowView() {
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<string[]>([]);
   const [highlightedConnectionIds, setHighlightedConnectionIds] = useState<string[]>([]);
   const [expandedNoteColorId, setExpandedNoteColorId] = useState("");
-  const [activeNodeDropId, setActiveNodeDropId] = useState("");
+  const [draggingBasicPortTool, setDraggingBasicPortTool] = useState<FlowBasicPortTool | null>(null);
+  const [activePortDropTarget, setActivePortDropTarget] = useState<{
+    nodeId: string;
+    direction: "input" | "output";
+  } | null>(null);
+  const [activePromptAttachTargetId, setActivePromptAttachTargetId] = useState("");
   const [draggingNote, setDraggingNote] = useState<{
     noteId: string;
     startWorldX: number;
@@ -6337,7 +6345,15 @@ function WorkflowView() {
 
     rememberFlowState();
     const idSet = new Set(ids);
-    setFlowNodes((items) => items.filter((node) => !idSet.has(node.nodeId)));
+    setFlowNodes((items) =>
+      items
+        .filter((node) => !idSet.has(node.nodeId))
+        .map((node) =>
+          node.attachedToNodeId && idSet.has(node.attachedToNodeId)
+            ? { ...node, attachedToNodeId: undefined }
+            : node
+        )
+    );
     setFlowConnections((connections) =>
       connections.filter(
         (connection) => !idSet.has(connection.fromNodeId) && !idSet.has(connection.toNodeId)
@@ -6445,7 +6461,9 @@ function WorkflowView() {
     setDraggingNode(null);
     setDraggingGroup(null);
     setDraggingNote(null);
-    setActiveNodeDropId("");
+    setDraggingBasicPortTool(null);
+    setActivePortDropTarget(null);
+    setActivePromptAttachTargetId("");
     setPanningCanvas(null);
     setSmartGuides([]);
     setSelectedNodeId("");
@@ -6517,6 +6535,26 @@ function WorkflowView() {
     );
   };
 
+  const updateFlowNodePromptText = (nodeId: string, promptText: string) => {
+    setFlowNodes((nodes) =>
+      nodes.map((node) => (node.nodeId === nodeId ? { ...node, promptText } : node))
+    );
+  };
+
+  const isPromptFlowNode = (node: FlowNode) => node.id === "basic-custom-prompt";
+
+  const canDropBasicPortTool = (
+    tool: FlowBasicPortTool,
+    direction: "input" | "output"
+  ) => tool.direction === "both" || tool.direction === direction;
+
+  const flowPortToolScopeLabel = (direction: FlowBasicPortDirection) => {
+    if (direction === "both") {
+      return "공용";
+    }
+    return direction;
+  };
+
   const addCustomFlowPort = (
     nodeId: string,
     direction: "input" | "output",
@@ -6582,8 +6620,9 @@ function WorkflowView() {
 
   const handleBasicPortToolDragStart = (
     event: DragEvent<HTMLElement>,
-    tool: (typeof flowBasicPortTools)[number]
+    tool: FlowBasicPortTool
   ) => {
+    setDraggingBasicPortTool(tool);
     event.dataTransfer.setData("application/x-flow-port-tool", JSON.stringify(tool));
     event.dataTransfer.effectAllowed = "copy";
   };
@@ -6858,11 +6897,14 @@ function WorkflowView() {
       );
 
       if (movedBounds) {
+        const draggingSingleNode = flowNodes.find((node) => node.nodeId === draggingNode.nodeId);
+        const isDraggingPrompt =
+          draggingNode.nodeIds.length === 1 && draggingSingleNode && isPromptFlowNode(draggingSingleNode);
         const center = {
           x: (movedBounds.left + movedBounds.right) / 2,
           y: (movedBounds.top + movedBounds.bottom) / 2
         };
-        const targetGroup = flowGroups.find((group) => {
+        const targetGroup = isDraggingPrompt ? undefined : flowGroups.find((group) => {
           if (draggingNode.nodeIds.every((nodeId) => group.nodeIds.includes(nodeId))) {
             return false;
           }
@@ -6878,8 +6920,25 @@ function WorkflowView() {
           );
         });
         setActiveGroupDropId(targetGroup?.id ?? "");
+        if (isDraggingPrompt) {
+          const targetNode = flowNodes.find((node) => {
+            if (node.nodeId === draggingNode.nodeId || isPromptFlowNode(node)) {
+              return false;
+            }
+            const bounds = flowNodeBounds(node);
+            const horizontallyAligned =
+              movedBounds.right >= bounds.left + 24 && movedBounds.left <= bounds.right - 24;
+            const closeToBottom =
+              movedBounds.top >= bounds.bottom - 16 && movedBounds.top <= bounds.bottom + 96;
+            return horizontallyAligned && closeToBottom;
+          });
+          setActivePromptAttachTargetId(targetNode?.nodeId ?? "");
+        } else {
+          setActivePromptAttachTargetId("");
+        }
       } else {
         setActiveGroupDropId("");
+        setActivePromptAttachTargetId("");
       }
 
       setFlowNodes((items) =>
@@ -6903,6 +6962,40 @@ function WorkflowView() {
                 : group
             )
           );
+        }
+        return "";
+      });
+      setActivePromptAttachTargetId((targetNodeId) => {
+        if (draggingNode.nodeIds.length === 1) {
+          const promptNodeId = draggingNode.nodeIds[0];
+          if (!targetNodeId) {
+            setFlowNodes((items) =>
+              items.map((node) =>
+                node.nodeId === promptNodeId ? { ...node, attachedToNodeId: undefined } : node
+              )
+            );
+          } else {
+            const targetNode = flowNodes.find((node) => node.nodeId === targetNodeId);
+            if (targetNode) {
+              const nextY = targetNode.y + estimateFlowNodeHeight(targetNode) + 14;
+              setFlowNodes((items) =>
+                items.map((node) =>
+                  node.nodeId === promptNodeId
+                    ? {
+                        ...node,
+                        x: targetNode.x,
+                        y: nextY,
+                        attachedToNodeId: targetNodeId
+                      }
+                    : node.nodeId === targetNodeId
+                      ? node
+                      : node.attachedToNodeId === targetNodeId && node.nodeId !== promptNodeId
+                        ? { ...node, attachedToNodeId: undefined }
+                        : node
+                )
+              );
+            }
+          }
         }
         return "";
       });
@@ -7059,10 +7152,11 @@ function WorkflowView() {
 
     const nodeId = `node-${tool.id}-${Date.now()}`;
     const nextTool = cloneFlowTool(tool);
+    const nodeDefaults = tool.id === "basic-custom-prompt" ? { promptText: "" } : {};
     rememberFlowState();
     setFlowNodes((items) => [
       ...items,
-      { ...nextTool, nodeId, ...(position ?? defaultFlowNodePosition(items.length)) }
+      { ...nextTool, ...nodeDefaults, nodeId, ...(position ?? defaultFlowNodePosition(items.length)) }
     ]);
     setExpandedNodeId(nodeId);
     setSelectedNodeId(nodeId);
@@ -7085,7 +7179,13 @@ function WorkflowView() {
       } catch {
         // Ignore invalid drag payloads from outside the app.
       }
-      setActiveNodeDropId("");
+      setActivePortDropTarget(null);
+      return;
+    }
+
+    if (event.dataTransfer.types.includes("application/x-flow-port-tool")) {
+      setActivePortDropTarget(null);
+      setDraggingBasicPortTool(null);
       return;
     }
 
@@ -7105,7 +7205,11 @@ function WorkflowView() {
     });
   };
 
-  const handleFlowNodeDrop = (event: DragEvent<HTMLDivElement>, nodeId: string) => {
+  const handleFlowPortToolDrop = (
+    event: DragEvent<HTMLDivElement>,
+    nodeId: string,
+    direction: "input" | "output"
+  ) => {
     const portToolRaw = event.dataTransfer.getData("application/x-flow-port-tool");
     if (!portToolRaw) {
       return;
@@ -7114,15 +7218,19 @@ function WorkflowView() {
     event.preventDefault();
     event.stopPropagation();
     try {
-      const portTool = JSON.parse(portToolRaw) as (typeof flowBasicPortTools)[number];
+      const portTool = JSON.parse(portToolRaw) as FlowBasicPortTool;
       if (!portTool.direction || !portTool.label || !portTool.type) {
         return;
       }
-      addCustomFlowPort(nodeId, portTool.direction, portTool.label, portTool.type);
+      if (!canDropBasicPortTool(portTool, direction)) {
+        return;
+      }
+      addCustomFlowPort(nodeId, direction, portTool.label, portTool.type);
     } catch {
       // Ignore invalid drag payloads from outside the app.
     } finally {
-      setActiveNodeDropId("");
+      setActivePortDropTarget(null);
+      setDraggingBasicPortTool(null);
     }
   };
 
@@ -7349,7 +7457,13 @@ function WorkflowView() {
     }
 
     rememberFlowState();
-    setFlowNodes((items) => items.filter((node) => node.nodeId !== nodeId));
+    setFlowNodes((items) =>
+      items
+        .filter((node) => node.nodeId !== nodeId)
+        .map((node) =>
+          node.attachedToNodeId === nodeId ? { ...node, attachedToNodeId: undefined } : node
+        )
+    );
     setFlowConnections((connections) =>
       connections.filter(
         (connection) => connection.fromNodeId !== nodeId && connection.toNodeId !== nodeId
@@ -7681,48 +7795,51 @@ function WorkflowView() {
                 height: note.height ?? 140,
                 "--flow-note-color": note.color ?? flowNoteColorOptions[0]
               } as CSSProperties}
-              onPointerDown={(event) => event.stopPropagation()}
+              onPointerDown={(event) => {
+                const target = event.target instanceof Element ? event.target : null;
+                if (target?.closest("textarea") || target?.closest(".flowNoteColorMenu")) {
+                  event.stopPropagation();
+                  return;
+                }
+                startFlowNoteDrag(event, note);
+              }}
               onContextMenu={(event) => event.stopPropagation()}
               onPointerUp={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 updateFlowNoteSize(note.id, rect.width / flowScale, rect.height / flowScale);
               }}
             >
-              <div
-                className="flowNoteHeader"
-                onPointerDown={(event) => startFlowNoteDrag(event, note)}
-              >
-                <span>메모</span>
-                <div className="flowNoteColorMenu" onPointerDown={(event) => event.stopPropagation()}>
-                  <button
-                    className="flowNoteColorCurrent"
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setExpandedNoteColorId((current) => (current === note.id ? "" : note.id));
-                    }}
-                    style={{ "--note-choice-color": note.color ?? flowNoteColorOptions[0] } as CSSProperties}
-                    aria-label="메모 색상 변경"
-                  />
-                  {expandedNoteColorId === note.id ? (
-                    <div className="flowNoteColorChoices">
-                      {flowNoteColorOptions.map((color) => (
-                        <button
-                          className={color === (note.color ?? flowNoteColorOptions[0]) ? "selected" : ""}
-                          key={color}
-                          type="button"
-                          onClick={() => updateFlowNoteColor(note.id, color)}
-                          style={{ "--note-choice-color": color } as CSSProperties}
-                          aria-label={`메모 색상 ${color}`}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+              <div className="flowNoteColorMenu" onPointerDown={(event) => event.stopPropagation()}>
+                <button
+                  className="flowNoteColorCurrent"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setExpandedNoteColorId((current) => (current === note.id ? "" : note.id));
+                  }}
+                  style={{ "--note-choice-color": note.color ?? flowNoteColorOptions[0] } as CSSProperties}
+                  aria-label="메모 색상 변경"
+                />
+                {expandedNoteColorId === note.id ? (
+                  <div className="flowNoteColorChoices">
+                    {flowNoteColorOptions.map((color) => (
+                      <button
+                        className={color === (note.color ?? flowNoteColorOptions[0]) ? "selected" : ""}
+                        key={color}
+                        type="button"
+                        onClick={() => updateFlowNoteColor(note.id, color)}
+                        style={{ "--note-choice-color": color } as CSSProperties}
+                        aria-label={`메모 색상 ${color}`}
+                      />
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <textarea
+                className="flowNoteTextArea"
                 value={note.text}
                 onChange={(event) => updateFlowNoteText(note.id, event.target.value)}
+                onPointerDown={(event) => event.stopPropagation()}
                 aria-label="메모"
               />
             </div>
@@ -7749,22 +7866,14 @@ function WorkflowView() {
                     draggingNode?.nodeIds.includes(node.nodeId) ? "dragging" : "",
                     runningNodeIds.includes(node.nodeId) ? "running" : "",
                     highlightedNodeIds.includes(node.nodeId) ? "issueHighlighted" : "",
-                    activeNodeDropId === node.nodeId ? "dropTarget" : ""
+                    activePromptAttachTargetId === node.nodeId ? "promptAttachTarget" : "",
+                    node.attachedToNodeId ? "attachedPrompt" : ""
                   ]
                     .filter(Boolean)
                     .join(" ")}
                   key={node.nodeId}
                   onPointerDown={(event) => handleFlowNodePointerDown(event, node.nodeId)}
                   onContextMenu={(event) => openFlowNodeMenu(event, node.nodeId)}
-                  onDragOver={(event) => {
-                    if (event.dataTransfer.types.includes("application/x-flow-port-tool")) {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setActiveNodeDropId(node.nodeId);
-                    }
-                  }}
-                  onDragLeave={() => setActiveNodeDropId((current) => (current === node.nodeId ? "" : current))}
-                  onDrop={(event) => handleFlowNodeDrop(event, node.nodeId)}
                   style={{
                     left: node.x,
                     top: node.y,
@@ -7798,7 +7907,37 @@ function WorkflowView() {
                   </div>
                   <div className={["flowNodeBody", isExpanded ? "expanded" : "compact"].join(" ")}>
                     <div className="flowPortColumns">
-                      <div className="flowPorts left">
+                      <div
+                        className={[
+                          "flowPorts",
+                          "left",
+                          activePortDropTarget?.nodeId === node.nodeId &&
+                          activePortDropTarget.direction === "input"
+                            ? "portDropTarget"
+                            : ""
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onDragOver={(event) => {
+                          if (!draggingBasicPortTool) {
+                            return;
+                          }
+                          if (!canDropBasicPortTool(draggingBasicPortTool, "input")) {
+                            return;
+                          }
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setActivePortDropTarget({ nodeId: node.nodeId, direction: "input" });
+                        }}
+                        onDragLeave={() =>
+                          setActivePortDropTarget((current) =>
+                            current?.nodeId === node.nodeId && current.direction === "input"
+                              ? null
+                              : current
+                          )
+                        }
+                        onDrop={(event) => handleFlowPortToolDrop(event, node.nodeId, "input")}
+                      >
                         <strong>Input</strong>
                         {node.inputs.map((port) => (
                           (() => {
@@ -7855,7 +7994,37 @@ function WorkflowView() {
                           })()
                         ))}
                       </div>
-                      <div className="flowPorts right">
+                      <div
+                        className={[
+                          "flowPorts",
+                          "right",
+                          activePortDropTarget?.nodeId === node.nodeId &&
+                          activePortDropTarget.direction === "output"
+                            ? "portDropTarget"
+                            : ""
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onDragOver={(event) => {
+                          if (!draggingBasicPortTool) {
+                            return;
+                          }
+                          if (!canDropBasicPortTool(draggingBasicPortTool, "output")) {
+                            return;
+                          }
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setActivePortDropTarget({ nodeId: node.nodeId, direction: "output" });
+                        }}
+                        onDragLeave={() =>
+                          setActivePortDropTarget((current) =>
+                            current?.nodeId === node.nodeId && current.direction === "output"
+                              ? null
+                              : current
+                          )
+                        }
+                        onDrop={(event) => handleFlowPortToolDrop(event, node.nodeId, "output")}
+                      >
                         <strong>Output</strong>
                         {node.outputs.map((port) => (
                           (() => {
@@ -7919,8 +8088,29 @@ function WorkflowView() {
                     </div>
                     {isExpanded ? (
                       <div className="flowNodeDetails">
-                        <strong>작동 원리</strong>
-                        <p>{node.description}</p>
+                        {node.id === "basic-result-preview" ? (
+                          <div className="flowNodePreview">
+                            <strong>결과 미리보기</strong>
+                            <p>아직 실행 결과가 없습니다. 실행 후 이 영역에 결과가 표시됩니다.</p>
+                          </div>
+                        ) : node.id === "basic-custom-prompt" ? (
+                          <label className="flowPromptEditor">
+                            <strong>프롬프트</strong>
+                            <textarea
+                              value={node.promptText ?? ""}
+                              onChange={(event) =>
+                                updateFlowNodePromptText(node.nodeId, event.target.value)
+                              }
+                              onPointerDown={(event) => event.stopPropagation()}
+                              placeholder="이 노드가 붙은 대상 노드를 실행할 때 추가할 문장을 입력합니다."
+                            />
+                          </label>
+                        ) : (
+                          <>
+                            <strong>작동 원리</strong>
+                            <p>{node.description}</p>
+                          </>
+                        )}
                       </div>
                     ) : null}
                   </div>
@@ -8042,7 +8232,7 @@ function WorkflowView() {
                     type="button"
                     onClick={() => setBasicToolsTab("ports")}
                   >
-                    인풋/아웃풋 도구
+                    연결값 도구
                   </button>
                 </div>
                 {basicToolsTab === "tools" ? (
@@ -8071,15 +8261,19 @@ function WorkflowView() {
                           key={tool.id}
                           type="button"
                           onDragStart={(event) => handleBasicPortToolDragStart(event, tool)}
+                          onDragEnd={() => {
+                            setDraggingBasicPortTool(null);
+                            setActivePortDropTarget(null);
+                          }}
                           style={{
                             "--basic-tool-color": palette.accent,
                             "--basic-tool-bg": palette.surface
                           } as CSSProperties}
                         >
-                          <span className="basicPortDirection">
-                            {tool.direction === "input" ? "IN" : "OUT"}
-                          </span>
                           <span>{tool.label}</span>
+                          <span className="basicToolScopeTag">
+                            {flowPortToolScopeLabel(tool.direction)}
+                          </span>
                           <small>{tool.description}</small>
                         </button>
                       );
