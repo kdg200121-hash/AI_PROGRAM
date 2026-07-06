@@ -1,5 +1,6 @@
 import type { RegistryFile } from "@mcp-registry/shared";
 import type { NewMcpServerInput, UpdateMcpServerInput } from "@mcp-registry/core";
+import type { ServerProcessResult } from "./processMonitor";
 
 declare global {
   interface Window {
@@ -13,6 +14,11 @@ declare global {
     mcpWindow?: {
       setCompactMode: (enabled: boolean) => Promise<void>;
       openWebView: () => Promise<void>;
+    };
+    mcpProcesses?: {
+      getSnapshot: () => Promise<ServerProcessResult>;
+      startServer: (serverId: string) => Promise<ServerProcessResult>;
+      stopServer: (serverId: string) => Promise<ServerProcessResult>;
     };
     skillInstaller?: {
       installSaveTool: () => Promise<{ installedPath: string }>;

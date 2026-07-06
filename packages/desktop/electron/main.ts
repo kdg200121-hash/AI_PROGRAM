@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from "electron";
 import { access, copyFile, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { basename, join } from "node:path";
 import {
   addServer,
@@ -14,6 +15,13 @@ import {
 import { nicknameForGitHubLogin } from "../src/githubAuthProfile";
 import { getWindowModeSize } from "../src/windowMode";
 import type { OpenDialogOptions } from "electron";
+import type { McpServerRecord, McpStatus, RegistryFile } from "@mcp-registry/shared";
+import type {
+  ProcessLogEntry,
+  ProcessSnapshot,
+  ProcessState,
+  ServerProcessResult
+} from "../src/processMonitor";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -711,6 +719,159 @@ function registryPath() {
   return process.env.MCP_REGISTRY_PATH ?? join(app.getPath("userData"), "registry.json");
 }
 
+interface RunningServerProcess {
+  child: ChildProcessWithoutNullStreams;
+  server: McpServerRecord;
+  startedAt: string;
+  lastMessage?: string;
+}
+
+const runningServerProcesses = new Map<string, RunningServerProcess>();
+const processLogs: ProcessLogEntry[] = [];
+const maxProcessLogEntries = 300;
+
+function appendProcessLog(
+  server: Pick<McpServerRecord, "id" | "name">,
+  level: ProcessLogEntry["level"],
+  message: string
+) {
+  const entry: ProcessLogEntry = {
+    id: `${Date.now()}-${processLogs.length}-${Math.random().toString(36).slice(2)}`,
+    serverId: server.id,
+    serverName: server.name,
+    level,
+    message: message.trim() || "(빈 로그)",
+    createdAt: new Date().toISOString()
+  };
+
+  processLogs.push(entry);
+  if (processLogs.length > maxProcessLogEntries) {
+    processLogs.splice(0, processLogs.length - maxProcessLogEntries);
+  }
+
+  const running = runningServerProcesses.get(server.id);
+  if (running) {
+    running.lastMessage = entry.message;
+  }
+}
+
+function snapshotFromRegistry(registry: RegistryFile): ProcessSnapshot {
+  const processes: ProcessState[] = registry.servers.map((server) => {
+    const running = runningServerProcesses.get(server.id);
+    return {
+      serverId: server.id,
+      serverName: server.name,
+      target: server.target,
+      status: running ? "running" : server.status,
+      pid: running?.child.pid,
+      startedAt: running?.startedAt,
+      lastMessage: running?.lastMessage
+    };
+  });
+
+  return {
+    processes,
+    logs: [...processLogs]
+  };
+}
+
+async function processResult(registry: RegistryFile): Promise<ServerProcessResult> {
+  return {
+    registry,
+    ...snapshotFromRegistry(registry)
+  };
+}
+
+async function updateServerProcessStatus(serverId: string, status: McpStatus) {
+  return updateServer(registryPath(), serverId, { status });
+}
+
+async function processSnapshotResult() {
+  await ensureUserRegistry();
+  return processResult(await loadRegistry(registryPath()));
+}
+
+async function startRegisteredServer(serverId: string) {
+  await ensureUserRegistry();
+  const registry = await loadRegistry(registryPath());
+  const server = registry.servers.find((item) => item.id === serverId);
+  if (!server) {
+    throw new Error("등록된 MCP 서버를 찾을 수 없습니다.");
+  }
+
+  if (runningServerProcesses.has(server.id)) {
+    appendProcessLog(server, "info", "이미 실행 중입니다.");
+    return processResult(await updateServerProcessStatus(server.id, "running"));
+  }
+
+  if (!server.launchCommand.trim()) {
+    appendProcessLog(server, "error", "실행 명령이 비어 있어 서버를 시작할 수 없습니다.");
+    return processResult(await updateServerProcessStatus(server.id, "error"));
+  }
+
+  let child: ChildProcessWithoutNullStreams;
+  try {
+    child = spawn(server.launchCommand, {
+      cwd: server.workingDirectory.trim() || undefined,
+      env: { ...process.env, ...(server.environment ?? {}) },
+      shell: true
+    });
+  } catch (error) {
+    appendProcessLog(server, "error", (error as Error).message);
+    return processResult(await updateServerProcessStatus(server.id, "error"));
+  }
+  const startedAt = new Date().toISOString();
+  runningServerProcesses.set(server.id, { child, server, startedAt });
+  appendProcessLog(server, "info", `실행 시작: ${server.launchCommand}`);
+
+  child.stdout.on("data", (chunk: Buffer) => {
+    appendProcessLog(server, "stdout", chunk.toString("utf8"));
+  });
+
+  child.stderr.on("data", (chunk: Buffer) => {
+    appendProcessLog(server, "stderr", chunk.toString("utf8"));
+  });
+
+  child.on("error", async (error) => {
+    runningServerProcesses.delete(server.id);
+    appendProcessLog(server, "error", error.message);
+    await updateServerProcessStatus(server.id, "error");
+  });
+
+  child.on("exit", async (code, signal) => {
+    runningServerProcesses.delete(server.id);
+    const status: McpStatus = code === 0 || signal === "SIGTERM" ? "stopped" : "error";
+    appendProcessLog(
+      server,
+      status === "error" ? "error" : "info",
+      `프로세스 종료: code=${code ?? "null"}, signal=${signal ?? "none"}`
+    );
+    await updateServerProcessStatus(server.id, status);
+  });
+
+  return processResult(await updateServerProcessStatus(server.id, "running"));
+}
+
+async function stopRegisteredServer(serverId: string) {
+  await ensureUserRegistry();
+  const registry = await loadRegistry(registryPath());
+  const server = registry.servers.find((item) => item.id === serverId);
+  if (!server) {
+    throw new Error("등록된 MCP 서버를 찾을 수 없습니다.");
+  }
+
+  const running = runningServerProcesses.get(server.id);
+  if (!running) {
+    appendProcessLog(server, "info", "앱에서 실행 중인 프로세스가 없습니다.");
+    return processResult(await updateServerProcessStatus(server.id, "stopped"));
+  }
+
+  appendProcessLog(server, "info", "중지 요청을 보냈습니다.");
+  running.child.kill();
+  runningServerProcesses.delete(server.id);
+  return processResult(await updateServerProcessStatus(server.id, "stopped"));
+}
+
 async function findBundledSkillPath(skillName: string) {
   const candidates = [
     join(app.getAppPath(), "assets", "skills", skillName),
@@ -870,7 +1031,7 @@ function startupLoadingUrl() {
   <body>
     <div class="panel">
       <div class="spinner"></div>
-      <strong>MCP 연결관리자 준비 중</strong>
+      <strong>MCP 연결 관리자 준비 중</strong>
       <span>작업 화면을 불러오고 있습니다.</span>
     </div>
   </body>
@@ -1113,7 +1274,24 @@ ipcMain.handle("registry:auto-add-servers", async () => {
   return next;
 });
 
+ipcMain.handle("mcp-processes:get-snapshot", async () => processSnapshotResult());
+
+ipcMain.handle("mcp-processes:start-server", async (_event, serverId: string) =>
+  startRegisteredServer(serverId)
+);
+
+ipcMain.handle("mcp-processes:stop-server", async (_event, serverId: string) =>
+  stopRegisteredServer(serverId)
+);
+
 void app.whenReady().then(createWindow);
+
+app.on("before-quit", () => {
+  for (const running of runningServerProcesses.values()) {
+    running.child.kill();
+  }
+  runningServerProcesses.clear();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

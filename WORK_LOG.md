@@ -1032,3 +1032,12 @@
 - 전체 검토 중 남아 있던 Home/Custom Flow 안내 문구와 기본 Flow 노드 문구의 깨진 한글을 정상 문구로 복구했다.
 - 기존 localStorage에 저장된 기본 Flow 노드도 `cad-read`, `excel-export`, `revit-place` id 기준으로 최신 기본 문구/포트 라벨을 사용하도록 보정했다.
 - `customFlowModel.test.ts`를 추가해 기본 Flow 노드 문구와 포트 중심 연결 좌표가 다시 깨지지 않도록 회귀 테스트를 추가했다.
+
+## 2026-07-06 추가 131
+
+- `MonitorView`를 `packages/desktop/src/MonitorView.tsx`로 분리하고 Process Monitor 공통 타입을 `processMonitor.ts`로 분리했다.
+- Electron main에 MCP 서버 프로세스 실행/중지 IPC를 추가했다. 등록 서버의 `launchCommand`, `workingDirectory`, `environment`를 사용해 child process를 실행하고 stdout/stderr/오류/종료 이벤트를 최근 로그로 유지한다.
+- 설정 창의 서버 상세에 실행/중지 버튼을 연결했고, 실행 결과는 Process Monitor 로그와 서버 상태에 반영되도록 했다.
+- Custom Flow 실행 전 검증 로직을 `customFlowValidation.ts`로 분리하고, 포트 타입 불일치/없는 노드 또는 포트/미연결 입력을 검출하는 패널을 캔버스에 추가했다.
+- `customFlowValidation.test.ts`를 추가해 Flow 검증 로직을 회귀 테스트로 고정했다.
+- Home 대시보드 디자인 개편은 사용자 요청에 따라 제외했다.

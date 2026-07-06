@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { RegistryFile } from "@mcp-registry/shared";
 import type { NewMcpServerInput, UpdateMcpServerInput } from "@mcp-registry/core";
+import type { ServerProcessResult } from "../src/processMonitor";
 
 contextBridge.exposeInMainWorld("mcpRegistry", {
   loadRegistry: async () => ipcRenderer.invoke("registry:load") as Promise<RegistryFile>,
@@ -21,6 +22,15 @@ contextBridge.exposeInMainWorld("mcpWindow", {
   openWebView: async () => {
     await ipcRenderer.invoke("window:open-web-view");
   }
+});
+
+contextBridge.exposeInMainWorld("mcpProcesses", {
+  getSnapshot: async () =>
+    ipcRenderer.invoke("mcp-processes:get-snapshot") as Promise<ServerProcessResult>,
+  startServer: async (serverId: string) =>
+    ipcRenderer.invoke("mcp-processes:start-server", serverId) as Promise<ServerProcessResult>,
+  stopServer: async (serverId: string) =>
+    ipcRenderer.invoke("mcp-processes:stop-server", serverId) as Promise<ServerProcessResult>
 });
 
 contextBridge.exposeInMainWorld("skillInstaller", {

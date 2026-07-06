@@ -35,6 +35,7 @@ import {
   type WorkspaceTabId
 } from "./workspaceTabs";
 import { PanelHeader } from "./panelHeader";
+import { MonitorView } from "./MonitorView";
 import {
   createServerDraft,
   getSelectedServerId,
@@ -68,6 +69,12 @@ import {
   type FlowTool,
   type StoredFlowGraph
 } from "./customFlowModel";
+import { validateFlowGraph } from "./customFlowValidation";
+import {
+  emptyProcessSnapshot,
+  type ProcessSnapshot,
+  type ServerProcessResult
+} from "./processMonitor";
 
 const pinnedTabsStorageKey = "mcp-registry:pinned-tabs";
 const favoriteSectionsStorageKey = "mcp-registry:favorite-sections";
@@ -816,6 +823,10 @@ export function App() {
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [registryError, setRegistryError] = useState("");
   const [autoAddMessage, setAutoAddMessage] = useState("");
+  const [processSnapshot, setProcessSnapshot] = useState<ProcessSnapshot>(() =>
+    emptyProcessSnapshot()
+  );
+  const [processActionMessage, setProcessActionMessage] = useState("");
   const [isCompact, setIsCompact] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeCompactSection, setActiveCompactSection] = useState<SidebarSectionId>("servers");
@@ -1200,6 +1211,15 @@ export function App() {
   }, [autoAddMessage]);
 
   useEffect(() => {
+    if (!processActionMessage) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setProcessActionMessage(""), 4200);
+    return () => window.clearTimeout(timer);
+  }, [processActionMessage]);
+
+  useEffect(() => {
     const element = openTabsRef.current;
     const stripElement = tabStripRef.current;
     if (!element || !stripElement) {
@@ -1324,6 +1344,36 @@ export function App() {
     });
   }, []);
 
+  const applyProcessResult = (result: ServerProcessResult) => {
+    setRegistry(result.registry);
+    setProcessSnapshot({
+      processes: result.processes,
+      logs: result.logs
+    });
+  };
+
+  const refreshProcessSnapshot = async () => {
+    const api = window.mcpProcesses;
+    if (!api) {
+      return;
+    }
+
+    try {
+      applyProcessResult(await api.getSnapshot());
+    } catch (error) {
+      setProcessActionMessage((error as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    void refreshProcessSnapshot();
+    const timer = window.setInterval(() => {
+      void refreshProcessSnapshot();
+    }, 2500);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   const activeServerWorkspace: WorkspaceTabId =
     activeSidebarSection === "revit"
       ? "revit"
@@ -1370,6 +1420,11 @@ export function App() {
   const revitCount = registry.servers.filter((server) => server.target === "revit").length;
   const runningCount = registry.servers.filter((server) => server.status === "running").length;
   const disconnectedCount = registry.servers.length - runningCount;
+  const selectedProcessState = selectedRegistryServer
+    ? processSnapshot.processes.find((process) => process.serverId === selectedRegistryServer.id)
+    : undefined;
+  const isSelectedServerRunning =
+    selectedProcessState?.status === "running" || selectedRegistryServer?.status === "running";
   const connectionScope = connectionScopeForPage(
     isCompact ? activeCompactSection : activeSidebarSection,
     activeTab
@@ -2593,6 +2648,40 @@ export function App() {
     setSelectedId(getSelectedServerId(next, preferredId));
     if (!window.mcpRegistry) {
       window.localStorage.setItem(browserRegistryStorageKey, JSON.stringify(next));
+    }
+  };
+
+  const startServerProcess = async (serverId: string) => {
+    const api = window.mcpProcesses;
+    if (!api) {
+      setProcessActionMessage("현재 실행 환경에서는 MCP 프로세스 실행을 사용할 수 없습니다.");
+      return;
+    }
+
+    try {
+      const result = await api.startServer(serverId);
+      applyProcessResult(result);
+      setSelectedId(serverId);
+      setProcessActionMessage("서버 실행 요청을 보냈습니다.");
+    } catch (error) {
+      setProcessActionMessage(error instanceof Error ? error.message : "서버 실행에 실패했습니다.");
+    }
+  };
+
+  const stopServerProcess = async (serverId: string) => {
+    const api = window.mcpProcesses;
+    if (!api) {
+      setProcessActionMessage("현재 실행 환경에서는 MCP 프로세스 중지를 사용할 수 없습니다.");
+      return;
+    }
+
+    try {
+      const result = await api.stopServer(serverId);
+      applyProcessResult(result);
+      setSelectedId(serverId);
+      setProcessActionMessage("서버 중지 요청을 보냈습니다.");
+    } catch (error) {
+      setProcessActionMessage(error instanceof Error ? error.message : "서버 중지에 실패했습니다.");
     }
   };
 
@@ -3868,7 +3957,12 @@ export function App() {
         ) : null}
 
         {!displaySubmenuItem && displaySidebarSection === "monitor" ? (
-          <MonitorView runningCount={runningCount} totalCount={registry.servers.length} />
+          <MonitorView
+            runningCount={runningCount}
+            totalCount={registry.servers.length}
+            processes={processSnapshot.processes}
+            logs={processSnapshot.logs}
+          />
         ) : null}
       </main>
 
@@ -4244,9 +4338,40 @@ export function App() {
                               />
                             </label>
                             {registryError ? <p className="formError">{registryError}</p> : null}
+                            {processActionMessage ? (
+                              <p className="processActionMessage">{processActionMessage}</p>
+                            ) : null}
                             <div className="serverEditorActions">
                               <button className="primary" type="button" onClick={saveServer}>
                                 저장
+                              </button>
+                              <button
+                                className="secondaryAction"
+                                type="button"
+                                disabled={
+                                  isCreatingServer ||
+                                  isSelectedServerRunning ||
+                                  !selectedRegistryServer?.launchCommand.trim()
+                                }
+                                onClick={() =>
+                                  selectedRegistryServer
+                                    ? startServerProcess(selectedRegistryServer.id)
+                                    : undefined
+                                }
+                              >
+                                실행
+                              </button>
+                              <button
+                                className="secondaryAction"
+                                type="button"
+                                disabled={isCreatingServer || !isSelectedServerRunning}
+                                onClick={() =>
+                                  selectedRegistryServer
+                                    ? stopServerProcess(selectedRegistryServer.id)
+                                    : undefined
+                                }
+                              >
+                                중지
                               </button>
                               <button className="secondaryAction" type="button" onClick={cancelServerEdit}>
                                 초기화
@@ -4594,7 +4719,12 @@ export function App() {
               </div>
             </div>
             <div className="dialogContent standaloneDialogContent">
-              <MonitorView runningCount={runningCount} totalCount={registry.servers.length} />
+              <MonitorView
+                runningCount={runningCount}
+                totalCount={registry.servers.length}
+                processes={processSnapshot.processes}
+                logs={processSnapshot.logs}
+              />
             </div>
           </section>
         </div>
@@ -5630,19 +5760,33 @@ function CustomToolSection({
 
 function ServersView({
   activeTab,
+  processActionMessage,
+  processStates,
   selected,
   selectedId,
   servers,
   tools,
-  onSelectServer
+  onSelectServer,
+  onStartServer,
+  onStopServer
 }: {
   activeTab: WorkspaceTabId;
+  processActionMessage: string;
+  processStates: ProcessSnapshot["processes"];
   selected: McpServerRecord | undefined;
   selectedId: string;
   servers: McpServerRecord[];
   tools: ReturnType<typeof getToolsForWorkspace>;
   onSelectServer: (serverId: string) => void;
+  onStartServer: (serverId: string) => void;
+  onStopServer: (serverId: string) => void;
 }) {
+  const selectedProcessState = selected
+    ? processStates.find((process) => process.serverId === selected.id)
+    : undefined;
+  const isSelectedRunning =
+    selectedProcessState?.status === "running" || selected?.status === "running";
+
   return (
     <section className="contentGrid">
       <section className="panel serverPanel">
@@ -5694,9 +5838,25 @@ function ServersView({
             <Field label="실행 명령" value={selected.launchCommand} />
             <Field label="작업 폴더" value={selected.workingDirectory} />
             <Field label="메모" value={selected.notes} multiline />
+            {processActionMessage ? (
+              <p className="processActionMessage">{processActionMessage}</p>
+            ) : null}
             <div className="buttonStack">
-              <button className="primary">실행</button>
-              <button>중지</button>
+              <button
+                className="primary"
+                type="button"
+                disabled={isSelectedRunning || !selected.launchCommand.trim()}
+                onClick={() => onStartServer(selected.id)}
+              >
+                실행
+              </button>
+              <button
+                type="button"
+                disabled={!isSelectedRunning}
+                onClick={() => onStopServer(selected.id)}
+              >
+                중지
+              </button>
             </div>
           </div>
         ) : (
@@ -6567,6 +6727,20 @@ function WorkflowView() {
       Boolean(item.bounds)
     );
   const selectionRect = selectionBox ? normalizeRect(selectionBox) : null;
+  const flowValidationIssues = useMemo(
+    () => validateFlowGraph(flowNodes, flowConnections),
+    [flowConnections, flowNodes]
+  );
+  const flowValidationErrorCount = flowValidationIssues.filter(
+    (issue) => issue.severity === "error"
+  ).length;
+  const flowValidationWarningCount = flowValidationIssues.length - flowValidationErrorCount;
+  const flowValidationTone =
+    flowValidationErrorCount > 0
+      ? "error"
+      : flowValidationWarningCount > 0
+        ? "warning"
+        : "ready";
 
   return (
     <section className="sectionView customFlowView">
@@ -6865,53 +7039,38 @@ function WorkflowView() {
             </button>
           </div>
         ) : null}
-      </div>
-    </section>
-  );
-}
-
-function MonitorView({ runningCount, totalCount }: { runningCount: number; totalCount: number }) {
-  return (
-    <section className="sectionView monitorView">
-      <div className="monitorStatus">
-        <div className="panel monitorTile">
-          <span>연결 상태</span>
-          <strong>{runningCount > 0 ? "일부 실행 중" : "대기 중"}</strong>
-          <p>
-            실행 중 {runningCount}개 / 전체 {totalCount}개
-          </p>
-        </div>
-        <div className="panel monitorTile">
-          <span>CAD 브리지</span>
-          <strong>확인 전</strong>
-          <p>AutoCAD MCP 포트 5100 상태를 확인합니다.</p>
-        </div>
-        <div className="panel monitorTile">
-          <span>Revit 브리지</span>
-          <strong>확인 전</strong>
-          <p>Revit MCP 포트 5001 상태를 확인합니다.</p>
-        </div>
-      </div>
-      <div className="panel logPanel">
-        <div className="panelHeader">
-          <h2>실행 로그</h2>
-        </div>
-        <div className="logList">
-          <p>[대기] MCP 서버 상태 확인 준비</p>
-          <p>[대기] CAD 화면 정보 수집 준비</p>
-          <p>[대기] Revit 작업 큐 실행 준비</p>
-        </div>
-      </div>
-      <div className="panel logPanel errorReportPanel">
-        <div className="panelHeader">
-          <h2>오류 리포트</h2>
-        </div>
-        <div className="logList">
-          <p>
-            <strong>접수된 오류 없음</strong>
-            <span>실제 MCP 실행/로그 수집이 연결되면 확인이 필요한 오류 항목이 여기에 표시됩니다.</span>
-          </p>
-        </div>
+        <aside className={`flowValidationPanel ${flowValidationTone}`} aria-label="Custom Flow 실행 전 검증">
+          <div className="flowValidationHeader">
+            <strong>실행 전 검증</strong>
+            <span>
+              오류 {flowValidationErrorCount} / 경고 {flowValidationWarningCount}
+            </span>
+          </div>
+          <div className="flowValidationList">
+            {flowValidationIssues.length > 0 ? (
+              flowValidationIssues.slice(0, 5).map((issue) => (
+                <button
+                  key={issue.id}
+                  type="button"
+                  className={`flowValidationItem ${issue.severity}`}
+                  onClick={() => {
+                    if (!issue.nodeId) {
+                      return;
+                    }
+                    setSelectedNodeId(issue.nodeId);
+                    setSelectedNodeIds([issue.nodeId]);
+                    setExpandedNodeId(issue.nodeId);
+                  }}
+                >
+                  <strong>{issue.title}</strong>
+                  <span>{issue.message}</span>
+                </button>
+              ))
+            ) : (
+              <p className="flowValidationReady">실행 전 검증을 통과했습니다.</p>
+            )}
+          </div>
+        </aside>
       </div>
     </section>
   );

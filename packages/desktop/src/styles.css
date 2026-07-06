@@ -3138,6 +3138,101 @@ tbody tr {
   pointer-events: none;
 }
 
+.flowValidationPanel {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 12;
+  display: grid;
+  gap: 9px;
+  width: min(360px, calc(100% - 32px));
+  max-height: min(320px, calc(100% - 32px));
+  padding: 12px;
+  border: 1px solid #cbd9ea;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(8px);
+}
+
+.flowValidationPanel.ready {
+  border-color: #b9dbc4;
+}
+
+.flowValidationPanel.warning {
+  border-color: #efd49b;
+}
+
+.flowValidationPanel.error {
+  border-color: #f0b4b4;
+}
+
+.flowValidationHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flowValidationHeader strong {
+  color: #10203a;
+  font-size: 13px;
+}
+
+.flowValidationHeader span {
+  color: #617086;
+  font-size: 12px;
+}
+
+.flowValidationList {
+  display: grid;
+  gap: 7px;
+  overflow: auto;
+}
+
+.flowValidationItem {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #dfe8f3;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #26384f;
+  text-align: left;
+  cursor: pointer;
+}
+
+.flowValidationItem.warning {
+  border-color: #efd49b;
+  background: #fff8eb;
+}
+
+.flowValidationItem.error {
+  border-color: #efb4b4;
+  background: #fff1f2;
+}
+
+.flowValidationItem strong,
+.flowValidationReady {
+  color: #10203a;
+  font-size: 12px;
+}
+
+.flowValidationItem span {
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.flowValidationReady {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid #d8e8dc;
+  border-radius: 8px;
+  background: #f0fbf4;
+}
+
 .flowNodeContextMenu {
   width: 130px;
 }
@@ -3170,6 +3265,48 @@ tbody tr {
   background: #f8fafc;
   color: #475569;
   font-size: 12px;
+}
+
+.processLogItem {
+  display: grid;
+  gap: 5px;
+}
+
+.processLogItem strong {
+  color: #10203a;
+  font-size: 12px;
+}
+
+.processLogItem span,
+.processLogItem small {
+  color: #526071;
+  line-height: 1.45;
+}
+
+.processLogItem small {
+  font-size: 11px;
+}
+
+.processLogItem.stderr,
+.processLogItem.error {
+  border-color: #efb4b4;
+  background: #fff1f2;
+}
+
+.processLogItem.stdout {
+  border-color: #bdd7c8;
+  background: #f0fbf4;
+}
+
+.processActionMessage {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #c8dcf4;
+  border-radius: 8px;
+  background: #f2f7fd;
+  color: #2e435f;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .errorReportPanel .logList p {
@@ -3915,6 +4052,14 @@ tbody tr {
 
 .compactMode .flowNode {
   transform: none;
+}
+
+.compactMode .flowValidationPanel {
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: auto;
+  max-height: 220px;
 }
 
 .compactMode .flowPorts.right span {
@@ -5504,6 +5649,56 @@ button.toolRiskBadge:focus-visible {
   border-color: rgba(93, 127, 171, 0.36);
   background: rgba(20, 26, 36, 0.76);
   color: #a8b5c8;
+}
+
+.darkMode .flowValidationPanel {
+  border-color: #37465d;
+  background: rgba(20, 26, 36, 0.9);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+}
+
+.darkMode .flowValidationHeader strong,
+.darkMode .flowValidationItem strong,
+.darkMode .flowValidationReady,
+.darkMode .processLogItem strong {
+  color: #f4f7fb;
+}
+
+.darkMode .flowValidationHeader span,
+.darkMode .flowValidationItem span,
+.darkMode .processLogItem span,
+.darkMode .processLogItem small {
+  color: #b8c0cb;
+}
+
+.darkMode .flowValidationItem {
+  border-color: #343f52;
+  background: #1b2432;
+  color: #dce6f4;
+}
+
+.darkMode .flowValidationItem.warning {
+  border-color: #7a5b22;
+  background: #2b2416;
+}
+
+.darkMode .flowValidationItem.error,
+.darkMode .processLogItem.stderr,
+.darkMode .processLogItem.error {
+  border-color: #734149;
+  background: #2b1d24;
+}
+
+.darkMode .flowValidationReady,
+.darkMode .processLogItem.stdout {
+  border-color: #31573f;
+  background: #17281f;
+}
+
+.darkMode .processActionMessage {
+  border-color: #40516c;
+  background: #1b2432;
+  color: #d9e5f6;
 }
 
 .darkMode .flowPaletteHeader strong,

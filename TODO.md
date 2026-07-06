@@ -28,9 +28,10 @@
 - [ ] GitHub 계정 기반 툴 업로드 권한 흐름 구현
 - [ ] 계정/라이선스 정책을 GitHub 또는 서버에 동기화해 여러 컴퓨터에서 중앙 강제
 - [ ] Google 로그인 또는 GitHub 로그인 중 앱 계정 시스템 방식 결정
-- [ ] 실행/중지 버튼을 실제 프로세스 관리 기능과 연결
-- [ ] Process Monitor에 실행 로그와 상태 갱신 연결
+- [x] 실행/중지 버튼을 실제 프로세스 관리 기능과 연결
+- [x] Process Monitor에 실행 로그와 상태 갱신 연결
 - [ ] MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장
 - [ ] Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결
-- [ ] Custom Flow 저장 그래프의 포트 호환성/누락 입력 검증 UI 추가
+- [x] Custom Flow 저장 그래프의 포트 호환성/누락 입력 검증 UI 추가
+- [ ] `App.tsx` 추가 분리: `WorkflowView`, `ToolMarketDialog`, `TabStrip`, Settings 세부 패널 순서로 컴포넌트 경계 정리
 

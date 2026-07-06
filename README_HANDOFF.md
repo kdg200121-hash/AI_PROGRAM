@@ -139,6 +139,7 @@ logs
 - Custom Flow 노드는 내부 좌우 포트 행에 입력/출력 아이콘과 텍스트를 표시하고, 연결선은 해당 포트 행 중앙 높이에 맞춰 붙습니다. 포트 행은 `button`이 아니라 일반 행 요소로 렌더링해 버튼처럼 보이지 않게 유지해야 합니다.
 - Custom Flow 노드 배경, 입력/출력 커넥터, 연결선은 `App.tsx`의 프로그램/포트 타입 색상표를 사용합니다. 연결선 색상은 출발 출력 포트 타입을 기준으로 합니다.
 - Custom Flow 입력 포트 커넥터는 hover 시 X 표시를 보여 클릭하면 연결을 끊을 수 있음을 알려줍니다.
+- Custom Flow 캔버스 오른쪽 아래에는 실행 전 검증 패널이 있습니다. `packages/desktop/src/customFlowValidation.ts`에서 없는 노드/포트, 포트 타입 불일치, 연결되지 않은 입력을 검사합니다.
 - Custom Flow에서는 빈 캔버스를 드래그해 여러 노드를 박스 선택할 수 있고, 선택된 노드 하나를 드래그하면 선택 묶음이 함께 이동합니다. `Ctrl/Shift` 클릭은 노드 선택을 토글합니다.
 - Custom Flow에서 선택된 노드를 우클릭해 `그룹 만들기`를 누르거나 `Ctrl+G`를 누르면 그룹 박스를 생성합니다. 그룹 박스를 드래그하면 포함된 노드들이 함께 이동합니다.
 - Custom Flow 그룹 헤더에서는 그룹 이름과 배경색을 바로 수정할 수 있습니다. 그룹 이름, 색상, 포함 노드 정보는 localStorage `mcp-registry:custom-flow-graph`의 `groups`에 저장됩니다.
@@ -150,7 +151,10 @@ logs
 - 탭 overflow(`...`) 리스트에서도 탭을 드래그해 순서를 바꿀 수 있고, 각 항목의 닫기 버튼으로 탭을 닫을 수 있습니다.
 - 배포 실행 파일에서는 registry가 `%APPDATA%\ai-program\registry.json`에 저장됩니다. 최초 실행 시 bundled `data\registry.json`을 사용자 데이터 폴더로 복사합니다.
 - Electron main/preload는 `dist-electron/main.cjs`, `dist-electron/preload.cjs`로 빌드합니다. `type: module` 프로젝트라 `.js` CommonJS 번들은 main process 오류가 납니다.
-- 다음 우선순위는 실행/중지 버튼을 실제 프로세스 관리 기능에 연결하고 Process Monitor에 상태/로그를 표시하는 작업입니다.
+- 실행/중지 버튼은 Electron main의 MCP 프로세스 IPC와 연결되어 있습니다. 등록 서버의 `launchCommand`, `workingDirectory`, `environment`로 child process를 실행하고 stdout/stderr/오류/종료 로그를 Process Monitor에 표시합니다.
+- 현재 프로세스 관리는 이 앱이 실행한 child process 기준입니다. 이미 외부에서 실행 중인 MCP 서버를 OS 프로세스 기준으로 찾아 중지하는 기능은 아직 없습니다.
+- 다음 우선순위는 MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장하고, Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결하는 작업입니다.
+- `App.tsx`는 여전히 큽니다. 이번에는 `MonitorView`, Process Monitor 타입, Custom Flow 검증 로직을 먼저 분리했습니다. 이후에는 `WorkflowView`, `ToolMarketDialog`, `TabStrip`, Settings 세부 패널 순서로 계속 분리하는 것이 좋습니다.
 - `node_modules` 안에 100MB 이상 Electron 실행 파일이 있으나 Git 제외 대상입니다.
 - Codex 채팅 기록은 GitHub로 넘어가지 않습니다. 중요한 내용은 `WORK_LOG.md`, `TODO.md`, `README_HANDOFF.md`에 남겨야 합니다.
 
