@@ -132,12 +132,12 @@ const flowBasicTools: FlowTool[] = [
     name: "활성 파일",
     description: "CAD, Excel, Revit처럼 현재 열려 있는 파일을 입력값으로 사용합니다.",
     inputs: [],
-    outputs: [{ id: "active-file", label: "활성파일", type: "any", iconName: "customTools" }]
+    outputs: [{ id: "active-file", label: "활성 파일", type: "file", iconName: "customTools" }]
   },
   {
     id: "basic-custom-prompt",
     programIcon: "customTools",
-    name: "프롬프트입력",
+    name: "프롬프트",
     description: "노드 아래에 붙여 실행 프롬프트에 문장을 추가합니다.",
     inputs: [],
     outputs: []
@@ -5995,6 +5995,7 @@ function ServersView({
 function WorkflowView() {
   const flowCanvasRef = useRef<HTMLDivElement | null>(null);
   const lastMiddleClickAtRef = useRef(0);
+  const lastCanvasPanStartAtRef = useRef(0);
   const suppressNextInputClickRef = useRef(false);
   const initialFlowGraphRef = useRef<StoredFlowGraph | null | undefined>(undefined);
   if (initialFlowGraphRef.current === undefined) {
@@ -6599,6 +6600,27 @@ function WorkflowView() {
     );
   };
 
+  const contextMenuPosition = (
+    event: MouseEvent<HTMLElement>,
+    size: { width: number; height: number }
+  ) => ({
+    x: Math.max(8, Math.min(event.clientX, window.innerWidth - size.width - 8)),
+    y: Math.max(8, Math.min(event.clientY, window.innerHeight - size.height - 8))
+  });
+
+  const openFlowNoteMenu = (event: MouseEvent<HTMLElement>, noteId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const position = contextMenuPosition(event, { width: 184, height: 78 });
+    setFlowNodeMenu(null);
+    setFlowCanvasMenu(null);
+    setSelectedNodeId("");
+    setSelectedNodeIds([]);
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([noteId]);
+    setFlowNoteMenu({ noteId, ...position });
+  };
+
   const deleteFlowNote = (noteId: string) => {
     if (!flowNotes.some((note) => note.id === noteId)) {
       return;
@@ -6816,6 +6838,17 @@ function WorkflowView() {
         target?.tagName === "SELECT" ||
         target?.isContentEditable;
 
+      if (isTyping && event.key === "Escape") {
+        event.preventDefault();
+        target?.blur();
+        setFlowNoteMenu(null);
+        setFlowNodeMenu(null);
+        setFlowCanvasMenu(null);
+        setExpandedGroupColorId("");
+        setExpandedNoteColorId("");
+        return;
+      }
+
       if (
         isTyping &&
         selectedNoteIds.length > 0 &&
@@ -6824,6 +6857,16 @@ function WorkflowView() {
       ) {
         event.preventDefault();
         deleteSelectedFlowItems();
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        target?.blur();
+        setIsFlowSearchOpen(true);
+        setIsBasicToolsOpen(false);
+        setIsHistoryMenuOpen(false);
+        setIsFlowRunMenuOpen(false);
         return;
       }
 
@@ -6846,15 +6889,6 @@ function WorkflowView() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
         event.preventDefault();
         restoreNextFlowState();
-        return;
-      }
-
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        setIsFlowSearchOpen(true);
-        setIsBasicToolsOpen(false);
-        setIsHistoryMenuOpen(false);
-        setIsFlowRunMenuOpen(false);
         return;
       }
 
@@ -6910,7 +6944,7 @@ function WorkflowView() {
       return;
     }
 
-    const moveCanvas = (event: globalThis.PointerEvent) => {
+    const moveCanvas = (event: globalThis.PointerEvent | globalThis.MouseEvent) => {
       setFlowPan({
         x: panningCanvas.startX + event.clientX - panningCanvas.startClientX,
         y: panningCanvas.startY + event.clientY - panningCanvas.startClientY
@@ -6922,11 +6956,15 @@ function WorkflowView() {
     window.addEventListener("pointermove", moveCanvas);
     window.addEventListener("pointerup", stopCanvasPan);
     window.addEventListener("pointercancel", stopCanvasPan);
+    window.addEventListener("mousemove", moveCanvas);
+    window.addEventListener("mouseup", stopCanvasPan);
 
     return () => {
       window.removeEventListener("pointermove", moveCanvas);
       window.removeEventListener("pointerup", stopCanvasPan);
       window.removeEventListener("pointercancel", stopCanvasPan);
+      window.removeEventListener("mousemove", moveCanvas);
+      window.removeEventListener("mouseup", stopCanvasPan);
     };
   }, [panningCanvas]);
 
@@ -7082,17 +7120,23 @@ function WorkflowView() {
         });
         setActiveGroupDropId(targetGroup?.id ?? "");
         if (isDraggingPrompt) {
-          const targetNode = flowNodes.find((node) => {
-            if (node.nodeId === draggingNode.nodeId || isPromptFlowNode(node)) {
-              return false;
-            }
-            const bounds = flowNodeBounds(node);
-            const horizontallyAligned =
-              movedBounds.right >= bounds.left + 24 && movedBounds.left <= bounds.right - 24;
-            const centerY = (movedBounds.top + movedBounds.bottom) / 2;
-            const nearNodeBottom = centerY >= bounds.top && centerY <= bounds.bottom + 150;
-            return horizontallyAligned && nearNodeBottom;
-          });
+          const promptCenterX = (movedBounds.left + movedBounds.right) / 2;
+          const targetNode = flowNodes
+            .filter((node) => node.nodeId !== draggingNode.nodeId && !isPromptFlowNode(node))
+            .map((node) => {
+              const bounds = flowNodeBounds(node);
+              const horizontallyAligned =
+                promptCenterX >= bounds.left - 36 && promptCenterX <= bounds.right + 36;
+              const nearNodeBottom =
+                movedBounds.top >= bounds.top && movedBounds.top <= bounds.bottom + 180;
+              return {
+                node,
+                distance: Math.abs(movedBounds.top - bounds.bottom),
+                matches: horizontallyAligned && nearNodeBottom
+              };
+            })
+            .filter((candidate) => candidate.matches)
+            .sort((a, b) => a.distance - b.distance)[0]?.node;
           setActivePromptAttachTargetId(targetNode?.nodeId ?? "");
         } else {
           setActivePromptAttachTargetId("");
@@ -7418,10 +7462,29 @@ function WorkflowView() {
     });
   };
 
-  const startCanvasPan = (event: PointerEvent<HTMLDivElement>) => {
+  const blurActiveFlowInput = () => {
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      (active.tagName === "INPUT" ||
+        active.tagName === "TEXTAREA" ||
+        active.tagName === "SELECT" ||
+        active.isContentEditable)
+    ) {
+      active.blur();
+    }
+  };
+
+  const startCanvasPan = (event: PointerEvent<HTMLDivElement> | MouseEvent<HTMLDivElement>) => {
+    const now = Date.now();
+    if (now - lastCanvasPanStartAtRef.current < 80) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    lastCanvasPanStartAtRef.current = now;
     event.preventDefault();
     event.stopPropagation();
-    const now = Date.now();
     if (now - lastMiddleClickAtRef.current < 320) {
       lastMiddleClickAtRef.current = 0;
       setPanningCanvas(null);
@@ -7442,6 +7505,14 @@ function WorkflowView() {
 
   const handleFlowCanvasPointerDownCapture = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button === 1) {
+      blurActiveFlowInput();
+      startCanvasPan(event);
+    }
+  };
+
+  const handleFlowCanvasMouseDownCapture = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.button === 1) {
+      blurActiveFlowInput();
       startCanvasPan(event);
     }
   };
@@ -7457,6 +7528,7 @@ function WorkflowView() {
     }
 
     event.preventDefault();
+    blurActiveFlowInput();
     setFlowNodeMenu(null);
     setFlowCanvasMenu(null);
     setSelectedGroupIds([]);
@@ -7527,6 +7599,7 @@ function WorkflowView() {
       return;
     }
 
+    blurActiveFlowInput();
     event.stopPropagation();
     setSelectedGroupIds([]);
     setSelectedNoteIds([]);
@@ -7550,6 +7623,7 @@ function WorkflowView() {
       return;
     }
 
+    blurActiveFlowInput();
     event.preventDefault();
     event.stopPropagation();
     setFlowNodeMenu(null);
@@ -7683,9 +7757,10 @@ function WorkflowView() {
   const openFlowNodeMenu = (event: MouseEvent<HTMLDivElement>, nodeId: string) => {
     event.preventDefault();
     event.stopPropagation();
+    const position = contextMenuPosition(event, { width: 184, height: 150 });
     setSelectedNodeId(nodeId);
     setSelectedNodeIds((ids) => (ids.includes(nodeId) ? ids : [nodeId]));
-    setFlowNodeMenu({ nodeId, x: event.clientX, y: event.clientY });
+    setFlowNodeMenu({ nodeId, ...position });
   };
 
   const updateFlowGroupName = (groupId: string, name: string) => {
@@ -7707,6 +7782,7 @@ function WorkflowView() {
       return;
     }
 
+    blurActiveFlowInput();
     event.preventDefault();
     event.stopPropagation();
     const validNodeIds = group.nodeIds.filter((id) => flowNodes.some((node) => node.nodeId === id));
@@ -7918,9 +7994,15 @@ function WorkflowView() {
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleFlowDrop}
         onPointerDownCapture={handleFlowCanvasPointerDownCapture}
+        onMouseDownCapture={handleFlowCanvasMouseDownCapture}
         onPointerDown={handleFlowCanvasPointerDown}
         onContextMenu={handleFlowCanvasContextMenu}
         onDoubleClick={handleFlowCanvasDoubleClick}
+        onAuxClick={(event) => {
+          if (event.button === 1) {
+            event.preventDefault();
+          }
+        }}
         onWheel={handleFlowWheel}
       >
         <div
@@ -8109,31 +8191,43 @@ function WorkflowView() {
               } as CSSProperties}
               onPointerDown={(event) => {
                 const target = event.target instanceof Element ? event.target : null;
+                if (event.button === 1) {
+                  return;
+                }
                 if (event.shiftKey && !target?.closest(".flowNoteColorMenu")) {
                   startSelectionBoxFromPointer(event);
                   return;
                 }
-                if (target?.closest("textarea") || target?.closest("input") || target?.closest(".flowNoteColorMenu")) {
-                  event.stopPropagation();
+                if (event.button !== 0) {
                   return;
                 }
-                startFlowNoteDrag(event, note);
-              }}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setFlowNodeMenu(null);
-                setFlowCanvasMenu(null);
+
+                if (!target?.closest("textarea") && !target?.closest("input")) {
+                  blurActiveFlowInput();
+                }
                 setSelectedNodeId("");
                 setSelectedNodeIds([]);
                 setSelectedGroupIds([]);
                 setSelectedNoteIds([note.id]);
-                setFlowNoteMenu({ noteId: note.id, x: event.clientX, y: event.clientY });
+                setFlowNoteMenu(null);
+                if (target?.closest(".flowNoteColorMenu")) {
+                  event.stopPropagation();
+                  return;
+                }
+                if (target?.closest("textarea") || target?.closest("input")) {
+                  event.stopPropagation();
+                  return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
               }}
+              onContextMenu={(event) => openFlowNoteMenu(event, note.id)}
               onPointerUp={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 updateFlowNoteSize(note.id, rect.width / flowScale, rect.height / flowScale);
               }}
+              tabIndex={0}
             >
               <div className="flowNoteHeaderRow" onPointerDown={(event) => event.stopPropagation()}>
                 <button
@@ -8148,6 +8242,7 @@ function WorkflowView() {
                   className="flowNoteTitleInput"
                   value={note.title ?? "메모"}
                   onChange={(event) => updateFlowNoteTitle(note.id, event.target.value)}
+                  onContextMenu={(event) => openFlowNoteMenu(event, note.id)}
                   onFocus={() => {
                     setSelectedNodeId("");
                     setSelectedNodeIds([]);
@@ -8194,6 +8289,7 @@ function WorkflowView() {
                 className="flowNoteTextArea"
                 value={note.text}
                 onChange={(event) => updateFlowNoteText(note.id, event.target.value)}
+                onContextMenu={(event) => openFlowNoteMenu(event, note.id)}
                 onPointerDown={(event) => {
                   if (event.button === 0) {
                     event.stopPropagation();
@@ -8643,7 +8739,7 @@ function WorkflowView() {
               aria-label="노드 검색"
               title="노드 검색 Ctrl+F"
             >
-              검색
+              노드 검색
             </button>
             {isFlowSearchOpen ? (
               <div className="flowToolbarMenu flowSearchMenu">

@@ -3620,7 +3620,7 @@ tbody tr {
 }
 
 .flowSearchButton {
-  width: 46px !important;
+  width: 62px !important;
   color: #334155 !important;
   font-size: 11px !important;
 }
@@ -3710,8 +3710,9 @@ tbody tr {
 .flowToolbarMenu.basicToolsMenu {
   left: auto;
   right: 0;
-  min-width: 312px;
-  max-width: 336px;
+  width: min(336px, calc(100vw - 32px));
+  min-width: min(312px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
   max-height: min(520px, calc(100vh - 78px));
   overflow: auto;
 }
@@ -3873,6 +3874,7 @@ tbody tr {
   gap: 9px;
   width: min(340px, calc(100vw - 32px));
   max-height: min(280px, calc(100vh - 88px));
+  min-width: 0;
   padding: 12px;
   border: 1px solid #cbd9ea;
   border-radius: 10px;
@@ -3880,6 +3882,7 @@ tbody tr {
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
   backdrop-filter: blur(8px);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .flowValidationPanel:hover .flowValidationPopover,
@@ -3904,6 +3907,7 @@ tbody tr {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .flowValidationHeader strong {
@@ -3921,7 +3925,9 @@ tbody tr {
   gap: 7px;
   min-height: 0;
   max-height: 216px;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   padding-right: 2px;
 }
@@ -3931,6 +3937,8 @@ tbody tr {
   gap: 3px;
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+  white-space: normal;
   padding: 9px 10px;
   border: 1px solid #dfe8f3;
   border-radius: 8px;
@@ -3954,6 +3962,8 @@ tbody tr {
 .flowValidationReady {
   color: #10203a;
   font-size: 12px;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .flowValidationItem span {

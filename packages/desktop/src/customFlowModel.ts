@@ -331,16 +331,14 @@ export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
       name: "활성 파일",
       description: "CAD, Excel, Revit처럼 현재 열려 있는 파일을 입력값으로 사용합니다.",
       inputs: [],
-      outputs: node.outputs.length > 0
-        ? node.outputs.filter((port) => port.id === "active-file")
-        : [makeFlowPort("active-file", "활성파일", "file", "customTools")]
+      outputs: [makeFlowPort("active-file", "활성 파일", "file", "customTools")]
     };
   }
 
   if (node.id === "basic-custom-prompt") {
     return {
       ...node,
-      name: "프롬프트입력",
+      name: "프롬프트",
       description: "노드 아래에 붙여 실행 프롬프트에 문장을 추가합니다.",
       inputs: [],
       outputs: [],
