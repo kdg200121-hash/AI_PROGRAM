@@ -155,7 +155,8 @@ logs
 - 현재 프로세스 관리는 이 앱이 실행한 child process 기준입니다. 이미 외부에서 실행 중인 MCP 서버를 OS 프로세스 기준으로 찾아 중지하는 기능은 아직 없습니다.
 - Settings의 MCP 서버 목록은 전체 서버를 보여주며, 이 창이 열려 있을 때 서버 선택도 전체 목록 기준으로 유지합니다. 일반 화면의 서버 상세 선택은 계속 현재 작업공간 필터 기준으로 동작합니다.
 - Custom Flow 입력/출력 포트 안쪽에는 타입 아이콘을 표시하지 않습니다. 포트 타입 구분은 포트 네모와 연결선 색상을 주된 신호로 사용합니다.
-- Custom Flow 연결선 좌표는 `customFlowModel.ts`의 `flowConnectionEndpoint`/`flowPortLocalY` 기준으로 포트 네모 중심에 맞춥니다. 포트 행 높이나 노드 헤더 여백을 바꾸면 `customFlowModel.test.ts`의 중심 좌표 테스트도 같이 갱신해야 합니다.
+- Custom Flow 연결선 좌표는 렌더링된 `.flowPortConnector` DOM의 실제 중심을 측정해 사용합니다. `customFlowModel.ts`의 `flowConnectionEndpoint`/`flowPortLocalY`는 측정값이 아직 없는 첫 렌더 시점의 fallback입니다.
+- 포트 행 높이, 노드 헤더 여백, compact/expanded 레이아웃을 바꿔도 연결선은 DOM 측정값을 따라가야 합니다. 다시 고정 숫자만으로 선 좌표를 맞추면 같은 중심 어긋남이 재발할 수 있습니다.
 - 다음 우선순위는 MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장하고, Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결하는 작업입니다.
 - `App.tsx`는 여전히 큽니다. 이번에는 `MonitorView`, Process Monitor 타입, Custom Flow 검증 로직을 먼저 분리했습니다. 이후에는 `WorkflowView`, `ToolMarketDialog`, `TabStrip`, Settings 세부 패널 순서로 계속 분리하는 것이 좋습니다.
 - `node_modules` 안에 100MB 이상 Electron 실행 파일이 있으나 Git 제외 대상입니다.

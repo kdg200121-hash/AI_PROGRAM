@@ -1,5 +1,6 @@
 ﻿import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, MouseEvent, PointerEvent, WheelEvent } from "react";
+import { useLayoutEffect } from "react";
 import type { McpServerRecord, McpTarget, RegistryFile } from "@mcp-registry/shared";
 import { getConnectionSummary } from "./connectionSummary";
 import { getToolsForWorkspace } from "./mcpToolCatalog";
@@ -5932,6 +5933,7 @@ function WorkflowView() {
     x: number;
     y: number;
   } | null>(null);
+  const [flowPortCenters, setFlowPortCenters] = useState<Record<string, { x: number; y: number }>>({});
   const [draggingNode, setDraggingNode] = useState<{
     nodeId: string;
     nodeIds: string[];
@@ -6013,6 +6015,63 @@ function WorkflowView() {
       y: (clientY - rect.top - flowPan.y) / flowScale
     };
   };
+
+  const flowPortCenterKey = (
+    nodeId: string,
+    direction: "input" | "output",
+    portId: string
+  ) => `${nodeId}:${direction}:${portId}`;
+
+  const getFlowPortCenter = (
+    node: FlowNode,
+    direction: "input" | "output",
+    portId: string
+  ) =>
+    flowPortCenters[flowPortCenterKey(node.nodeId, direction, portId)] ??
+    flowConnectionEndpoint(node, direction, portId);
+
+  useLayoutEffect(() => {
+    if (!flowCanvasRef.current) {
+      return;
+    }
+
+    const canvasRect = flowCanvasRef.current.getBoundingClientRect();
+    const nextCenters: Record<string, { x: number; y: number }> = {};
+    const connectorElements = flowCanvasRef.current.querySelectorAll<HTMLElement>(
+      "[data-flow-port-center]"
+    );
+
+    connectorElements.forEach((element) => {
+      const key = element.dataset.flowPortCenter;
+      if (!key) {
+        return;
+      }
+
+      const rect = element.getBoundingClientRect();
+      nextCenters[key] = {
+        x: (rect.left + rect.width / 2 - canvasRect.left - flowPan.x) / flowScale,
+        y: (rect.top + rect.height / 2 - canvasRect.top - flowPan.y) / flowScale
+      };
+    });
+
+    setFlowPortCenters((current) => {
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(nextCenters);
+      if (
+        currentKeys.length === nextKeys.length &&
+        nextKeys.every(
+          (key) =>
+            current[key] &&
+            Math.abs(current[key].x - nextCenters[key].x) < 0.01 &&
+            Math.abs(current[key].y - nextCenters[key].y) < 0.01
+        )
+      ) {
+        return current;
+      }
+
+      return nextCenters;
+    });
+  }, [expandedNodeId, flowNodes, flowPan.x, flowPan.y, flowScale]);
 
   const estimateFlowNodeHeight = (node: FlowNode) => {
     const portRows = Math.max(1, node.inputs.length, node.outputs.length);
@@ -6780,8 +6839,8 @@ function WorkflowView() {
               const outputPort = node.outputs.find((port) => port.id === connection.fromPortId);
               const inputPort = nextNode.inputs.find((port) => port.id === connection.toPortId);
               const connectionColor = flowConnectionColor(node, outputPort);
-              const start = flowConnectionEndpoint(node, "output", connection.fromPortId);
-              const end = flowConnectionEndpoint(nextNode, "input", connection.toPortId);
+              const start = getFlowPortCenter(node, "output", connection.fromPortId);
+              const end = getFlowPortCenter(nextNode, "input", connection.toPortId);
               const startX = start.x;
               const startY = start.y;
               const endX = end.x;
@@ -6805,7 +6864,7 @@ function WorkflowView() {
                 return null;
               }
 
-              const start = flowConnectionEndpoint(node, "output", connectionDrag.fromPortId);
+              const start = getFlowPortCenter(node, "output", connectionDrag.fromPortId);
               const outputPort = node.outputs.find((port) => port.id === connectionDrag.fromPortId);
               const connectionColor = flowConnectionColor(node, outputPort);
               const startX = start.x;
@@ -6945,7 +7004,11 @@ function WorkflowView() {
                               "--flow-port-ring": portPalette.border
                             } as CSSProperties}
                           >
-                            <span className="flowPortConnector" aria-hidden="true" />
+                            <span
+                              className="flowPortConnector"
+                              data-flow-port-center={flowPortCenterKey(node.nodeId, "input", port.id)}
+                              aria-hidden="true"
+                            />
                             <span>{port.label}</span>
                           </div>
                             );
@@ -6980,7 +7043,11 @@ function WorkflowView() {
                             } as CSSProperties}
                           >
                             <span>{port.label}</span>
-                            <span className="flowPortConnector" aria-hidden="true" />
+                            <span
+                              className="flowPortConnector"
+                              data-flow-port-center={flowPortCenterKey(node.nodeId, "output", port.id)}
+                              aria-hidden="true"
+                            />
                           </div>
                             );
                           })()
