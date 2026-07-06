@@ -60,6 +60,7 @@ import {
   flowToolPalette,
   isFlowTypeCompatible,
   loadStoredFlowGraph,
+  normalizeStoredBasicFlowNode,
   parseDraggedFlowTool,
   serializeFlowToolForDrag,
   type FlowConnection,
@@ -136,7 +137,7 @@ const flowBasicTools: FlowTool[] = [
   {
     id: "basic-custom-prompt",
     programIcon: "customTools",
-    name: "프롬프트",
+    name: "프롬프트입력",
     description: "노드 아래에 붙여 실행 프롬프트에 문장을 추가합니다.",
     inputs: [],
     outputs: []
@@ -6001,7 +6002,9 @@ function WorkflowView() {
   }
   const initialFlowGraph = initialFlowGraphRef.current;
   const [flowNodes, setFlowNodes] = useState<FlowNode[]>(() =>
-    initialFlowGraph?.nodes.length ? initialFlowGraph.nodes : defaultFlowNodes()
+    initialFlowGraph?.nodes.length
+      ? initialFlowGraph.nodes.map(normalizeStoredBasicFlowNode)
+      : defaultFlowNodes()
   );
   const [flowConnections, setFlowConnections] = useState<FlowConnection[]>(() =>
     initialFlowGraph?.connections.length ? initialFlowGraph.connections : defaultFlowConnections()
@@ -6027,6 +6030,11 @@ function WorkflowView() {
     y: number;
     worldX: number;
     worldY: number;
+  } | null>(null);
+  const [flowNoteMenu, setFlowNoteMenu] = useState<{
+    noteId: string;
+    x: number;
+    y: number;
   } | null>(null);
   const [isFlowValidationPinned, setIsFlowValidationPinned] = useState(false);
   const [flowScale, setFlowScale] = useState(initialFlowGraph?.scale ?? 1);
@@ -6056,6 +6064,7 @@ function WorkflowView() {
   const [basicToolsTab, setBasicToolsTab] = useState<"tools" | "ports">("tools");
   const [isHistoryMenuOpen, setIsHistoryMenuOpen] = useState(false);
   const [runningNodeIds, setRunningNodeIds] = useState<string[]>([]);
+  const runTimersRef = useRef<number[]>([]);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<string[]>([]);
   const [highlightedConnectionIds, setHighlightedConnectionIds] = useState<string[]>([]);
   const [expandedNoteColorId, setExpandedNoteColorId] = useState("");
@@ -6256,8 +6265,9 @@ function WorkflowView() {
 
   const estimateFlowNodeHeight = (node: FlowNode) => {
     const portRows = Math.max(1, node.inputs.length, node.outputs.length);
+    const portHeight = node.inputs.length > 0 || node.outputs.length > 0 ? portRows * 36 : 0;
     const detailsHeight = expandedNodeIds.includes(node.nodeId) ? 104 : 0;
-    return 102 + portRows * 36 + detailsHeight;
+    return 102 + portHeight + detailsHeight;
   };
 
   const flowNodeBounds = (node: FlowNode) => ({
@@ -6512,6 +6522,7 @@ function WorkflowView() {
     setConnectionDrag(null);
     setFlowNodeMenu(null);
     setFlowCanvasMenu(null);
+    setFlowNoteMenu(null);
     setIsFlowRunMenuOpen(false);
     setIsBasicToolsOpen(false);
     setIsFlowSearchOpen(false);
@@ -6541,6 +6552,7 @@ function WorkflowView() {
       ...notes,
       {
         id: noteId,
+        title: "메모",
         text: "메모",
         x: position.x,
         y: position.y,
@@ -6579,6 +6591,44 @@ function WorkflowView() {
     setFlowNotes((notes) =>
       notes.map((note) => (note.id === noteId ? { ...note, text } : note))
     );
+  };
+
+  const updateFlowNoteTitle = (noteId: string, title: string) => {
+    setFlowNotes((notes) =>
+      notes.map((note) => (note.id === noteId ? { ...note, title } : note))
+    );
+  };
+
+  const deleteFlowNote = (noteId: string) => {
+    if (!flowNotes.some((note) => note.id === noteId)) {
+      return;
+    }
+
+    rememberFlowState();
+    setFlowNotes((notes) => notes.filter((note) => note.id !== noteId));
+    setSelectedNoteIds((ids) => ids.filter((id) => id !== noteId));
+    setFlowNoteMenu(null);
+  };
+
+  const duplicateFlowNote = (noteId: string) => {
+    const note = flowNotes.find((item) => item.id === noteId);
+    if (!note) {
+      return;
+    }
+
+    rememberFlowState();
+    const nextNote = {
+      ...note,
+      id: `note-${Date.now()}`,
+      x: note.x + 24,
+      y: note.y + 24
+    };
+    setFlowNotes((notes) => [...notes, nextNote]);
+    setSelectedNoteIds([nextNote.id]);
+    setSelectedNodeId("");
+    setSelectedNodeIds([]);
+    setSelectedGroupIds([]);
+    setFlowNoteMenu(null);
   };
 
   const updateFlowNoteColor = (noteId: string, color: string) => {
@@ -6714,6 +6764,7 @@ function WorkflowView() {
       if (
         target?.closest(".flowCanvasToolbar") ||
         target?.closest(".flowValidationPanel") ||
+        target?.closest(".flowNoteContextMenu") ||
         target?.closest(".flowGroupColorMenu") ||
         target?.closest(".flowNoteColorMenu")
       ) {
@@ -6722,6 +6773,7 @@ function WorkflowView() {
 
       setFlowNodeMenu(null);
       setFlowCanvasMenu(null);
+      setFlowNoteMenu(null);
       setIsFlowRunMenuOpen(false);
       setIsBasicToolsOpen(false);
       setIsHistoryMenuOpen(false);
@@ -6746,6 +6798,14 @@ function WorkflowView() {
       })
     );
   }, [flowConnections, flowGroups, flowNodes, flowNotes, flowPan, flowScale]);
+
+  useEffect(
+    () => () => {
+      runTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      runTimersRef.current = [];
+    },
+    []
+  );
 
   useEffect(() => {
     const handleFlowKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -7029,9 +7089,9 @@ function WorkflowView() {
             const bounds = flowNodeBounds(node);
             const horizontallyAligned =
               movedBounds.right >= bounds.left + 24 && movedBounds.left <= bounds.right - 24;
-            const closeToBottom =
-              movedBounds.top >= bounds.bottom - 16 && movedBounds.top <= bounds.bottom + 96;
-            return horizontallyAligned && closeToBottom;
+            const centerY = (movedBounds.top + movedBounds.bottom) / 2;
+            const nearNodeBottom = centerY >= bounds.top && centerY <= bounds.bottom + 150;
+            return horizontallyAligned && nearNodeBottom;
           });
           setActivePromptAttachTargetId(targetNode?.nodeId ?? "");
         } else {
@@ -7708,6 +7768,27 @@ function WorkflowView() {
         ? "warning"
         : "ready";
   const flowValidationIssueCount = flowValidationIssues.length;
+  const flowValidationNodeToneById = useMemo(() => {
+    const toneMap = new Map<string, "error" | "warning">();
+    flowValidationIssues.forEach((issue) => {
+      const connection = issue.connectionId
+        ? flowConnections.find((item) => item.id === issue.connectionId)
+        : null;
+      const nodeIds = issue.nodeId
+        ? [issue.nodeId]
+        : connection
+          ? [connection.fromNodeId, connection.toNodeId]
+          : [];
+
+      nodeIds.forEach((nodeId) => {
+        const current = toneMap.get(nodeId);
+        if (issue.severity === "error" || !current) {
+          toneMap.set(nodeId, issue.severity);
+        }
+      });
+    });
+    return toneMap;
+  }, [flowConnections, flowValidationIssues]);
   const normalizedFlowSearchQuery = flowSearchQuery.trim().toLowerCase();
   const flowSearchResults = useMemo(() => {
     if (!normalizedFlowSearchQuery) {
@@ -7741,8 +7822,38 @@ function WorkflowView() {
       return;
     }
 
-    setRunningNodeIds(nodeIds);
-    window.setTimeout(() => setRunningNodeIds([]), flowRunMode === "step" ? 900 : 1300);
+    runTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    runTimersRef.current = [];
+    setRunningNodeIds([]);
+
+    if (flowValidationIssues.length > 0) {
+      setIsFlowValidationPinned(true);
+      const firstIssue = flowValidationIssues[0];
+      const connection = firstIssue.connectionId
+        ? flowConnections.find((item) => item.id === firstIssue.connectionId)
+        : null;
+      setHighlightedConnectionIds(firstIssue.connectionId ? [firstIssue.connectionId] : []);
+      setHighlightedNodeIds(
+        firstIssue.nodeId
+          ? [firstIssue.nodeId]
+          : connection
+            ? [connection.fromNodeId, connection.toNodeId]
+            : []
+      );
+    }
+
+    nodeIds.forEach((nodeId, index) => {
+      const startTimerId = window.setTimeout(() => {
+        setRunningNodeIds([nodeId]);
+      }, index * 520);
+      runTimersRef.current.push(startTimerId);
+    });
+
+    const clearTimerId = window.setTimeout(() => {
+      setRunningNodeIds([]);
+      runTimersRef.current = [];
+    }, nodeIds.length * 520 + 420);
+    runTimersRef.current.push(clearTimerId);
   };
 
   const focusFlowIssue = (issue: (typeof flowValidationIssues)[number]) => {
@@ -8002,18 +8113,50 @@ function WorkflowView() {
                   startSelectionBoxFromPointer(event);
                   return;
                 }
-                if (target?.closest("textarea") || target?.closest(".flowNoteColorMenu")) {
+                if (target?.closest("textarea") || target?.closest("input") || target?.closest(".flowNoteColorMenu")) {
                   event.stopPropagation();
                   return;
                 }
                 startFlowNoteDrag(event, note);
               }}
-              onContextMenu={(event) => event.stopPropagation()}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setFlowNodeMenu(null);
+                setFlowCanvasMenu(null);
+                setSelectedNodeId("");
+                setSelectedNodeIds([]);
+                setSelectedGroupIds([]);
+                setSelectedNoteIds([note.id]);
+                setFlowNoteMenu({ noteId: note.id, x: event.clientX, y: event.clientY });
+              }}
               onPointerUp={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 updateFlowNoteSize(note.id, rect.width / flowScale, rect.height / flowScale);
               }}
             >
+              <div className="flowNoteHeaderRow" onPointerDown={(event) => event.stopPropagation()}>
+                <button
+                  className="flowNoteDragHandle"
+                  type="button"
+                  onPointerDown={(event) => startFlowNoteDrag(event, note)}
+                  aria-label="메모 이동"
+                >
+                  ⋮⋮
+                </button>
+                <input
+                  className="flowNoteTitleInput"
+                  value={note.title ?? "메모"}
+                  onChange={(event) => updateFlowNoteTitle(note.id, event.target.value)}
+                  onFocus={() => {
+                    setSelectedNodeId("");
+                    setSelectedNodeIds([]);
+                    setSelectedGroupIds([]);
+                    setSelectedNoteIds([note.id]);
+                  }}
+                  aria-label="메모 제목"
+                />
+              </div>
               <div
                 className="flowNoteColorMenu"
                 onPointerDown={(event) => {
@@ -8067,6 +8210,9 @@ function WorkflowView() {
           {flowNodes.map((node) => {
               const isExpanded = expandedNodeIds.includes(node.nodeId);
               const nodePalette = flowPaletteForType(flowTypeForNode(node));
+              const hasInputPorts = node.inputs.length > 0;
+              const hasOutputPorts = node.outputs.length > 0;
+              const validationTone = flowValidationNodeToneById.get(node.nodeId);
               const incomingPortIds = new Set(
                 flowConnections
                   .filter((connection) => connection.toNodeId === node.nodeId)
@@ -8085,6 +8231,8 @@ function WorkflowView() {
                     selectedNodeIds.includes(node.nodeId) ? "selected" : "",
                     draggingNode?.nodeIds.includes(node.nodeId) ? "dragging" : "",
                     runningNodeIds.includes(node.nodeId) ? "running" : "",
+                    validationTone === "error" ? "issueError" : "",
+                    validationTone === "warning" ? "issueWarning" : "",
                     highlightedNodeIds.includes(node.nodeId) ? "issueHighlighted" : "",
                     activePromptAttachTargetId === node.nodeId ? "promptAttachTarget" : "",
                     node.attachedToNodeId ? "attachedPrompt" : ""
@@ -8111,6 +8259,15 @@ function WorkflowView() {
                       <strong>{node.name}</strong>
                       <small>{node.description}</small>
                     </span>
+                    {validationTone ? (
+                      <span
+                        className={`flowNodeIssueBadge ${validationTone}`}
+                        title={validationTone === "error" ? "오류가 있는 노드" : "경고가 있는 노드"}
+                        aria-label={validationTone === "error" ? "오류가 있는 노드" : "경고가 있는 노드"}
+                      >
+                        {validationTone === "error" ? "×" : "!"}
+                      </span>
+                    ) : null}
                     <button
                       className="flowNodeChevron"
                       type="button"
@@ -8132,7 +8289,16 @@ function WorkflowView() {
                     </button>
                   </div>
                   <div className={["flowNodeBody", isExpanded ? "expanded" : "compact"].join(" ")}>
-                    <div className="flowPortColumns">
+                    {hasInputPorts || hasOutputPorts ? (
+                    <div
+                      className={[
+                        "flowPortColumns",
+                        !hasInputPorts || !hasOutputPorts ? "singleColumn" : ""
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {hasInputPorts ? (
                       <div
                         className={[
                           "flowPorts",
@@ -8229,6 +8395,8 @@ function WorkflowView() {
                           })()
                         ))}
                       </div>
+                      ) : null}
+                      {hasOutputPorts ? (
                       <div
                         className={[
                           "flowPorts",
@@ -8320,12 +8488,14 @@ function WorkflowView() {
                           })()
                         ))}
                       </div>
+                      ) : null}
                     </div>
+                    ) : null}
                     {isExpanded ? (
                       <div className="flowNodeDetails">
                         {node.id === "basic-result-preview" ? (
                           <div className="flowNodePreview">
-                            <strong>결과 미리보기</strong>
+                            <strong>결과값</strong>
                             <p>아직 실행 결과가 없습니다. 실행 후 이 영역에 결과가 표시됩니다.</p>
                           </div>
                         ) : node.id === "basic-custom-prompt" ? (
@@ -8428,6 +8598,26 @@ function WorkflowView() {
             >
               <span>메모 만들기</span>
               <kbd>Double Click</kbd>
+            </button>
+          </div>
+        ) : null}
+        {flowNoteMenu ? (
+          <div
+            className="contextMenu flowNodeContextMenu flowNoteContextMenu"
+            style={{ left: flowNoteMenu.x, top: flowNoteMenu.y } as CSSProperties}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" onClick={() => duplicateFlowNote(flowNoteMenu.noteId)}>
+              <span>복제</span>
+              <kbd>Ctrl+C / V</kbd>
+            </button>
+            <button
+              className="danger"
+              type="button"
+              onClick={() => deleteFlowNote(flowNoteMenu.noteId)}
+            >
+              <span>삭제</span>
+              <kbd>Del</kbd>
             </button>
           </div>
         ) : null}

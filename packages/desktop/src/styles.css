@@ -2849,12 +2849,14 @@ tbody tr {
 .flowNote {
   position: absolute;
   z-index: 7;
-  display: block;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
   width: 220px;
   height: 140px;
   min-height: 112px;
   min-width: 180px;
-  padding: 24px 10px 10px;
+  padding: 8px 10px 10px;
   border: 1px solid color-mix(in srgb, var(--flow-note-color, #fff7c7) 58%, #b98a13);
   border-radius: 8px;
   background: var(--flow-note-color, #fff7c7);
@@ -2877,9 +2879,58 @@ tbody tr {
 .flowNoteColorMenu {
   position: absolute;
   right: 8px;
-  top: 7px;
+  top: 8px;
   display: inline-flex;
   align-items: center;
+}
+
+.flowNoteHeaderRow {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 22px;
+  align-items: center;
+  min-height: 24px;
+}
+
+.flowNoteDragHandle {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(95, 71, 18, 0.58);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: -2px;
+  cursor: grab;
+}
+
+.flowNoteDragHandle:active {
+  cursor: grabbing;
+}
+
+.flowNoteDragHandle:focus-visible {
+  outline: 2px solid rgba(120, 93, 16, 0.28);
+  outline-offset: 1px;
+}
+
+.flowNoteTitleInput {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #5f4712;
+  font: 900 12px/1.2 "Segoe UI", Arial, sans-serif;
+  outline: none;
+}
+
+.flowNoteTitleInput:focus {
+  border-color: rgba(120, 93, 16, 0.22);
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .flowNoteColorCurrent,
@@ -2921,7 +2972,7 @@ tbody tr {
 
 .flowNote textarea {
   width: 100%;
-  height: calc(100% - 2px);
+  height: 100%;
   min-height: 0;
   padding: 0 2px 2px;
   resize: none;
@@ -3067,11 +3118,25 @@ tbody tr {
 }
 
 .flowNode.running {
-  border-color: #0d9488;
+  border-color: #2563eb;
   border-width: 3px;
   box-shadow:
-    0 0 0 4px rgba(20, 184, 166, 0.2),
-    0 18px 36px rgba(13, 148, 136, 0.2);
+    0 0 0 4px rgba(37, 99, 235, 0.18),
+    0 18px 36px rgba(37, 99, 235, 0.18);
+}
+
+.flowNode.issueWarning {
+  border-color: #d97706;
+  box-shadow:
+    0 0 0 3px rgba(217, 119, 6, 0.14),
+    0 14px 28px rgba(146, 64, 14, 0.1);
+}
+
+.flowNode.issueError {
+  border-color: #dc2626;
+  box-shadow:
+    0 0 0 3px rgba(220, 38, 38, 0.16),
+    0 14px 28px rgba(153, 27, 27, 0.12);
 }
 
 .flowNode.issueHighlighted {
@@ -3092,7 +3157,7 @@ tbody tr {
 
 .flowNodeHeader {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 9px;
   width: 100%;
@@ -3180,6 +3245,26 @@ tbody tr {
   white-space: nowrap;
 }
 
+.flowNodeIssueBadge {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.flowNodeIssueBadge.warning {
+  background: #d97706;
+}
+
+.flowNodeIssueBadge.error {
+  background: #dc2626;
+}
+
 .flowNodeChevron {
   display: grid;
   place-items: center;
@@ -3218,6 +3303,10 @@ tbody tr {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   padding-top: 10px;
+}
+
+.flowPortColumns.singleColumn {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .flowPorts,
@@ -3460,7 +3549,7 @@ tbody tr {
 
 .flowCanvasToolbar {
   position: absolute;
-  right: 60px;
+  right: 56px;
   top: 16px;
   z-index: 30;
   display: inline-flex;
@@ -3782,8 +3871,8 @@ tbody tr {
   display: none;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 9px;
-  width: min(360px, calc(100vw - 32px));
-  max-height: min(300px, calc(100vh - 92px));
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(280px, calc(100vh - 88px));
   padding: 12px;
   border: 1px solid #cbd9ea;
   border-radius: 10px;
@@ -3831,6 +3920,7 @@ tbody tr {
   display: grid;
   gap: 7px;
   min-height: 0;
+  max-height: 216px;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 2px;
@@ -3840,6 +3930,7 @@ tbody tr {
   display: grid;
   gap: 3px;
   width: 100%;
+  min-width: 0;
   padding: 9px 10px;
   border: 1px solid #dfe8f3;
   border-radius: 8px;
@@ -3869,6 +3960,8 @@ tbody tr {
   color: #526071;
   font-size: 12px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .flowValidationReady {
@@ -4707,7 +4800,7 @@ tbody tr {
 }
 
 .compactMode .flowCanvasToolbar {
-  right: 52px;
+  right: 50px;
   top: 10px;
 }
 
@@ -6463,6 +6556,19 @@ button.toolRiskBadge:focus-visible {
 
 .darkMode .flowNote textarea {
   color: #f8e7a1;
+}
+
+.darkMode .flowNoteTitleInput {
+  color: #f8e7a1;
+}
+
+.darkMode .flowNoteDragHandle {
+  color: rgba(248, 231, 161, 0.58);
+}
+
+.darkMode .flowNoteTitleInput:focus {
+  border-color: rgba(248, 231, 161, 0.22);
+  background: rgba(17, 24, 36, 0.34);
 }
 
 .darkMode .flowNodePreview p,

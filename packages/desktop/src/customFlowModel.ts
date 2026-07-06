@@ -58,6 +58,7 @@ export interface FlowGroup {
 
 export interface FlowNote {
   id: string;
+  title?: string;
   text: string;
   x: number;
   y: number;
@@ -301,6 +302,55 @@ export function cloneFlowTool(tool: FlowTool): FlowTool {
   };
 }
 
+export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
+  if (node.id === "basic-result-preview") {
+    return {
+      ...node,
+      name: "결과 미리보기",
+      description: "앞 노드의 결과를 이 노드 안에서 바로 확인합니다.",
+      inputs: node.inputs.filter((port) => port.id === "result"),
+      outputs: []
+    };
+  }
+
+  if (node.id === "basic-path-select") {
+    return {
+      ...node,
+      name: "경로 지정",
+      description: "파일이나 폴더 경로를 다음 노드 입력값으로 전달합니다.",
+      inputs: [],
+      outputs: node.outputs.length > 0
+        ? node.outputs.filter((port) => port.id === "path")
+        : [makeFlowPort("path", "경로", "text", "textData")]
+    };
+  }
+
+  if (node.id === "basic-active-file") {
+    return {
+      ...node,
+      name: "활성 파일",
+      description: "CAD, Excel, Revit처럼 현재 열려 있는 파일을 입력값으로 사용합니다.",
+      inputs: [],
+      outputs: node.outputs.length > 0
+        ? node.outputs.filter((port) => port.id === "active-file")
+        : [makeFlowPort("active-file", "활성파일", "file", "customTools")]
+    };
+  }
+
+  if (node.id === "basic-custom-prompt") {
+    return {
+      ...node,
+      name: "프롬프트입력",
+      description: "노드 아래에 붙여 실행 프롬프트에 문장을 추가합니다.",
+      inputs: [],
+      outputs: [],
+      promptText: node.promptText ?? ""
+    };
+  }
+
+  return node;
+}
+
 export function defaultFlowNodes() {
   return [
     { ...cloneFlowTool(flowToolPalette[0]), nodeId: "node-cad-read", ...defaultFlowNodePosition(0) },
@@ -338,7 +388,7 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
         const paletteTool = flowToolPalette.find((tool) => tool.id === id);
         const toolDefaults = paletteTool ? cloneFlowTool(paletteTool) : null;
 
-        return {
+        return normalizeStoredBasicFlowNode({
           id,
           programIcon: toolDefaults?.programIcon ?? node.programIcon ?? "customTools",
           name: toolDefaults?.name ?? String(node.name ?? `Node ${index + 1}`),
@@ -359,7 +409,7 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
           promptText: typeof node.promptText === "string" ? node.promptText : undefined,
           attachedToNodeId:
             typeof node.attachedToNodeId === "string" ? node.attachedToNodeId : undefined
-        };
+        });
       }),
       connections: parsed.connections
         .map((connection, index) => ({
@@ -384,6 +434,7 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
         ? parsed.notes
             .map((note, index) => ({
               id: String(note.id ?? `stored-note-${index}`),
+              title: String(note.title ?? "메모"),
               text: String(note.text ?? "메모"),
               x: Number(note.x ?? defaultFlowNodePosition(index).x),
               y: Number(note.y ?? defaultFlowNodePosition(index).y),
