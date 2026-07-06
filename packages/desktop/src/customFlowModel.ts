@@ -127,6 +127,15 @@ export function flowPortIconName(port: string): AppIconName {
   if (port === "CAD" || port === "cad") {
     return "cad";
   }
+  if (port === "object") {
+    return "objectData";
+  }
+  if (port === "number") {
+    return "numberData";
+  }
+  if (port === "text") {
+    return "textData";
+  }
   return "customTools";
 }
 
@@ -342,13 +351,18 @@ export function flowPortLocalY(node: FlowNode, direction: "input" | "output", po
   return 104 + index * 36;
 }
 
+const flowPortConnectorCenterOffset = 2;
+
 export function flowConnectionEndpoint(
   node: FlowNode,
   direction: "input" | "output",
   portId: string
 ) {
   return {
-    x: direction === "output" ? node.x + flowNodeWidth : node.x,
+    x:
+      direction === "output"
+        ? node.x + flowNodeWidth - flowPortConnectorCenterOffset
+        : node.x + flowPortConnectorCenterOffset,
     y: node.y + flowPortLocalY(node, direction, portId)
   };
 }

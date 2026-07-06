@@ -8,10 +8,13 @@ export type AppIconName =
   | "home"
   | "monitor"
   | "moreTools"
+  | "objectData"
+  | "numberData"
   | "revit"
   | "settings"
   | "shareTools"
   | "tekla"
+  | "textData"
   | "workflow";
 
 interface AppIconProps {
@@ -72,6 +75,35 @@ function renderIcon(name: AppIconName, title?: string) {
           <path d="M9.5 7.5h5" />
           <path d="m7.7 10 3.5 4.2" />
           <path d="m16.3 10-3.5 4.2" />
+        </svg>
+      );
+    case "objectData":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <rect x="5" y="5" width="6" height="6" rx="1.4" />
+          <rect x="13" y="5" width="6" height="6" rx="1.4" />
+          <rect x="5" y="13" width="6" height="6" rx="1.4" />
+          <rect x="13" y="13" width="6" height="6" rx="1.4" />
+        </svg>
+      );
+    case "numberData":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M9 4 7.4 20" />
+          <path d="M16.6 4 15 20" />
+          <path d="M5 9h14" />
+          <path d="M4 15h14" />
+        </svg>
+      );
+    case "textData":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M5 6h14" />
+          <path d="M12 6v12" />
+          <path d="M8 18h8" />
         </svg>
       );
     case "moreTools":
