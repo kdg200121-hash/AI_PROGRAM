@@ -80,7 +80,7 @@ export const flowToolPalette: FlowTool[] = [
     id: "cad-read",
     programIcon: "cad",
     name: "CAD 객체 읽기",
-    description: "선, 문자, 블록 같은 CAD 객체를 읽어 다음 노드로 넘깁니다.",
+    description: "선, 문자, 블록 같은 CAD 객체를 읽어 다음 노드로 전달합니다.",
     inputs: [makeFlowPort("cad-source", "CAD", "cad")],
     outputs: [
       makeFlowPort("objects", "객체", "object"),
@@ -91,7 +91,7 @@ export const flowToolPalette: FlowTool[] = [
     id: "excel-export",
     programIcon: "excel",
     name: "Excel 내보내기",
-    description: "앞 노드의 결과값을 Excel 표 형태로 정리합니다.",
+    description: "앞 노드의 결과값을 Excel 표 형식으로 정리합니다.",
     inputs: [makeFlowPort("objects", "객체", "object")],
     outputs: [makeFlowPort("excel-file", "Excel", "excel")]
   },
@@ -293,21 +293,31 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
     }
 
     return {
-      nodes: parsed.nodes.map((node, index) => ({
-        id: String(node.id ?? `stored-${index}`),
-        programIcon: node.programIcon ?? "customTools",
-        name: String(node.name ?? `Node ${index + 1}`),
-        description: String(node.description ?? ""),
-        inputs: Array.isArray(node.inputs)
-          ? node.inputs.map((port, portIndex) => normalizeFlowPort(port, `input-${portIndex}`))
-          : [makeFlowPort("input", "입력", "any")],
-        outputs: Array.isArray(node.outputs)
-          ? node.outputs.map((port, portIndex) => normalizeFlowPort(port, `output-${portIndex}`))
-          : [makeFlowPort("result", "결과", "any")],
-        nodeId: String(node.nodeId ?? `stored-node-${index}`),
-        x: Number(node.x ?? defaultFlowNodePosition(index).x),
-        y: Number(node.y ?? defaultFlowNodePosition(index).y)
-      })),
+      nodes: parsed.nodes.map((node, index) => {
+        const id = String(node.id ?? `stored-${index}`);
+        const paletteTool = flowToolPalette.find((tool) => tool.id === id);
+        const toolDefaults = paletteTool ? cloneFlowTool(paletteTool) : null;
+
+        return {
+          id,
+          programIcon: toolDefaults?.programIcon ?? node.programIcon ?? "customTools",
+          name: toolDefaults?.name ?? String(node.name ?? `Node ${index + 1}`),
+          description: toolDefaults?.description ?? String(node.description ?? ""),
+          inputs: toolDefaults?.inputs ?? (
+            Array.isArray(node.inputs)
+              ? node.inputs.map((port, portIndex) => normalizeFlowPort(port, `input-${portIndex}`))
+              : [makeFlowPort("input", "입력", "any")]
+          ),
+          outputs: toolDefaults?.outputs ?? (
+            Array.isArray(node.outputs)
+              ? node.outputs.map((port, portIndex) => normalizeFlowPort(port, `output-${portIndex}`))
+              : [makeFlowPort("result", "결과", "any")]
+          ),
+          nodeId: String(node.nodeId ?? `stored-node-${index}`),
+          x: Number(node.x ?? defaultFlowNodePosition(index).x),
+          y: Number(node.y ?? defaultFlowNodePosition(index).y)
+        };
+      }),
       connections: parsed.connections
         .map((connection, index) => ({
           id: String(connection.id ?? `stored-connection-${index}`),

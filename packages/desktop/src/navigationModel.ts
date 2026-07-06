@@ -37,8 +37,8 @@ export const overviewCards: OverviewCard[] = [
     body: "MCP 연결 확인 결과와 실행 기록을 이 영역에 표시합니다."
   },
   {
-    title: "다음 작업 큐",
-    body: "수집한 정보가 다음 작업으로 넘어가기 전 대기 목록을 보여줍니다."
+    title: "다음 작업 대기",
+    body: "수집한 정보가 다음 작업으로 이어질 수 있도록 대기 목록을 보여줍니다."
   },
   {
     title: "변환 준비 상태",
@@ -49,7 +49,7 @@ export const overviewCards: OverviewCard[] = [
 export const workflowSteps: WorkflowStep[] = [
   {
     title: "툴 선택",
-    body: "왼쪽 메뉴나 페이지 안에서 사용할 MCP 툴을 플로우에 추가합니다."
+    body: "왼쪽 메뉴의 페이지 안에서 사용할 MCP 툴을 플로우에 추가합니다."
   },
   {
     title: "노드 연결",

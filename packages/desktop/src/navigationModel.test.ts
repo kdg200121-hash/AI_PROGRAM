@@ -22,7 +22,7 @@ describe("navigationModel", () => {
   it("provides operational overview cards for the empty area", () => {
     expect(overviewCards.map((card) => card.title)).toEqual([
       "최근 연결 로그",
-      "다음 작업 큐",
+      "다음 작업 대기",
       "변환 준비 상태"
     ]);
   });
