@@ -55,6 +55,7 @@ import {
   defaultFlowNodes,
   flowConnectionEndpoint,
   flowNodeWidth,
+  flowPortIconName,
   flowToolIdFromMenuItem,
   flowToolPalette,
   isFlowTypeCompatible,
@@ -84,6 +85,55 @@ import {
 } from "./processMonitor";
 
 const flowGroupColorOptions = ["#60a5fa", "#34d399", "#fbbf24", "#f87171", "#a78bfa", "#94a3b8"];
+const flowNoteColorOptions = ["#fff7c7", "#dff7ff", "#e8f8e8", "#f3e8ff", "#ffe4e6", "#f1f5f9"];
+const flowBasicTools: FlowTool[] = [
+  {
+    id: "basic-result-preview",
+    programIcon: "customTools",
+    name: "결과 미리보기",
+    description: "앞 노드의 결과를 별도 창에서 확인할 준비를 합니다.",
+    inputs: [{ id: "result", label: "결과", type: "any", iconName: "customTools" }],
+    outputs: [{ id: "preview", label: "미리보기", type: "any", iconName: "customTools" }]
+  },
+  {
+    id: "basic-path-select",
+    programIcon: "customTools",
+    name: "경로 지정",
+    description: "파일이나 폴더 경로를 다음 노드 입력값으로 전달합니다.",
+    inputs: [],
+    outputs: [{ id: "path", label: "경로", type: "text", iconName: "textData" }]
+  },
+  {
+    id: "basic-active-file",
+    programIcon: "customTools",
+    name: "활성 파일",
+    description: "CAD, Excel, Revit처럼 현재 열려 있는 파일을 입력값으로 사용합니다.",
+    inputs: [],
+    outputs: [{ id: "active-file", label: "활성파일", type: "any", iconName: "customTools" }]
+  },
+  {
+    id: "basic-custom-prompt",
+    programIcon: "customTools",
+    name: "커스텀 창",
+    description: "메모처럼 입력한 문장을 노드 프롬프트 보조값으로 연결합니다.",
+    inputs: [],
+    outputs: [{ id: "prompt", label: "프롬프트", type: "text", iconName: "textData" }]
+  }
+];
+
+const flowBasicPortTools: Array<{
+  id: string;
+  direction: "input" | "output";
+  label: string;
+  type: FlowPortType;
+  description: string;
+}> = [
+  { id: "input-text", direction: "input", label: "텍스트 입력", type: "text", description: "노드에 텍스트 입력 포트를 추가합니다." },
+  { id: "input-path", direction: "input", label: "경로 입력", type: "text", description: "노드에 파일/폴더 경로 입력 포트를 추가합니다." },
+  { id: "input-active", direction: "input", label: "활성파일 입력", type: "any", description: "현재 열린 파일을 받을 입력 포트를 추가합니다." },
+  { id: "output-text", direction: "output", label: "텍스트 출력", type: "text", description: "노드에 텍스트 출력 포트를 추가합니다." },
+  { id: "output-result", direction: "output", label: "결과 출력", type: "any", description: "노드에 범용 결과 출력 포트를 추가합니다." }
+];
 
 const pinnedTabsStorageKey = "mcp-registry:pinned-tabs";
 const favoriteSectionsStorageKey = "mcp-registry:favorite-sections";
@@ -5957,10 +6007,21 @@ function WorkflowView() {
   const [expandedGroupColorId, setExpandedGroupColorId] = useState("");
   const [flowRunMode, setFlowRunMode] = useState<"batch" | "step">("batch");
   const [isFlowRunMenuOpen, setIsFlowRunMenuOpen] = useState(false);
+  const [isBasicToolsOpen, setIsBasicToolsOpen] = useState(false);
+  const [basicToolsTab, setBasicToolsTab] = useState<"tools" | "ports">("tools");
   const [isHistoryMenuOpen, setIsHistoryMenuOpen] = useState(false);
   const [runningNodeIds, setRunningNodeIds] = useState<string[]>([]);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<string[]>([]);
   const [highlightedConnectionIds, setHighlightedConnectionIds] = useState<string[]>([]);
+  const [expandedNoteColorId, setExpandedNoteColorId] = useState("");
+  const [activeNodeDropId, setActiveNodeDropId] = useState("");
+  const [draggingNote, setDraggingNote] = useState<{
+    noteId: string;
+    startWorldX: number;
+    startWorldY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
   const [draggingNode, setDraggingNode] = useState<{
     nodeId: string;
     nodeIds: string[];
@@ -6332,11 +6393,15 @@ function WorkflowView() {
     setFlowNodeMenu(null);
     setFlowCanvasMenu(null);
     setIsFlowRunMenuOpen(false);
+    setIsBasicToolsOpen(false);
     setIsHistoryMenuOpen(false);
     setExpandedGroupColorId("");
+    setExpandedNoteColorId("");
     setSelectionBox(null);
     setDraggingNode(null);
     setDraggingGroup(null);
+    setDraggingNote(null);
+    setActiveNodeDropId("");
     setPanningCanvas(null);
     setSmartGuides([]);
     setSelectedNodeId("");
@@ -6352,10 +6417,32 @@ function WorkflowView() {
         id: noteId,
         text: "메모",
         x: position.x,
-        y: position.y
+        y: position.y,
+        width: 220,
+        height: 140,
+        color: flowNoteColorOptions[0]
       }
     ]);
     setFlowCanvasMenu(null);
+  };
+
+  const startFlowNoteDrag = (event: PointerEvent<HTMLElement>, note: FlowNote) => {
+    if (event.button !== 0 || !flowCanvasRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    rememberFlowState();
+    const rect = flowCanvasRef.current.getBoundingClientRect();
+    setDraggingNote({
+      noteId: note.id,
+      startWorldX: (event.clientX - rect.left - flowPan.x) / flowScale,
+      startWorldY: (event.clientY - rect.top - flowPan.y) / flowScale,
+      originX: note.x,
+      originY: note.y
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const updateFlowNoteText = (noteId: string, text: string) => {
@@ -6364,16 +6451,133 @@ function WorkflowView() {
     );
   };
 
+  const updateFlowNoteColor = (noteId: string, color: string) => {
+    rememberFlowState();
+    setFlowNotes((notes) =>
+      notes.map((note) => (note.id === noteId ? { ...note, color } : note))
+    );
+    setExpandedNoteColorId("");
+  };
+
+  const updateFlowNoteSize = (noteId: string, width: number, height: number) => {
+    setFlowNotes((notes) =>
+      notes.map((note) =>
+        note.id === noteId
+          ? {
+              ...note,
+              width: Math.max(180, Math.round(width)),
+              height: Math.max(120, Math.round(height))
+            }
+          : note
+      )
+    );
+  };
+
+  const addCustomFlowPort = (
+    nodeId: string,
+    direction: "input" | "output",
+    label: string,
+    type: FlowPortType
+  ) => {
+    rememberFlowState();
+    const port: FlowPort = {
+      id: `custom-${direction}-${Date.now()}`,
+      label,
+      type,
+      iconName: flowPortIconName(type),
+      custom: true
+    };
+    setFlowNodes((nodes) =>
+      nodes.map((node) =>
+        node.nodeId === nodeId
+          ? {
+              ...node,
+              [direction === "input" ? "inputs" : "outputs"]: [
+                ...(direction === "input" ? node.inputs : node.outputs),
+                port
+              ]
+            }
+          : node
+      )
+    );
+    setExpandedNodeId(nodeId);
+  };
+
+  const removeCustomFlowPort = (
+    nodeId: string,
+    direction: "input" | "output",
+    portId: string
+  ) => {
+    rememberFlowState();
+    setFlowNodes((nodes) =>
+      nodes.map((node) =>
+        node.nodeId === nodeId
+          ? {
+              ...node,
+              [direction === "input" ? "inputs" : "outputs"]:
+                direction === "input"
+                  ? node.inputs.filter((port) => port.id !== portId || !port.custom)
+                  : node.outputs.filter((port) => port.id !== portId || !port.custom)
+            }
+          : node
+      )
+    );
+    setFlowConnections((connections) =>
+      connections.filter((connection) =>
+        direction === "input"
+          ? !(connection.toNodeId === nodeId && connection.toPortId === portId)
+          : !(connection.fromNodeId === nodeId && connection.fromPortId === portId)
+      )
+    );
+  };
+
+  const handleBasicToolDragStart = (event: DragEvent<HTMLElement>, tool: FlowTool) => {
+    event.dataTransfer.setData("application/x-flow-tool-data", JSON.stringify(tool));
+    event.dataTransfer.effectAllowed = "copy";
+  };
+
+  const handleBasicPortToolDragStart = (
+    event: DragEvent<HTMLElement>,
+    tool: (typeof flowBasicPortTools)[number]
+  ) => {
+    event.dataTransfer.setData("application/x-flow-port-tool", JSON.stringify(tool));
+    event.dataTransfer.effectAllowed = "copy";
+  };
+
+  const handleCustomPortDragStart = (
+    event: DragEvent<HTMLElement>,
+    nodeId: string,
+    direction: "input" | "output",
+    portId: string
+  ) => {
+    event.dataTransfer.setData(
+      "application/x-flow-remove-port",
+      JSON.stringify({ nodeId, direction, portId })
+    );
+    event.dataTransfer.effectAllowed = "move";
+  };
+
   useEffect(() => {
-    const closeFlowNodeMenu = () => {
+    const closeFlowNodeMenu = (event: globalThis.PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (
+        target?.closest(".flowCanvasToolbar") ||
+        target?.closest(".flowGroupColorMenu") ||
+        target?.closest(".flowNoteColorMenu")
+      ) {
+        return;
+      }
+
       setFlowNodeMenu(null);
       setFlowCanvasMenu(null);
       setIsFlowRunMenuOpen(false);
+      setIsBasicToolsOpen(false);
       setIsHistoryMenuOpen(false);
       setExpandedGroupColorId("");
+      setExpandedNoteColorId("");
     };
-    window.addEventListener("click", closeFlowNodeMenu);
-    return () => window.removeEventListener("click", closeFlowNodeMenu);
+    window.addEventListener("pointerdown", closeFlowNodeMenu);
+    return () => window.removeEventListener("pointerdown", closeFlowNodeMenu);
   }, []);
 
   useEffect(() => {
@@ -6701,6 +6905,45 @@ function WorkflowView() {
   }, [draggingGroup, flowPan.x, flowPan.y, flowScale]);
 
   useEffect(() => {
+    if (!draggingNote) {
+      return;
+    }
+
+    const moveNote = (event: globalThis.PointerEvent) => {
+      if (!flowCanvasRef.current) {
+        return;
+      }
+
+      const rect = flowCanvasRef.current.getBoundingClientRect();
+      const nextWorldX = (event.clientX - rect.left - flowPan.x) / flowScale;
+      const nextWorldY = (event.clientY - rect.top - flowPan.y) / flowScale;
+      setFlowNotes((notes) =>
+        notes.map((note) =>
+          note.id === draggingNote.noteId
+            ? {
+                ...note,
+                x: draggingNote.originX + nextWorldX - draggingNote.startWorldX,
+                y: draggingNote.originY + nextWorldY - draggingNote.startWorldY
+              }
+            : note
+        )
+      );
+    };
+
+    const stopNoteDrag = () => setDraggingNote(null);
+
+    window.addEventListener("pointermove", moveNote);
+    window.addEventListener("pointerup", stopNoteDrag);
+    window.addEventListener("pointercancel", stopNoteDrag);
+
+    return () => {
+      window.removeEventListener("pointermove", moveNote);
+      window.removeEventListener("pointerup", stopNoteDrag);
+      window.removeEventListener("pointercancel", stopNoteDrag);
+    };
+  }, [draggingNote, flowPan.x, flowPan.y, flowScale]);
+
+  useEffect(() => {
     if (!connectionDrag) {
       return;
     }
@@ -6774,6 +7017,24 @@ function WorkflowView() {
 
   const handleFlowDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    const removedPortRaw = event.dataTransfer.getData("application/x-flow-remove-port");
+    if (removedPortRaw) {
+      try {
+        const removedPort = JSON.parse(removedPortRaw) as {
+          nodeId?: string;
+          direction?: "input" | "output";
+          portId?: string;
+        };
+        if (removedPort.nodeId && removedPort.direction && removedPort.portId) {
+          removeCustomFlowPort(removedPort.nodeId, removedPort.direction, removedPort.portId);
+        }
+      } catch {
+        // Ignore invalid drag payloads from outside the app.
+      }
+      setActiveNodeDropId("");
+      return;
+    }
+
     const toolId = event.dataTransfer.getData("application/x-flow-tool");
     const draggedTool = parseDraggedFlowTool(
       event.dataTransfer.getData("application/x-flow-tool-data")
@@ -6788,6 +7049,27 @@ function WorkflowView() {
       x: dropPoint.x - 120,
       y: dropPoint.y - 28
     });
+  };
+
+  const handleFlowNodeDrop = (event: DragEvent<HTMLDivElement>, nodeId: string) => {
+    const portToolRaw = event.dataTransfer.getData("application/x-flow-port-tool");
+    if (!portToolRaw) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      const portTool = JSON.parse(portToolRaw) as (typeof flowBasicPortTools)[number];
+      if (!portTool.direction || !portTool.label || !portTool.type) {
+        return;
+      }
+      addCustomFlowPort(nodeId, portTool.direction, portTool.label, portTool.type);
+    } catch {
+      // Ignore invalid drag payloads from outside the app.
+    } finally {
+      setActiveNodeDropId("");
+    }
   };
 
   const handleFlowWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -7328,10 +7610,52 @@ function WorkflowView() {
             <div
               className="flowNote"
               key={note.id}
-              style={{ left: note.x, top: note.y } as CSSProperties}
+              style={{
+                left: note.x,
+                top: note.y,
+                width: note.width ?? 220,
+                height: note.height ?? 140,
+                "--flow-note-color": note.color ?? flowNoteColorOptions[0]
+              } as CSSProperties}
               onPointerDown={(event) => event.stopPropagation()}
               onContextMenu={(event) => event.stopPropagation()}
+              onPointerUp={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                updateFlowNoteSize(note.id, rect.width / flowScale, rect.height / flowScale);
+              }}
             >
+              <div
+                className="flowNoteHeader"
+                onPointerDown={(event) => startFlowNoteDrag(event, note)}
+              >
+                <span>메모</span>
+                <div className="flowNoteColorMenu" onPointerDown={(event) => event.stopPropagation()}>
+                  <button
+                    className="flowNoteColorCurrent"
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setExpandedNoteColorId((current) => (current === note.id ? "" : note.id));
+                    }}
+                    style={{ "--note-choice-color": note.color ?? flowNoteColorOptions[0] } as CSSProperties}
+                    aria-label="메모 색상 변경"
+                  />
+                  {expandedNoteColorId === note.id ? (
+                    <div className="flowNoteColorChoices">
+                      {flowNoteColorOptions.map((color) => (
+                        <button
+                          className={color === (note.color ?? flowNoteColorOptions[0]) ? "selected" : ""}
+                          key={color}
+                          type="button"
+                          onClick={() => updateFlowNoteColor(note.id, color)}
+                          style={{ "--note-choice-color": color } as CSSProperties}
+                          aria-label={`메모 색상 ${color}`}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
               <textarea
                 value={note.text}
                 onChange={(event) => updateFlowNoteText(note.id, event.target.value)}
@@ -7360,13 +7684,23 @@ function WorkflowView() {
                     selectedNodeIds.includes(node.nodeId) ? "selected" : "",
                     draggingNode?.nodeIds.includes(node.nodeId) ? "dragging" : "",
                     runningNodeIds.includes(node.nodeId) ? "running" : "",
-                    highlightedNodeIds.includes(node.nodeId) ? "issueHighlighted" : ""
+                    highlightedNodeIds.includes(node.nodeId) ? "issueHighlighted" : "",
+                    activeNodeDropId === node.nodeId ? "dropTarget" : ""
                   ]
                     .filter(Boolean)
                     .join(" ")}
                   key={node.nodeId}
                   onPointerDown={(event) => handleFlowNodePointerDown(event, node.nodeId)}
                   onContextMenu={(event) => openFlowNodeMenu(event, node.nodeId)}
+                  onDragOver={(event) => {
+                    if (event.dataTransfer.types.includes("application/x-flow-port-tool")) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setActiveNodeDropId(node.nodeId);
+                    }
+                  }}
+                  onDragLeave={() => setActiveNodeDropId((current) => (current === node.nodeId ? "" : current))}
+                  onDrop={(event) => handleFlowNodeDrop(event, node.nodeId)}
                   style={{
                     left: node.x,
                     top: node.y,
@@ -7410,13 +7744,20 @@ function WorkflowView() {
                             className={[
                               "flowPortRow",
                               "inputPortRow",
-                              incomingPortIds.has(port.id) ? "connected" : ""
+                              incomingPortIds.has(port.id) ? "connected" : "",
+                              port.custom ? "customPort" : ""
                             ]
                               .filter(Boolean)
                               .join(" ")}
                             key={port.id}
                             data-flow-input-node={node.nodeId}
                             data-flow-input-port={port.id}
+                            draggable={Boolean(port.custom)}
+                            onDragStart={(event) =>
+                              port.custom
+                                ? handleCustomPortDragStart(event, node.nodeId, "input", port.id)
+                                : undefined
+                            }
                             onClick={(event) => handleInputPortClick(event, node.nodeId, port.id)}
                             title={`입력 포트: ${port.label}`}
                             aria-label={`${node.name} ${port.label} 입력 포트`}
@@ -7431,6 +7772,20 @@ function WorkflowView() {
                               aria-hidden="true"
                             />
                             <span>{port.label}</span>
+                            {port.custom ? (
+                              <button
+                                className="flowPortDeleteButton"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  removeCustomFlowPort(node.nodeId, "input", port.id);
+                                }}
+                                onPointerDown={(event) => event.stopPropagation()}
+                                aria-label={`${port.label} 입력 포트 삭제`}
+                              >
+                                ×
+                              </button>
+                            ) : null}
                           </div>
                             );
                           })()
@@ -7447,6 +7802,7 @@ function WorkflowView() {
                               "flowPortRow",
                               "outputPortRow",
                               outgoingPortIds.has(port.id) ? "connected" : "",
+                              port.custom ? "customPort" : "",
                               pendingConnection?.nodeId === node.nodeId &&
                               pendingConnection.portId === port.id
                                 ? "pending"
@@ -7457,6 +7813,12 @@ function WorkflowView() {
                             key={port.id}
                             data-flow-output-node={node.nodeId}
                             data-flow-output-port={port.id}
+                            draggable={Boolean(port.custom)}
+                            onDragStart={(event) =>
+                              port.custom
+                                ? handleCustomPortDragStart(event, node.nodeId, "output", port.id)
+                                : undefined
+                            }
                             onPointerDown={(event) => startConnectionDrag(event, node.nodeId, port.id)}
                             title={`출력 포트: ${port.label}`}
                             aria-label={`${node.name} ${port.label} 출력 포트`}
@@ -7465,6 +7827,20 @@ function WorkflowView() {
                               "--flow-port-ring": portPalette.border
                             } as CSSProperties}
                           >
+                            {port.custom ? (
+                              <button
+                                className="flowPortDeleteButton"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  removeCustomFlowPort(node.nodeId, "output", port.id);
+                                }}
+                                onPointerDown={(event) => event.stopPropagation()}
+                                aria-label={`${port.label} 출력 포트 삭제`}
+                              >
+                                ×
+                              </button>
+                            ) : null}
                             <span>{port.label}</span>
                             <span
                               className="flowPortConnector"
@@ -7562,6 +7938,82 @@ function WorkflowView() {
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
         >
+          <div className="flowToolbarSplit">
+            <button
+              className="flowBasicToolsButton"
+              type="button"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsBasicToolsOpen((current) => !current);
+              }}
+              aria-label="기본도구"
+              title="기본도구"
+            >
+              도구
+            </button>
+            {isBasicToolsOpen ? (
+              <div className="flowToolbarMenu basicToolsMenu">
+                <div className="basicToolsTabs">
+                  <button
+                    className={basicToolsTab === "tools" ? "selected" : ""}
+                    type="button"
+                    onClick={() => setBasicToolsTab("tools")}
+                  >
+                    툴
+                  </button>
+                  <button
+                    className={basicToolsTab === "ports" ? "selected" : ""}
+                    type="button"
+                    onClick={() => setBasicToolsTab("ports")}
+                  >
+                    인풋/아웃풋 도구
+                  </button>
+                </div>
+                {basicToolsTab === "tools" ? (
+                  <div className="basicToolsList">
+                    {flowBasicTools.map((tool) => (
+                      <button
+                        draggable
+                        key={tool.id}
+                        type="button"
+                        onDragStart={(event) => handleBasicToolDragStart(event, tool)}
+                        onClick={() => addFlowNode(tool)}
+                      >
+                        <AppIcon className="basicToolsIcon" name={tool.programIcon} />
+                        <span>{tool.name}</span>
+                        <small>{tool.description}</small>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="basicToolsList">
+                    {flowBasicPortTools.map((tool) => {
+                      const palette = flowPaletteForType(tool.type);
+                      return (
+                        <button
+                          draggable
+                          key={tool.id}
+                          type="button"
+                          onDragStart={(event) => handleBasicPortToolDragStart(event, tool)}
+                          style={{
+                            "--basic-tool-color": palette.accent,
+                            "--basic-tool-bg": palette.surface
+                          } as CSSProperties}
+                        >
+                          <span className="basicPortDirection">
+                            {tool.direction === "input" ? "IN" : "OUT"}
+                          </span>
+                          <span>{tool.label}</span>
+                          <small>{tool.description}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
           <div className="flowToolbarSplit">
             <button
               type="button"

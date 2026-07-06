@@ -10,6 +10,7 @@ export interface FlowPort {
   label: string;
   type: FlowPortType;
   iconName: AppIconName;
+  custom?: boolean;
 }
 
 export interface FlowTool {
@@ -47,6 +48,9 @@ export interface FlowNote {
   text: string;
   x: number;
   y: number;
+  width?: number;
+  height?: number;
+  color?: string;
 }
 
 export interface FlowSnapshot {
@@ -79,9 +83,10 @@ function makeFlowPort(
   id: string,
   label: string,
   type: FlowPortType,
-  iconName = flowPortIconName(type)
+  iconName = flowPortIconName(type),
+  custom = false
 ): FlowPort {
-  return { id, label, type, iconName };
+  return { id, label, type, iconName, custom };
 }
 
 export const flowToolPalette: FlowTool[] = [
@@ -258,7 +263,8 @@ function normalizeFlowPort(port: Partial<FlowPort> | string, fallbackId: string)
     String(port.id ?? fallbackId),
     String(port.label ?? port.id ?? fallbackId),
     type,
-    port.iconName ?? flowPortIconName(type)
+    port.iconName ?? flowPortIconName(type),
+    Boolean(port.custom)
   );
 }
 
@@ -352,7 +358,10 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
               id: String(note.id ?? `stored-note-${index}`),
               text: String(note.text ?? "메모"),
               x: Number(note.x ?? defaultFlowNodePosition(index).x),
-              y: Number(note.y ?? defaultFlowNodePosition(index).y)
+              y: Number(note.y ?? defaultFlowNodePosition(index).y),
+              width: Number(note.width ?? 220),
+              height: Number(note.height ?? 140),
+              color: String(note.color ?? "#fff7c7")
             }))
             .filter((note) => Number.isFinite(note.x) && Number.isFinite(note.y))
         : [],

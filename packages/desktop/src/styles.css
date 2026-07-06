@@ -2826,19 +2826,85 @@ tbody tr {
 .flowNote {
   position: absolute;
   z-index: 6;
-  width: 190px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 220px;
+  height: 140px;
   min-height: 112px;
-  padding: 10px;
-  border: 1px solid #e5c86d;
+  min-width: 180px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--flow-note-color, #fff7c7) 58%, #b98a13);
   border-radius: 8px;
-  background: #fff7c7;
+  background: var(--flow-note-color, #fff7c7);
   box-shadow: 0 12px 24px rgba(120, 93, 16, 0.13);
+  overflow: auto;
+  resize: both;
+}
+
+.flowNoteHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 6px 8px 5px 10px;
+  border-bottom: 1px solid rgba(120, 93, 16, 0.16);
+  color: #4b3710;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: grab;
+  user-select: none;
+}
+
+.flowNoteHeader:active {
+  cursor: grabbing;
+}
+
+.flowNoteColorMenu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.flowNoteColorCurrent,
+.flowNoteColorChoices button {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.86);
+  border-radius: 50%;
+  background: var(--note-choice-color);
+  box-shadow: 0 0 0 1px rgba(120, 93, 16, 0.2);
+  cursor: pointer;
+}
+
+.flowNoteColorChoices {
+  position: absolute;
+  right: 0;
+  top: 22px;
+  z-index: 14;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid #d4c37b;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 22px rgba(120, 93, 16, 0.15);
+}
+
+.flowNoteColorChoices button.selected {
+  box-shadow:
+    0 0 0 2px rgba(120, 93, 16, 0.34),
+    0 0 0 4px rgba(255, 255, 255, 0.84);
 }
 
 .flowNote textarea {
   width: 100%;
-  min-height: 88px;
-  resize: vertical;
+  height: 100%;
+  min-height: 0;
+  padding: 10px;
+  resize: none;
   border: 0;
   background: transparent;
   color: #5f4712;
@@ -2996,6 +3062,13 @@ tbody tr {
     0 18px 36px rgba(190, 18, 60, 0.18);
 }
 
+.flowNode.dropTarget {
+  border-color: #7c3aed;
+  box-shadow:
+    0 0 0 4px rgba(124, 58, 237, 0.18),
+    0 18px 34px rgba(76, 29, 149, 0.16);
+}
+
 .flowNodeHeader {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -3071,7 +3144,7 @@ tbody tr {
 
 .flowNodeHeader strong {
   overflow: hidden;
-  color: #10203a;
+  color: #061226;
   font-size: 14px;
   font-weight: 800;
   text-overflow: ellipsis;
@@ -3080,6 +3153,7 @@ tbody tr {
 
 .flowNodeHeader small {
   margin-top: 4px;
+  color: #34445f;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3183,6 +3257,41 @@ tbody tr {
 .flowPortRow.connected {
   border-color: #c8dcf4;
   background: rgba(237, 245, 255, 0.76);
+}
+
+.flowPortRow.customPort {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  border-color: color-mix(in srgb, var(--flow-port-color, #7c3aed) 48%, #d8c8ff);
+  border-style: dashed;
+  background: color-mix(in srgb, var(--flow-port-color, #7c3aed) 10%, #ffffff);
+}
+
+.outputPortRow.customPort {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.flowPortDeleteButton {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(71, 85, 105, 0.18);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.flowPortDeleteButton:hover,
+.flowPortDeleteButton:focus-visible {
+  border-color: #f0b4b4;
+  background: #fff1f2;
+  color: #be123c;
+  outline: none;
 }
 
 .outputPortRow {
@@ -3336,6 +3445,12 @@ tbody tr {
   color: #0f766e !important;
 }
 
+.flowBasicToolsButton {
+  width: 54px !important;
+  color: #334155 !important;
+  font-size: 12px !important;
+}
+
 .flowToolbarMenu {
   position: absolute;
   right: 0;
@@ -3353,6 +3468,75 @@ tbody tr {
 
 .flowToolbarMenu.historyMenu {
   min-width: 220px;
+}
+
+.flowToolbarMenu.basicToolsMenu {
+  left: 0;
+  right: auto;
+  min-width: 312px;
+  max-width: 336px;
+}
+
+.basicToolsTabs {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 5px;
+}
+
+.flowToolbarMenu .basicToolsTabs button {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.basicToolsList {
+  display: grid;
+  gap: 6px;
+}
+
+.flowToolbarMenu .basicToolsList button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  min-height: 54px;
+  cursor: grab;
+}
+
+.flowToolbarMenu .basicToolsList button:active {
+  cursor: grabbing;
+}
+
+.basicToolsIcon,
+.basicPortDirection {
+  grid-row: span 2;
+}
+
+.basicToolsIcon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: #eaf4ff;
+  color: #2d5f9f;
+}
+
+.basicPortDirection {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, var(--basic-tool-color, #4f7fbd) 46%, transparent);
+  border-radius: 999px;
+  background: var(--basic-tool-bg, #f6faff);
+  color: var(--basic-tool-color, #2d5f9f);
+  font-size: 10px;
+  font-weight: 900;
 }
 
 .flowToolbarMenu button {
@@ -5867,6 +6051,7 @@ button.toolRiskBadge:focus-visible {
 }
 
 .darkMode .flowGroupColorChoices,
+.darkMode .flowNoteColorChoices,
 .darkMode .flowToolbarMenu {
   border-color: #37465d;
   background: rgba(20, 26, 36, 0.94);
@@ -5976,6 +6161,24 @@ button.toolRiskBadge:focus-visible {
   background: #1b2b42;
 }
 
+.darkMode .flowPortRow.customPort {
+  border-color: color-mix(in srgb, var(--flow-port-color, #a78bfa) 58%, #37465d);
+  background: color-mix(in srgb, var(--flow-port-color, #a78bfa) 12%, #1e2836);
+}
+
+.darkMode .flowPortDeleteButton {
+  border-color: #39475d;
+  background: #1b2432;
+  color: #b8c0cb;
+}
+
+.darkMode .flowPortDeleteButton:hover,
+.darkMode .flowPortDeleteButton:focus-visible {
+  border-color: #734149;
+  background: #2b1d24;
+  color: #fb7185;
+}
+
 .darkMode .flowPortConnector {
   border-color: #1c222c;
   background: var(--flow-port-color, #7aa7e8);
@@ -5987,6 +6190,13 @@ button.toolRiskBadge:focus-visible {
   box-shadow:
     0 0 0 4px rgba(45, 212, 191, 0.2),
     0 18px 36px rgba(0, 0, 0, 0.28);
+}
+
+.darkMode .flowNode.dropTarget {
+  border-color: #a78bfa;
+  box-shadow:
+    0 0 0 4px rgba(167, 139, 250, 0.18),
+    0 18px 34px rgba(0, 0, 0, 0.28);
 }
 
 .darkMode .flowNode.issueHighlighted {
@@ -6020,15 +6230,25 @@ button.toolRiskBadge:focus-visible {
   color: #f4f7fb;
 }
 
+.darkMode .basicToolsIcon {
+  background: #1b2b42;
+  color: #dbeafe;
+}
+
 .darkMode .flowToolbarMenu button small,
 .darkMode .flowToolbarMenuEmpty {
   color: #b8c0cb;
 }
 
 .darkMode .flowNote {
-  border-color: #6b5d28;
-  background: #332b14;
+  border-color: color-mix(in srgb, var(--flow-note-color, #6b5d28) 42%, #6b5d28);
+  background: color-mix(in srgb, var(--flow-note-color, #332b14) 28%, #332b14);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+
+.darkMode .flowNoteHeader {
+  border-color: rgba(248, 231, 161, 0.16);
+  color: #f8e7a1;
 }
 
 .darkMode .flowNote textarea {
