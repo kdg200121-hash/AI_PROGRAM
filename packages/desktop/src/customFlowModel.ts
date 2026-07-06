@@ -310,6 +310,19 @@ export function cloneFlowTool(tool: FlowTool): FlowTool {
   };
 }
 
+export function applyFlowNodeDrag(
+  nodes: FlowNode[],
+  origins: { nodeId: string; x: number; y: number }[],
+  delta: { x: number; y: number }
+) {
+  const originMap = new Map(origins.map((origin) => [origin.nodeId, origin]));
+
+  return nodes.map((node) => {
+    const origin = originMap.get(node.nodeId);
+    return origin ? { ...node, x: origin.x + delta.x, y: origin.y + delta.y } : node;
+  });
+}
+
 export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
   if (node.id === "basic-result-preview") {
     return {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultFlowNodes,
+  applyFlowNodeDrag,
   flowConnectionEndpoint,
   flowNodeDisplayIconName,
   flowNodeWidth,
@@ -66,5 +67,17 @@ describe("customFlowModel", () => {
     expect(flowNodeDisplayIconName({ ...promptNode, attachedToNodeId: "node-1" })).toBe(
       "promptAttached"
     );
+  });
+
+  it("moves dragged nodes from their drag origins instead of accumulating from current positions", () => {
+    const nodes = defaultFlowNodes();
+    const origins = nodes.map((node) => ({ nodeId: node.nodeId, x: node.x, y: node.y }));
+    const firstMove = applyFlowNodeDrag(nodes, origins, { x: 40, y: 12 });
+    const secondMove = applyFlowNodeDrag(firstMove, origins, { x: 42, y: 15 });
+
+    expect(secondMove[0].x).toBe(origins[0].x + 42);
+    expect(secondMove[0].y).toBe(origins[0].y + 15);
+    expect(secondMove[1].x).toBe(origins[1].x + 42);
+    expect(secondMove[1].y).toBe(origins[1].y + 15);
   });
 });

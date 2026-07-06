@@ -49,6 +49,7 @@ import { AppIcon, type AppIconName } from "./uiIcons";
 import { isNewerVersion, shouldRequireSharedToolReview } from "./toolSharingPolicy";
 import {
   cloneFlowTool,
+  applyFlowNodeDrag,
   customFlowGraphStorageKey,
   defaultFlowConnections,
   defaultFlowNodePosition,
@@ -6214,16 +6215,32 @@ function WorkflowView() {
     portId: string
   ) => `${nodeId}:${direction}:${portId}`;
 
+  const isNodePositionChanging = (nodeId: string) =>
+    Boolean(
+      draggingNode?.nodeIds.includes(nodeId) ||
+      draggingGroup?.nodeIds.includes(nodeId)
+    );
+
   const getFlowPortCenter = (
     node: FlowNode,
     direction: "input" | "output",
     portId: string
-  ) =>
-    flowPortCenters[flowPortCenterKey(node.nodeId, direction, portId)] ??
-    flowConnectionEndpoint(node, direction, portId);
+  ) => {
+    if (isNodePositionChanging(node.nodeId)) {
+      return flowConnectionEndpoint(node, direction, portId);
+    }
+
+    return (
+      flowPortCenters[flowPortCenterKey(node.nodeId, direction, portId)] ??
+      flowConnectionEndpoint(node, direction, portId)
+    );
+  };
 
   useLayoutEffect(() => {
     if (!flowCanvasRef.current) {
+      return;
+    }
+    if (draggingNode || draggingGroup) {
       return;
     }
 
@@ -6263,7 +6280,7 @@ function WorkflowView() {
 
       return nextCenters;
     });
-  }, [expandedNodeIds, flowNodes, flowPan.x, flowPan.y, flowScale]);
+  }, [draggingGroup, draggingNode, expandedNodeIds, flowNodes, flowPan.x, flowPan.y, flowScale]);
 
   const estimateFlowNodeHeight = (node: FlowNode) => {
     const portRows = Math.max(1, node.inputs.length, node.outputs.length);
@@ -7034,6 +7051,35 @@ function WorkflowView() {
       return;
     }
 
+    let queuedFlowNodes: FlowNode[] | null = null;
+    let animationFrameId = 0;
+    const scheduleFlowNodesUpdate = (nextNodes: FlowNode[]) => {
+      queuedFlowNodes = nextNodes;
+      if (animationFrameId) {
+        return;
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = 0;
+        const nodes = queuedFlowNodes;
+        queuedFlowNodes = null;
+        if (nodes) {
+          setFlowNodes(nodes);
+        }
+      });
+    };
+    const flushFlowNodesUpdate = () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+        animationFrameId = 0;
+      }
+      const nodes = queuedFlowNodes;
+      queuedFlowNodes = null;
+      if (nodes) {
+        setFlowNodes(nodes);
+      }
+    };
+
     const moveNode = (event: globalThis.PointerEvent) => {
       if (!flowCanvasRef.current) {
         return;
@@ -7151,17 +7197,16 @@ function WorkflowView() {
         setActivePromptAttachTargetId("");
       }
 
-      setFlowNodes((items) =>
-        items.map((node) => {
-          const origin = originMap.get(node.nodeId);
-          return origin
-            ? { ...node, x: origin.x + deltaX + snapDeltaX, y: origin.y + deltaY + snapDeltaY }
-            : node;
+      scheduleFlowNodesUpdate(
+        applyFlowNodeDrag(flowNodes, draggingNode.origins, {
+          x: deltaX + snapDeltaX,
+          y: deltaY + snapDeltaY
         })
       );
     };
 
     const stopNodeDrag = () => {
+      flushFlowNodesUpdate();
       setActiveGroupDropId((groupId) => {
         if (groupId) {
           const droppedIds = draggingNode.nodeIds;
@@ -7221,6 +7266,9 @@ function WorkflowView() {
       window.removeEventListener("pointermove", moveNode);
       window.removeEventListener("pointerup", stopNodeDrag);
       window.removeEventListener("pointercancel", stopNodeDrag);
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
     };
   }, [draggingNode, flowPan.x, flowPan.y, flowScale]);
 
@@ -7228,6 +7276,35 @@ function WorkflowView() {
     if (!draggingGroup) {
       return;
     }
+
+    let queuedFlowNodes: FlowNode[] | null = null;
+    let animationFrameId = 0;
+    const scheduleFlowNodesUpdate = (nextNodes: FlowNode[]) => {
+      queuedFlowNodes = nextNodes;
+      if (animationFrameId) {
+        return;
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = 0;
+        const nodes = queuedFlowNodes;
+        queuedFlowNodes = null;
+        if (nodes) {
+          setFlowNodes(nodes);
+        }
+      });
+    };
+    const flushFlowNodesUpdate = () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+        animationFrameId = 0;
+      }
+      const nodes = queuedFlowNodes;
+      queuedFlowNodes = null;
+      if (nodes) {
+        setFlowNodes(nodes);
+      }
+    };
 
     const moveGroup = (event: globalThis.PointerEvent) => {
       if (!flowCanvasRef.current) {
@@ -7239,16 +7316,15 @@ function WorkflowView() {
       const nextWorldY = (event.clientY - rect.top - flowPan.y) / flowScale;
       const deltaX = nextWorldX - draggingGroup.startWorldX;
       const deltaY = nextWorldY - draggingGroup.startWorldY;
-      const originMap = new Map(draggingGroup.origins.map((origin) => [origin.nodeId, origin]));
-      setFlowNodes((items) =>
-        items.map((node) => {
-          const origin = originMap.get(node.nodeId);
-          return origin ? { ...node, x: origin.x + deltaX, y: origin.y + deltaY } : node;
-        })
+      scheduleFlowNodesUpdate(
+        applyFlowNodeDrag(flowNodes, draggingGroup.origins, { x: deltaX, y: deltaY })
       );
     };
 
-    const stopGroupDrag = () => setDraggingGroup(null);
+    const stopGroupDrag = () => {
+      flushFlowNodesUpdate();
+      setDraggingGroup(null);
+    };
 
     window.addEventListener("pointermove", moveGroup);
     window.addEventListener("pointerup", stopGroupDrag);
@@ -7258,6 +7334,9 @@ function WorkflowView() {
       window.removeEventListener("pointermove", moveGroup);
       window.removeEventListener("pointerup", stopGroupDrag);
       window.removeEventListener("pointercancel", stopGroupDrag);
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
     };
   }, [draggingGroup, flowPan.x, flowPan.y, flowScale]);
 
@@ -7265,6 +7344,35 @@ function WorkflowView() {
     if (!draggingNote) {
       return;
     }
+
+    let queuedFlowNotes: FlowNote[] | null = null;
+    let animationFrameId = 0;
+    const scheduleFlowNotesUpdate = (nextNotes: FlowNote[]) => {
+      queuedFlowNotes = nextNotes;
+      if (animationFrameId) {
+        return;
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = 0;
+        const notes = queuedFlowNotes;
+        queuedFlowNotes = null;
+        if (notes) {
+          setFlowNotes(notes);
+        }
+      });
+    };
+    const flushFlowNotesUpdate = () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+        animationFrameId = 0;
+      }
+      const notes = queuedFlowNotes;
+      queuedFlowNotes = null;
+      if (notes) {
+        setFlowNotes(notes);
+      }
+    };
 
     const moveNote = (event: globalThis.PointerEvent) => {
       if (!flowCanvasRef.current) {
@@ -7274,8 +7382,8 @@ function WorkflowView() {
       const rect = flowCanvasRef.current.getBoundingClientRect();
       const nextWorldX = (event.clientX - rect.left - flowPan.x) / flowScale;
       const nextWorldY = (event.clientY - rect.top - flowPan.y) / flowScale;
-      setFlowNotes((notes) =>
-        notes.map((note) =>
+      scheduleFlowNotesUpdate(
+        flowNotes.map((note) =>
           note.id === draggingNote.noteId
             ? {
                 ...note,
@@ -7287,7 +7395,10 @@ function WorkflowView() {
       );
     };
 
-    const stopNoteDrag = () => setDraggingNote(null);
+    const stopNoteDrag = () => {
+      flushFlowNotesUpdate();
+      setDraggingNote(null);
+    };
 
     window.addEventListener("pointermove", moveNote);
     window.addEventListener("pointerup", stopNoteDrag);
@@ -7297,6 +7408,9 @@ function WorkflowView() {
       window.removeEventListener("pointermove", moveNote);
       window.removeEventListener("pointerup", stopNoteDrag);
       window.removeEventListener("pointercancel", stopNoteDrag);
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
     };
   }, [draggingNote, flowPan.x, flowPan.y, flowScale]);
 
