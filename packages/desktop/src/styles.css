@@ -2769,11 +2769,37 @@ tbody tr {
   box-shadow:
     0 0 0 4px rgba(20, 184, 166, 0.18),
     0 18px 34px rgba(45, 95, 159, 0.14);
+  transform: translateY(-2px);
+}
+
+.flowNode.promptAttachTarget::after {
+  content: "프롬프트 붙이기";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: -38px;
+  display: grid;
+  place-items: center;
+  height: 26px;
+  border: 1px dashed #14b8a6;
+  border-radius: 8px;
+  background: rgba(240, 253, 250, 0.96);
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  box-shadow: 0 10px 22px rgba(20, 184, 166, 0.18);
+  pointer-events: none;
 }
 
 .flowNode.attachedPrompt {
   border-style: dashed;
-  border-color: #7c8da6;
+  border-color: #14b8a6;
+  background: color-mix(in srgb, var(--flow-node-bg, #fff) 88%, #ccfbf1);
+}
+
+.flowNode.attachedPrompt .flowNodeProgramIcon {
+  color: #f8fafc;
 }
 
 .flowGroupHeader {
@@ -3186,32 +3212,45 @@ tbody tr {
 .flowNodeProgramIcon {
   display: inline-grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 8px;
   color: #fff;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.55) inset,
+    0 8px 16px rgba(15, 23, 42, 0.18);
 }
 
 .flowNodeProgramIcon.uiIcon-cad {
-  background: linear-gradient(135deg, #d5252f, #8f1720);
+  background: linear-gradient(135deg, #b91c1c, #6f1118);
 }
 
 .flowNodeProgramIcon.uiIcon-revit {
-  background: linear-gradient(135deg, #2e66b7, #163f85);
+  background: linear-gradient(135deg, #1d4ed8, #12306f);
 }
 
 .flowNodeProgramIcon.uiIcon-excel {
-  background: linear-gradient(135deg, #107c41, #185c37);
+  background: linear-gradient(135deg, #04783d, #064e2d);
 }
 
 .flowNodeProgramIcon.uiIcon-tekla {
-  background: linear-gradient(135deg, #1f5fbf, #153c83);
+  background: linear-gradient(135deg, #6d28d9, #3b168a);
 }
 
 .flowNodeProgramIcon.uiIcon-workflow,
-.flowNodeProgramIcon.uiIcon-customTools {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+.flowNodeProgramIcon.uiIcon-customTools,
+.flowNodeProgramIcon.uiIcon-promptDetached,
+.flowNodeProgramIcon.uiIcon-promptAttached {
+  background: linear-gradient(135deg, #2563eb, #123b91);
+}
+
+.flowNodeProgramIcon.uiIcon-promptDetached {
+  background: linear-gradient(135deg, #64748b, #26364d);
+}
+
+.flowNodeProgramIcon.uiIcon-promptAttached {
+  background: linear-gradient(135deg, #0f766e, #134e4a);
 }
 
 .flowNodeProgramIcon .uiIconSvg {
@@ -3230,16 +3269,18 @@ tbody tr {
 
 .flowNodeHeader strong {
   overflow: hidden;
-  color: #061226;
-  font-size: 14px;
-  font-weight: 800;
+  color: #020617;
+  font-size: 14.5px;
+  font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .flowNodeHeader small {
   margin-top: 4px;
-  color: #34445f;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3872,8 +3913,8 @@ tbody tr {
   display: none;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 9px;
-  width: min(340px, calc(100vw - 32px));
-  max-height: min(280px, calc(100vh - 88px));
+  width: min(500px, calc(100vw - 32px));
+  max-height: min(420px, calc(100vh - 88px));
   min-width: 0;
   padding: 12px;
   border: 1px solid #cbd9ea;
@@ -3921,31 +3962,38 @@ tbody tr {
 }
 
 .flowValidationList {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 7px;
   min-height: 0;
-  max-height: 216px;
+  max-height: min(326px, calc(100vh - 168px));
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding-right: 2px;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
 }
 
 .flowValidationItem {
-  display: grid;
-  gap: 3px;
+  display: block;
   width: 100%;
+  height: auto;
+  min-height: auto;
   min-width: 0;
   box-sizing: border-box;
+  align-self: stretch;
   white-space: normal;
-  padding: 9px 10px;
+  padding: 10px 12px;
   border: 1px solid #dfe8f3;
   border-radius: 8px;
   background: #f8fafc;
   color: #26384f;
   text-align: left;
+  line-height: 1.4;
   cursor: pointer;
+  overflow: visible;
 }
 
 .flowValidationItem.warning {
@@ -3966,10 +4014,17 @@ tbody tr {
   word-break: keep-all;
 }
 
+.flowValidationItem strong {
+  display: block;
+  margin-bottom: 5px;
+  line-height: 1.25;
+}
+
 .flowValidationItem span {
+  display: block;
   color: #526071;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
   overflow-wrap: anywhere;
   word-break: keep-all;
 }
@@ -6336,6 +6391,17 @@ button.toolRiskBadge:focus-visible {
   color: #f4f7fb;
 }
 
+.darkMode .flowNodeHeader small {
+  color: #c8d6ea;
+}
+
+.darkMode .flowNodeProgramIcon {
+  border-color: rgba(226, 232, 240, 0.16);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 10px 18px rgba(0, 0, 0, 0.34);
+}
+
 .darkMode .flowNode.expanded {
   border-color: #5d7fab;
 }
@@ -6397,8 +6463,20 @@ button.toolRiskBadge:focus-visible {
     0 18px 34px rgba(0, 0, 0, 0.28);
 }
 
+.darkMode .flowNode.promptAttachTarget::after {
+  border-color: #2dd4bf;
+  background: rgba(18, 45, 45, 0.96);
+  color: #99f6e4;
+  box-shadow: 0 10px 22px rgba(45, 212, 191, 0.12);
+}
+
 .darkMode .flowNode.attachedPrompt {
-  border-color: #74839a;
+  border-color: #2dd4bf;
+  background: color-mix(in srgb, var(--flow-node-bg, #1f2937) 82%, #134e4a);
+}
+
+.darkMode .flowNode.attachedPrompt .flowNodeProgramIcon {
+  color: #f8fafc;
 }
 
 .darkMode .flowNodeHeader:hover,

@@ -1180,3 +1180,12 @@
 - `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`는 Electron 기본 실행 파일을 복사해 만드는 구조라 수정된 앱 코드가 들어가도 파일 시간이 오래된 것처럼 보일 수 있었다. 패키징 후 exe의 수정 시간을 현재 시간으로 갱신하도록 `package-win.mjs`를 보정했다.
 - 최신 코드로 `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win`을 통과했고, `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`와 `release\AI_PROGRAM-win32-x64-latest.zip`을 다시 생성했다.
 - 브라우저 확인용 개발 서버도 `127.0.0.1:5173`에서 다시 실행했다.
+
+## 2026-07-06 추가 148
+
+- Custom Flow에서 노드를 드래그할 때 화면이 튀는 원인을 노드 위치 상태 변경마다 드래그 이벤트 effect가 재등록되는 구조와 localStorage 저장이 매 이동마다 실행되는 구조로 보고 수정했다. 노드 드래그 effect는 드래그 시작 당시 상태를 기준으로 유지하고, 저장은 짧게 지연해 이동 중 끊김을 줄였다.
+- 흐름 점검 팝오버의 항목이 서로 겹쳐 보이지 않도록 패널 폭과 내부 스크롤 영역을 키우고, 점검 항목을 자동 높이 카드처럼 표시하도록 CSS를 정리했다.
+- 노드의 경고/오류 아이콘에 마우스를 올리면 해당 노드와 관련된 흐름 점검 사유가 표시되도록 노드별 이슈 목록을 연결했다.
+- 프롬프트 노드는 붙기 전에는 끊어진 연결 아이콘, 다른 노드 아래에 붙은 뒤에는 연결된 아이콘으로 표시되게 했다. 붙일 대상 노드에는 `프롬프트 붙이기` 슬롯과 강조 효과가 나타난다.
+- 노드 아이콘, 노드명, 설명 텍스트를 더 진하게 보이도록 라이트/다크 모드 색상과 아이콘 대비를 조정했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과 후 최신 exe와 zip을 다시 생성했다.

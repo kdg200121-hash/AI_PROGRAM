@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   defaultFlowNodes,
   flowConnectionEndpoint,
+  flowNodeDisplayIconName,
   flowNodeWidth,
   parseDraggedFlowTool,
-  flowToolPalette
+  flowToolPalette,
+  type FlowNode
 } from "./customFlowModel";
 
 describe("customFlowModel", () => {
@@ -45,5 +47,24 @@ describe("customFlowModel", () => {
 
     expect(parsed?.inputs).toHaveLength(1);
     expect(parsed?.outputs).toEqual([]);
+  });
+
+  it("shows prompt nodes as detached until they are attached to another node", () => {
+    const promptNode: FlowNode = {
+      nodeId: "prompt-1",
+      id: "basic-custom-prompt",
+      programIcon: "promptDetached",
+      name: "프롬프트",
+      description: "노드 아래에 붙여 실행 프롬프트에 문장을 추가합니다.",
+      inputs: [],
+      outputs: [],
+      x: 0,
+      y: 0
+    };
+
+    expect(flowNodeDisplayIconName(promptNode)).toBe("promptDetached");
+    expect(flowNodeDisplayIconName({ ...promptNode, attachedToNodeId: "node-1" })).toBe(
+      "promptAttached"
+    );
   });
 });

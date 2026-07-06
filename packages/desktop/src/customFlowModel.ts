@@ -136,6 +136,14 @@ export const flowToolPalette: FlowTool[] = [
   }
 ];
 
+export function flowNodeDisplayIconName(node: FlowNode): AppIconName {
+  if (node.id === "basic-custom-prompt") {
+    return node.attachedToNodeId ? "promptAttached" : "promptDetached";
+  }
+
+  return node.programIcon;
+}
+
 export function defaultFlowNodePosition(index: number) {
   return {
     x: 48 + index * 396,

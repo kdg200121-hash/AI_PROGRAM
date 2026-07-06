@@ -10,6 +10,8 @@ export type AppIconName =
   | "moreTools"
   | "objectData"
   | "numberData"
+  | "promptAttached"
+  | "promptDetached"
   | "revit"
   | "settings"
   | "shareTools"
@@ -104,6 +106,28 @@ function renderIcon(name: AppIconName, title?: string) {
           <path d="M5 6h14" />
           <path d="M12 6v12" />
           <path d="M8 18h8" />
+        </svg>
+      );
+    case "promptDetached":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M8.8 9.2 7.2 7.6a3 3 0 0 0-4.2 4.2l2 2a3 3 0 0 0 4.1.1" />
+          <path d="M15.2 14.8 16.8 16.4a3 3 0 0 0 4.2-4.2l-2-2a3 3 0 0 0-4.1-.1" />
+          <path d="m8 16 8-8" />
+          <path d="m4 20 2-2" />
+          <path d="m18 6 2-2" />
+        </svg>
+      );
+    case "promptAttached":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M9.6 8.4 8.1 6.9a3.2 3.2 0 0 0-4.5 4.5l2.3 2.3a3.2 3.2 0 0 0 4.5 0l.8-.8" />
+          <path d="m14.4 15.6 1.5 1.5a3.2 3.2 0 0 0 4.5-4.5l-2.3-2.3a3.2 3.2 0 0 0-4.5 0l-.8.8" />
+          <path d="m9 15 6-6" />
+          <path d="M7.8 3.8v2.6" />
+          <path d="M3.8 7.8h2.6" />
         </svg>
       );
     case "moreTools":

@@ -54,6 +54,7 @@ import {
   defaultFlowNodePosition,
   defaultFlowNodes,
   flowConnectionEndpoint,
+  flowNodeDisplayIconName,
   flowNodeWidth,
   flowPortIconName,
   flowToolIdFromMenuItem,
@@ -78,7 +79,7 @@ import {
   type SmartGuideLine,
   type SmartGuideRect
 } from "./customFlowSmartGuides";
-import { validateFlowGraph } from "./customFlowValidation";
+import { validateFlowGraph, type FlowValidationIssue } from "./customFlowValidation";
 import {
   emptyProcessSnapshot,
   type ProcessSnapshot,
@@ -136,7 +137,7 @@ const flowBasicTools: FlowTool[] = [
   },
   {
     id: "basic-custom-prompt",
-    programIcon: "customTools",
+    programIcon: "promptDetached",
     name: "프롬프트",
     description: "노드 아래에 붙여 실행 프롬프트에 문장을 추가합니다.",
     inputs: [],
@@ -6808,17 +6809,21 @@ function WorkflowView() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      customFlowGraphStorageKey,
-      JSON.stringify({
-        nodes: flowNodes,
-        connections: flowConnections,
-        groups: flowGroups,
-        notes: flowNotes,
-        scale: flowScale,
-        pan: flowPan
-      })
-    );
+    const saveTimerId = window.setTimeout(() => {
+      window.localStorage.setItem(
+        customFlowGraphStorageKey,
+        JSON.stringify({
+          nodes: flowNodes,
+          connections: flowConnections,
+          groups: flowGroups,
+          notes: flowNotes,
+          scale: flowScale,
+          pan: flowPan
+        })
+      );
+    }, 140);
+
+    return () => window.clearTimeout(saveTimerId);
   }, [flowConnections, flowGroups, flowNodes, flowNotes, flowPan, flowScale]);
 
   useEffect(
@@ -7217,7 +7222,7 @@ function WorkflowView() {
       window.removeEventListener("pointerup", stopNodeDrag);
       window.removeEventListener("pointercancel", stopNodeDrag);
     };
-  }, [draggingNode, flowGroups, flowNodes, flowPan.x, flowPan.y, flowScale]);
+  }, [draggingNode, flowPan.x, flowPan.y, flowScale]);
 
   useEffect(() => {
     if (!draggingGroup) {
@@ -7844,19 +7849,21 @@ function WorkflowView() {
         ? "warning"
         : "ready";
   const flowValidationIssueCount = flowValidationIssues.length;
+  const nodeIdsForValidationIssue = (issue: FlowValidationIssue) => {
+    const connection = issue.connectionId
+      ? flowConnections.find((item) => item.id === issue.connectionId)
+      : null;
+
+    return issue.nodeId
+      ? [issue.nodeId]
+      : connection
+        ? [connection.fromNodeId, connection.toNodeId]
+        : [];
+  };
   const flowValidationNodeToneById = useMemo(() => {
     const toneMap = new Map<string, "error" | "warning">();
     flowValidationIssues.forEach((issue) => {
-      const connection = issue.connectionId
-        ? flowConnections.find((item) => item.id === issue.connectionId)
-        : null;
-      const nodeIds = issue.nodeId
-        ? [issue.nodeId]
-        : connection
-          ? [connection.fromNodeId, connection.toNodeId]
-          : [];
-
-      nodeIds.forEach((nodeId) => {
+      nodeIdsForValidationIssue(issue).forEach((nodeId) => {
         const current = toneMap.get(nodeId);
         if (issue.severity === "error" || !current) {
           toneMap.set(nodeId, issue.severity);
@@ -7864,6 +7871,15 @@ function WorkflowView() {
       });
     });
     return toneMap;
+  }, [flowConnections, flowValidationIssues]);
+  const flowValidationNodeIssuesById = useMemo(() => {
+    const issueMap = new Map<string, FlowValidationIssue[]>();
+    flowValidationIssues.forEach((issue) => {
+      nodeIdsForValidationIssue(issue).forEach((nodeId) => {
+        issueMap.set(nodeId, [...(issueMap.get(nodeId) ?? []), issue]);
+      });
+    });
+    return issueMap;
   }, [flowConnections, flowValidationIssues]);
   const normalizedFlowSearchQuery = flowSearchQuery.trim().toLowerCase();
   const flowSearchResults = useMemo(() => {
@@ -8315,6 +8331,14 @@ function WorkflowView() {
               const hasInputPorts = node.inputs.length > 0;
               const hasOutputPorts = node.outputs.length > 0;
               const validationTone = flowValidationNodeToneById.get(node.nodeId);
+              const validationIssuesForNode = flowValidationNodeIssuesById.get(node.nodeId) ?? [];
+              const validationIssueTooltip = validationIssuesForNode
+                .map((issue) => {
+                  const label = issue.severity === "error" ? "오류" : "경고";
+                  return `${label}: ${issue.title}\n${issue.message}`;
+                })
+                .join("\n\n");
+              const displayIconName = flowNodeDisplayIconName(node);
               const incomingPortIds = new Set(
                 flowConnections
                   .filter((connection) => connection.toNodeId === node.nodeId)
@@ -8356,7 +8380,7 @@ function WorkflowView() {
                     className="flowNodeHeader"
                     onPointerDown={(event) => startNodeDrag(event, node.nodeId)}
                   >
-                    <AppIcon className="flowNodeProgramIcon" name={node.programIcon} />
+                    <AppIcon className="flowNodeProgramIcon" name={displayIconName} />
                     <span className="flowNodeTitleBlock">
                       <strong>{node.name}</strong>
                       <small>{node.description}</small>
@@ -8364,8 +8388,14 @@ function WorkflowView() {
                     {validationTone ? (
                       <span
                         className={`flowNodeIssueBadge ${validationTone}`}
-                        title={validationTone === "error" ? "오류가 있는 노드" : "경고가 있는 노드"}
-                        aria-label={validationTone === "error" ? "오류가 있는 노드" : "경고가 있는 노드"}
+                        title={
+                          validationIssueTooltip ||
+                          (validationTone === "error" ? "오류가 있는 노드" : "경고가 있는 노드")
+                        }
+                        aria-label={
+                          validationIssueTooltip ||
+                          (validationTone === "error" ? "오류가 있는 노드" : "경고가 있는 노드")
+                        }
                       >
                         {validationTone === "error" ? "×" : "!"}
                       </span>
@@ -8770,7 +8800,10 @@ function WorkflowView() {
                   {flowSearchResults.length > 0 ? (
                     flowSearchResults.map((node) => (
                       <button key={node.nodeId} type="button" onClick={() => focusFlowNode(node.nodeId)}>
-                        <AppIcon className="flowSearchResultIcon" name={node.programIcon} />
+                        <AppIcon
+                          className="flowSearchResultIcon"
+                          name={flowNodeDisplayIconName(node)}
+                        />
                         <span>{node.name}</span>
                         <small>{node.description}</small>
                       </button>
