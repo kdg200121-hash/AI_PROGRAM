@@ -1060,3 +1060,11 @@
 - 원인은 CSS 레이아웃으로 실제 포트 네모 위치가 결정되는데, 연결선은 TypeScript의 고정 숫자 좌표(`flowConnectionEndpoint`)로 계산하던 구조였다.
 - 각 포트 네모에 측정용 data attribute를 붙이고, 렌더링된 DOM의 실제 중심 좌표를 읽어 SVG 연결선 시작/끝점으로 사용하도록 변경했다.
 - `flowConnectionEndpoint`는 측정값이 아직 없는 첫 렌더 시점의 fallback으로만 사용한다.
+
+## 2026-07-06 추가 135
+
+- Custom Flow 노드를 `Shift`를 누른 상태로 드래그하면 Photoshop/Figma Smart Guides처럼 다른 노드의 left/center/right, top/middle/bottom 기준에 가까울 때 자동으로 붙도록 했다.
+- 여러 노드를 선택해 함께 움직일 때는 선택 묶음 전체의 바운딩 박스를 기준으로 정렬한다.
+- 세 노드가 나란히 있을 때 가운데 노드가 양쪽 노드 사이의 같은 간격 위치에 가까워지면 자동으로 붙는 간격 스냅도 추가했다.
+- 정렬선은 붉은 실선, 간격선은 보라색 점선으로 표시한다.
+- Smart Guide 계산 로직을 `customFlowSmartGuides.ts`로 분리하고, 정렬/가로 간격/세로 간격 테스트를 추가했다.

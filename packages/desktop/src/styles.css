@@ -2835,6 +2835,56 @@ tbody tr {
   stroke-dasharray: 5 5;
 }
 
+.flowSmartGuideLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  width: 10000px;
+  height: 7000px;
+  pointer-events: none;
+}
+
+.flowSmartGuide {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.flowSmartGuide.vertical {
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.flowSmartGuide.horizontal {
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.flowSmartGuide.align {
+  background: #e11d48;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.82);
+}
+
+.flowSmartGuide.spacing.vertical {
+  background: repeating-linear-gradient(
+    to bottom,
+    #7c3aed 0,
+    #7c3aed 8px,
+    transparent 8px,
+    transparent 13px
+  );
+}
+
+.flowSmartGuide.spacing.horizontal {
+  background: repeating-linear-gradient(
+    to right,
+    #7c3aed 0,
+    #7c3aed 8px,
+    transparent 8px,
+    transparent 13px
+  );
+}
+
 .flowNode.expanded {
   border-color: #7da9dc;
 }

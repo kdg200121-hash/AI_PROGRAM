@@ -70,6 +70,11 @@ import {
   type FlowTool,
   type StoredFlowGraph
 } from "./customFlowModel";
+import {
+  calculateSmartGuideSnap,
+  type SmartGuideLine,
+  type SmartGuideRect
+} from "./customFlowSmartGuides";
 import { validateFlowGraph } from "./customFlowValidation";
 import {
   emptyProcessSnapshot,
@@ -5934,6 +5939,7 @@ function WorkflowView() {
     y: number;
   } | null>(null);
   const [flowPortCenters, setFlowPortCenters] = useState<Record<string, { x: number; y: number }>>({});
+  const [smartGuides, setSmartGuides] = useState<SmartGuideLine[]>([]);
   const [draggingNode, setDraggingNode] = useState<{
     nodeId: string;
     nodeIds: string[];
@@ -6080,11 +6086,26 @@ function WorkflowView() {
   };
 
   const flowNodeBounds = (node: FlowNode) => ({
+    id: node.nodeId,
     left: node.x,
     top: node.y,
     right: node.x + flowNodeWidth,
     bottom: node.y + estimateFlowNodeHeight(node)
   });
+
+  const boundsFromRects = (rects: SmartGuideRect[]): SmartGuideRect | null => {
+    if (rects.length === 0) {
+      return null;
+    }
+
+    return {
+      id: "selection",
+      left: Math.min(...rects.map((bound) => bound.left)),
+      top: Math.min(...rects.map((bound) => bound.top)),
+      right: Math.max(...rects.map((bound) => bound.right)),
+      bottom: Math.max(...rects.map((bound) => bound.bottom))
+    };
+  };
 
   const normalizeRect = (rect: {
     startX: number;
@@ -6394,15 +6415,58 @@ function WorkflowView() {
       const deltaX = nextWorldX - draggingNode.startWorldX;
       const deltaY = nextWorldY - draggingNode.startWorldY;
       const originMap = new Map(draggingNode.origins.map((origin) => [origin.nodeId, origin]));
+      const selectedIdSet = new Set(draggingNode.nodeIds);
+      let snapDeltaX = 0;
+      let snapDeltaY = 0;
+
+      if (event.shiftKey) {
+        const movingBounds = boundsFromRects(
+          flowNodes
+            .filter((node) => selectedIdSet.has(node.nodeId))
+            .map((node) => {
+              const origin = originMap.get(node.nodeId);
+              const x = (origin?.x ?? node.x) + deltaX;
+              const y = (origin?.y ?? node.y) + deltaY;
+              return {
+                id: node.nodeId,
+                left: x,
+                top: y,
+                right: x + flowNodeWidth,
+                bottom: y + estimateFlowNodeHeight(node)
+              };
+            })
+        );
+
+        if (movingBounds) {
+          const snap = calculateSmartGuideSnap({
+            moving: movingBounds,
+            stationary: flowNodes
+              .filter((node) => !selectedIdSet.has(node.nodeId))
+              .map(flowNodeBounds),
+            threshold: 8 / flowScale
+          });
+          snapDeltaX = snap.deltaX;
+          snapDeltaY = snap.deltaY;
+          setSmartGuides(snap.guides);
+        }
+      } else {
+        setSmartGuides([]);
+      }
+
       setFlowNodes((items) =>
         items.map((node) => {
           const origin = originMap.get(node.nodeId);
-          return origin ? { ...node, x: origin.x + deltaX, y: origin.y + deltaY } : node;
+          return origin
+            ? { ...node, x: origin.x + deltaX + snapDeltaX, y: origin.y + deltaY + snapDeltaY }
+            : node;
         })
       );
     };
 
-    const stopNodeDrag = () => setDraggingNode(null);
+    const stopNodeDrag = () => {
+      setDraggingNode(null);
+      setSmartGuides([]);
+    };
 
     window.addEventListener("pointermove", moveNode);
     window.addEventListener("pointerup", stopNodeDrag);
@@ -6413,7 +6477,7 @@ function WorkflowView() {
       window.removeEventListener("pointerup", stopNodeDrag);
       window.removeEventListener("pointercancel", stopNodeDrag);
     };
-  }, [draggingNode, flowPan.x, flowPan.y, flowScale]);
+  }, [draggingNode, flowNodes, flowPan.x, flowPan.y, flowScale]);
 
   useEffect(() => {
     if (!draggingGroup) {
@@ -6882,6 +6946,33 @@ function WorkflowView() {
               );
             })() : null}
           </svg>
+          {smartGuides.length > 0 ? (
+            <div className="flowSmartGuideLayer" aria-hidden="true">
+              {smartGuides.map((guide, index) => (
+                <span
+                  className={[
+                    "flowSmartGuide",
+                    guide.axis === "x" ? "vertical" : "horizontal",
+                    guide.type
+                  ].join(" ")}
+                  key={`${guide.axis}-${guide.type}-${guide.position}-${index}`}
+                  style={
+                    guide.axis === "x"
+                      ? {
+                          left: guide.position,
+                          top: guide.start,
+                          height: Math.max(1, guide.end - guide.start)
+                        }
+                      : {
+                          left: guide.start,
+                          top: guide.position,
+                          width: Math.max(1, guide.end - guide.start)
+                        }
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
           {renderedFlowGroups.map(({ group, bounds }) => (
             <div
               className={[
