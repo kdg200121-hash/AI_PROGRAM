@@ -3296,6 +3296,18 @@ tbody tr {
   background: rgba(237, 245, 255, 0.76);
 }
 
+.inputPortRow.compatibleTarget {
+  border-color: #86d4a5;
+  background: rgba(240, 253, 244, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.12);
+}
+
+.inputPortRow.incompatibleTarget {
+  border-color: #f3b4b4;
+  background: rgba(255, 241, 242, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.1);
+}
+
 .flowPortRow.customPort {
   grid-template-columns: auto minmax(0, 1fr) auto;
   border-color: color-mix(in srgb, var(--flow-port-color, #7c3aed) 48%, #d8c8ff);
@@ -6254,6 +6266,18 @@ button.toolRiskBadge:focus-visible {
 .darkMode .flowPortRow.connected {
   border-color: #496b98;
   background: #1b2b42;
+}
+
+.darkMode .inputPortRow.compatibleTarget {
+  border-color: #2f7d4d;
+  background: #132a1d;
+  box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.12);
+}
+
+.darkMode .inputPortRow.incompatibleTarget {
+  border-color: #734149;
+  background: #2b1d24;
+  box-shadow: inset 0 0 0 1px rgba(251, 113, 133, 0.12);
 }
 
 .darkMode .flowPortRow.customPort {

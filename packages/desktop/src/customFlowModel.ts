@@ -3,7 +3,18 @@ import type { AppIconName } from "./uiIcons";
 
 export const customFlowGraphStorageKey = "mcp-registry:custom-flow-graph";
 
-export type FlowPortType = "cad" | "revit" | "excel" | "object" | "number" | "text" | "any";
+export type FlowPortType =
+  | "cad"
+  | "revit"
+  | "excel"
+  | "object"
+  | "number"
+  | "text"
+  | "coordinate"
+  | "table"
+  | "file"
+  | "boolean"
+  | "any";
 
 export interface FlowPort {
   id: string;
@@ -151,6 +162,18 @@ export function flowPortIconName(port: string): AppIconName {
   }
   if (port === "text") {
     return "textData";
+  }
+  if (port === "coordinate") {
+    return "numberData";
+  }
+  if (port === "table") {
+    return "excel";
+  }
+  if (port === "file") {
+    return "customTools";
+  }
+  if (port === "boolean") {
+    return "numberData";
   }
   return "customTools";
 }

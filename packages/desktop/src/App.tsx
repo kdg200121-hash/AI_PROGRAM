@@ -153,9 +153,19 @@ const flowBasicPortTools: Array<{
   description: string;
 }> = [
   { id: "text", direction: "both", label: "텍스트", type: "text", description: "텍스트 값을 입력 또는 출력 포트로 추가합니다." },
-  { id: "path", direction: "input", label: "경로", type: "text", description: "파일/폴더 경로를 받을 입력 포트를 추가합니다." },
-  { id: "active-file", direction: "input", label: "활성파일", type: "any", description: "현재 열린 파일을 받을 입력 포트를 추가합니다." },
-  { id: "result", direction: "output", label: "결과", type: "any", description: "다음 노드로 보낼 결과 출력 포트를 추가합니다." }
+  { id: "number", direction: "both", label: "숫자", type: "number", description: "길이, 개수, 높이 같은 숫자 값을 주고받습니다." },
+  { id: "coordinate", direction: "both", label: "좌표", type: "coordinate", description: "X/Y/Z 위치값이나 기준점을 주고받습니다." },
+  { id: "object", direction: "both", label: "객체", type: "object", description: "CAD 객체, Revit 요소, Tekla 부재 같은 대상을 주고받습니다." },
+  { id: "table", direction: "both", label: "테이블", type: "table", description: "Excel 표나 행/열 데이터 묶음을 주고받습니다." },
+  { id: "file", direction: "both", label: "파일", type: "file", description: "파일 경로나 파일 결과물을 주고받습니다." },
+  { id: "folder", direction: "both", label: "폴더", type: "file", description: "폴더 경로나 저장 위치를 주고받습니다." },
+  { id: "boolean", direction: "both", label: "참/거짓", type: "boolean", description: "실행 옵션, 필터 조건 같은 선택값을 주고받습니다." },
+  { id: "active-file", direction: "input", label: "활성파일", type: "file", description: "현재 열린 파일을 받을 입력 포트를 추가합니다." },
+  { id: "selected-element", direction: "input", label: "선택 요소", type: "object", description: "현재 프로그램에서 선택한 객체나 요소를 입력으로 받습니다." },
+  { id: "result", direction: "output", label: "결과", type: "any", description: "다음 노드로 보낼 범용 결과 출력 포트를 추가합니다." },
+  { id: "log", direction: "output", label: "로그", type: "text", description: "실행 로그나 처리 메시지를 출력합니다." },
+  { id: "error", direction: "output", label: "오류", type: "text", description: "오류 메시지나 실패 사유를 출력합니다." },
+  { id: "report", direction: "output", label: "리포트", type: "file", description: "검토서, 엑셀, PDF 같은 결과 파일을 출력합니다." }
 ];
 
 type FlowBasicPortTool = (typeof flowBasicPortTools)[number];
@@ -183,6 +193,10 @@ const flowTypePalette: Record<
   object: { accent: "#d97706", border: "#f1cf9a", surface: "#fff7ed", group: "#fed7aa" },
   number: { accent: "#0891b2", border: "#a5ddea", surface: "#ecfeff", group: "#a5f3fc" },
   text: { accent: "#475569", border: "#cbd5e1", surface: "#f8fafc", group: "#e2e8f0" },
+  coordinate: { accent: "#0d9488", border: "#99f6e4", surface: "#f0fdfa", group: "#99f6e4" },
+  table: { accent: "#15803d", border: "#bbf7d0", surface: "#f0fdf4", group: "#bbf7d0" },
+  file: { accent: "#7c2d12", border: "#fed7aa", surface: "#fff7ed", group: "#fed7aa" },
+  boolean: { accent: "#9333ea", border: "#d8b4fe", surface: "#faf5ff", group: "#e9d5ff" },
   any: { accent: "#4f7fbd", border: "#bfd4ed", surface: "#f6faff", group: "#bfdbfe" }
 };
 
@@ -7622,6 +7636,10 @@ function WorkflowView() {
   };
 
   const nodeMap = new Map(flowNodes.map((node) => [node.nodeId, node]));
+  const pendingOutputNode = pendingConnection ? nodeMap.get(pendingConnection.nodeId) : null;
+  const pendingOutputPort = pendingOutputNode?.outputs.find(
+    (port) => port.id === pendingConnection?.portId
+  );
   const flowGridSize = 26 * flowScale;
   const flowCanvasStyle = {
     "--flow-grid-size": `${flowGridSize}px`,
@@ -8066,12 +8084,21 @@ function WorkflowView() {
                         {node.inputs.map((port) => (
                           (() => {
                             const portPalette = flowPaletteForType(port.type);
+                            const isPendingInputTarget =
+                              Boolean(pendingConnection) && pendingConnection?.nodeId !== node.nodeId;
+                            const isCompatibleInputTarget =
+                              isPendingInputTarget && isFlowTypeCompatible(pendingOutputPort, port);
                             return (
                           <div
                             className={[
                               "flowPortRow",
                               "inputPortRow",
                               incomingPortIds.has(port.id) ? "connected" : "",
+                              isPendingInputTarget
+                                ? isCompatibleInputTarget
+                                  ? "compatibleTarget"
+                                  : "incompatibleTarget"
+                                : "",
                               port.custom ? "customPort" : ""
                             ]
                               .filter(Boolean)
