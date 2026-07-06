@@ -6051,6 +6051,8 @@ function WorkflowView() {
   const [flowRunMode, setFlowRunMode] = useState<"batch" | "step">("batch");
   const [isFlowRunMenuOpen, setIsFlowRunMenuOpen] = useState(false);
   const [isBasicToolsOpen, setIsBasicToolsOpen] = useState(false);
+  const [isFlowSearchOpen, setIsFlowSearchOpen] = useState(false);
+  const [flowSearchQuery, setFlowSearchQuery] = useState("");
   const [basicToolsTab, setBasicToolsTab] = useState<"tools" | "ports">("tools");
   const [isHistoryMenuOpen, setIsHistoryMenuOpen] = useState(false);
   const [runningNodeIds, setRunningNodeIds] = useState<string[]>([]);
@@ -6512,6 +6514,7 @@ function WorkflowView() {
     setFlowCanvasMenu(null);
     setIsFlowRunMenuOpen(false);
     setIsBasicToolsOpen(false);
+    setIsFlowSearchOpen(false);
     setIsHistoryMenuOpen(false);
     setIsFlowValidationPinned(false);
     setExpandedGroupColorId("");
@@ -6753,6 +6756,17 @@ function WorkflowView() {
         target?.tagName === "SELECT" ||
         target?.isContentEditable;
 
+      if (
+        isTyping &&
+        selectedNoteIds.length > 0 &&
+        event.key === "Delete" &&
+        (event.ctrlKey || event.metaKey)
+      ) {
+        event.preventDefault();
+        deleteSelectedFlowItems();
+        return;
+      }
+
       if (isTyping) {
         return;
       }
@@ -6772,6 +6786,15 @@ function WorkflowView() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
         event.preventDefault();
         restoreNextFlowState();
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setIsFlowSearchOpen(true);
+        setIsBasicToolsOpen(false);
+        setIsHistoryMenuOpen(false);
+        setIsFlowRunMenuOpen(false);
         return;
       }
 
@@ -7392,6 +7415,24 @@ function WorkflowView() {
     });
   };
 
+  const startSelectionBoxFromPointer = (event: PointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setFlowNodeMenu(null);
+    setFlowCanvasMenu(null);
+    setSelectedNodeId("");
+    setSelectedNodeIds([]);
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
+    const point = canvasPointFromPointer(event.clientX, event.clientY);
+    setSelectionBox({
+      startX: point.x,
+      startY: point.y,
+      currentX: point.x,
+      currentY: point.y
+    });
+  };
+
   const handleFlowCanvasContextMenu = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest(".flowNode") || target?.closest(".flowNote") || target?.closest(".flowGroupBox")) {
@@ -7667,6 +7708,26 @@ function WorkflowView() {
         ? "warning"
         : "ready";
   const flowValidationIssueCount = flowValidationIssues.length;
+  const normalizedFlowSearchQuery = flowSearchQuery.trim().toLowerCase();
+  const flowSearchResults = useMemo(() => {
+    if (!normalizedFlowSearchQuery) {
+      return flowNodes.slice(0, 8);
+    }
+
+    return flowNodes
+      .filter((node) => {
+        const haystack = [
+          node.name,
+          node.description,
+          ...node.inputs.map((port) => port.label),
+          ...node.outputs.map((port) => port.label)
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedFlowSearchQuery);
+      })
+      .slice(0, 12);
+  }, [flowNodes, normalizedFlowSearchQuery]);
 
   const runFlow = () => {
     const stepNodeId = selectedNodeId || flowNodes[0]?.nodeId;
@@ -7707,6 +7768,25 @@ function WorkflowView() {
       );
     }
   };
+  const focusFlowNode = (nodeId: string) => {
+    const node = flowNodes.find((item) => item.nodeId === nodeId);
+    if (!node || !flowCanvasRef.current) {
+      return;
+    }
+
+    const rect = flowCanvasRef.current.getBoundingClientRect();
+    const nodeHeight = estimateFlowNodeHeight(node);
+    setSelectedNodeId(node.nodeId);
+    setSelectedNodeIds([node.nodeId]);
+    setSelectedGroupIds([]);
+    setSelectedNoteIds([]);
+    setExpandedNodeIds((ids) => (ids.includes(node.nodeId) ? ids : [...ids, node.nodeId]));
+    setFlowPan({
+      x: rect.width / 2 - (node.x + flowNodeWidth / 2) * flowScale,
+      y: rect.height / 2 - (node.y + nodeHeight / 2) * flowScale
+    });
+    setIsFlowSearchOpen(false);
+  };
   const flowNodeMenuNodeIds = flowNodeMenu
     ? selectedNodeIds.includes(flowNodeMenu.nodeId)
       ? selectedNodeIds
@@ -7716,7 +7796,7 @@ function WorkflowView() {
     flowNodeMenuNodeIds.length > 0 &&
     flowGroups.some((group) => group.nodeIds.some((nodeId) => flowNodeMenuNodeIds.includes(nodeId)));
   const isFlowToolbarActive =
-    isBasicToolsOpen || isHistoryMenuOpen || isFlowRunMenuOpen;
+    isBasicToolsOpen || isHistoryMenuOpen || isFlowRunMenuOpen || isFlowSearchOpen;
 
   return (
     <section className="sectionView customFlowView">
@@ -7918,6 +7998,10 @@ function WorkflowView() {
               } as CSSProperties}
               onPointerDown={(event) => {
                 const target = event.target instanceof Element ? event.target : null;
+                if (event.shiftKey && !target?.closest(".flowNoteColorMenu")) {
+                  startSelectionBoxFromPointer(event);
+                  return;
+                }
                 if (target?.closest("textarea") || target?.closest(".flowNoteColorMenu")) {
                   event.stopPropagation();
                   return;
@@ -8354,6 +8438,50 @@ function WorkflowView() {
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
         >
+          <div className="flowToolbarSplit flowSearchSplit">
+            <button
+              className="flowSearchButton"
+              type="button"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsFlowSearchOpen((current) => !current);
+                setIsBasicToolsOpen(false);
+                setIsHistoryMenuOpen(false);
+                setIsFlowRunMenuOpen(false);
+              }}
+              aria-label="노드 검색"
+              title="노드 검색 Ctrl+F"
+            >
+              검색
+            </button>
+            {isFlowSearchOpen ? (
+              <div className="flowToolbarMenu flowSearchMenu">
+                <label className="flowSearchField">
+                  <span>노드 검색</span>
+                  <input
+                    autoFocus
+                    value={flowSearchQuery}
+                    onChange={(event) => setFlowSearchQuery(event.target.value)}
+                    placeholder="노드명, 설명, 포트 검색"
+                  />
+                </label>
+                <div className="flowSearchResults">
+                  {flowSearchResults.length > 0 ? (
+                    flowSearchResults.map((node) => (
+                      <button key={node.nodeId} type="button" onClick={() => focusFlowNode(node.nodeId)}>
+                        <AppIcon className="flowSearchResultIcon" name={node.programIcon} />
+                        <span>{node.name}</span>
+                        <small>{node.description}</small>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="flowToolbarMenuEmpty">검색 결과가 없습니다.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <div className="flowToolbarSplit flowBasicToolsSplit">
             <button
               className="flowBasicToolsButton"

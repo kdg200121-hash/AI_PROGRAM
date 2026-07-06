@@ -2848,7 +2848,7 @@ tbody tr {
 
 .flowNote {
   position: absolute;
-  z-index: 6;
+  z-index: 7;
   display: block;
   width: 220px;
   height: 140px;
@@ -3528,6 +3528,71 @@ tbody tr {
   width: 46px !important;
   color: #334155 !important;
   font-size: 11px !important;
+}
+
+.flowSearchButton {
+  width: 46px !important;
+  color: #334155 !important;
+  font-size: 11px !important;
+}
+
+.flowSearchMenu {
+  left: auto;
+  right: 0;
+  width: 312px;
+  max-height: min(420px, calc(100vh - 78px));
+  overflow: hidden;
+}
+
+.flowSearchField {
+  display: grid;
+  gap: 6px;
+}
+
+.flowSearchField span {
+  color: #10203a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.flowSearchField input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #cbd9ea;
+  border-radius: 8px;
+  background: #fff;
+  color: #10203a;
+  font: 700 12px/1 "Segoe UI", Arial, sans-serif;
+  outline: none;
+}
+
+.flowSearchField input:focus {
+  border-color: #8fb4e6;
+  box-shadow: 0 0 0 3px rgba(79, 127, 189, 0.14);
+}
+
+.flowSearchResults {
+  display: grid;
+  gap: 5px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.flowToolbarMenu .flowSearchResults button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 8px;
+  align-items: center;
+  min-height: 50px;
+}
+
+.flowSearchResultIcon {
+  grid-row: span 2;
+  width: 24px;
+  height: 24px;
+  color: #2d5f9f;
 }
 
 .flowBasicToolsSplit {
@@ -6349,6 +6414,25 @@ button.toolRiskBadge:focus-visible {
 .darkMode .flowToolbarMenu button.selected {
   border-color: #496b98;
   background: #1b2b42;
+}
+
+.darkMode .flowSearchField span {
+  color: #f4f7fb;
+}
+
+.darkMode .flowSearchField input {
+  border-color: #37465d;
+  background: #111824;
+  color: #d9e5f6;
+}
+
+.darkMode .flowSearchField input:focus {
+  border-color: #5d7fab;
+  box-shadow: 0 0 0 3px rgba(122, 167, 232, 0.14);
+}
+
+.darkMode .flowSearchResultIcon {
+  color: #dbeafe;
 }
 
 .darkMode .flowToolbarMenu button span {
