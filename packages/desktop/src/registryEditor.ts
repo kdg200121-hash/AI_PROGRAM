@@ -22,8 +22,21 @@ export function createServerDraft(target: McpTarget): ServerDraft {
         ? "http://localhost:5100/mcp"
         : target === "revit"
           ? "http://localhost:5001/mcp"
-          : "http://localhost:3000/mcp",
-    port: target === "cad" ? "5100" : target === "revit" ? "5001" : "3000",
+          : target === "excel"
+            ? "http://localhost:5200/mcp"
+            : target === "tekla"
+              ? "http://localhost:5300/mcp"
+              : "http://localhost:3000/mcp",
+    port:
+      target === "cad"
+        ? "5100"
+        : target === "revit"
+          ? "5001"
+          : target === "excel"
+            ? "5200"
+            : target === "tekla"
+              ? "5300"
+              : "3000",
     launchCommand: "",
     workingDirectory: "",
     notes: ""

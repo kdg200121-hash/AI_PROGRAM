@@ -15,7 +15,7 @@ const emptyRegistry = (): RegistryFile => ({ version: 1, servers: [] });
 
 export async function loadRegistry(path: string): Promise<RegistryFile> {
   try {
-    const content = await readFile(path, "utf8");
+    const content = (await readFile(path, "utf8")).replace(/^\uFEFF/, "");
     const parsed = JSON.parse(content) as RegistryFile;
     return {
       version: 1,

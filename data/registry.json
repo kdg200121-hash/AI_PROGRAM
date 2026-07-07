@@ -34,7 +34,7 @@
     {
       "id": "excel-default",
       "name": "Excel MCP Bridge",
-      "target": "other",
+      "target": "excel",
       "connectionType": "http",
       "url": "http://localhost:5200/mcp",
       "port": 5200,
@@ -42,7 +42,7 @@
       "workingDirectory": "C:\\Tools\\ExcelMcpBridge",
       "environment": {},
       "status": "unknown",
-      "notes": "Excel workbook read/write bridge placeholder. Target is other until Excel is supported as a first-class registry target.",
+      "notes": "Excel workbook read/write bridge placeholder. Target is excel so Excel pages can show scoped MCP connection state.",
       "createdAt": "2026-07-07T00:00:00.000Z",
       "updatedAt": "2026-07-07T00:00:00.000Z"
     }

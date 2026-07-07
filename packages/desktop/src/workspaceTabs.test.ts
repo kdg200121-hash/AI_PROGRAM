@@ -38,6 +38,36 @@ const servers: McpServerRecord[] = [
     notes: "",
     createdAt: "2026-07-03T00:00:00.000Z",
     updatedAt: "2026-07-03T00:00:00.000Z"
+  },
+  {
+    id: "excel",
+    name: "Excel MCP Bridge",
+    target: "excel",
+    connectionType: "http",
+    url: "http://localhost:5200/mcp",
+    port: 5200,
+    launchCommand: "excel-mcp-bridge.exe",
+    workingDirectory: "C:\\Tools\\ExcelMcpBridge",
+    environment: {},
+    status: "unknown",
+    notes: "",
+    createdAt: "2026-07-03T00:00:00.000Z",
+    updatedAt: "2026-07-03T00:00:00.000Z"
+  },
+  {
+    id: "tekla",
+    name: "Tekla MCP Bridge",
+    target: "tekla",
+    connectionType: "http",
+    url: "http://localhost:5300/mcp",
+    port: 5300,
+    launchCommand: "tekla-mcp-bridge.exe",
+    workingDirectory: "C:\\Tools\\TeklaMcpBridge",
+    environment: {},
+    status: "unknown",
+    notes: "",
+    createdAt: "2026-07-03T00:00:00.000Z",
+    updatedAt: "2026-07-03T00:00:00.000Z"
   }
 ];
 
@@ -59,10 +89,12 @@ describe("filterServersByWorkspace", () => {
   });
 
   it.each([
-    ["registry", ["revit", "cad"]],
+    ["registry", ["revit", "cad", "excel", "tekla"]],
     ["cad", ["cad"]],
     ["revit", ["revit"]],
-    ["workflow", ["revit", "cad"]]
+    ["workflow", ["revit", "cad", "excel", "tekla"]],
+    ["excel", ["excel"]],
+    ["tekla", ["tekla"]]
   ] satisfies Array<[WorkspaceTabId, string[]]>)(
     "filters visible servers for %s tab",
     (tabId, expectedIds) => {

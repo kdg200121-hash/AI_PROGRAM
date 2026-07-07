@@ -5,9 +5,11 @@ export type AppIconName =
   | "cad"
   | "customTools"
   | "download"
+  | "edit"
   | "excel"
   | "folder"
   | "home"
+  | "market"
   | "monitor"
   | "moreTools"
   | "objectData"
@@ -16,6 +18,8 @@ export type AppIconName =
   | "promptAttached"
   | "promptDetached"
   | "revit"
+  | "save"
+  | "search"
   | "settings"
   | "shareTools"
   | "tekla"
@@ -165,6 +169,16 @@ function renderIcon(name: AppIconName, title?: string) {
           <path d="M21.7 6.3a6.8 6.8 0 0 1-8.6 8.6l-7 7a2.6 2.6 0 0 1-3.7-3.7l7-7A6.8 6.8 0 0 1 18 2.6l-3.4 3.4 1.2 3.1 3.1 1.2 3.4-3.4c-.1-.2-.3-.4-.6-.6Z" />
         </svg>
       );
+    case "market":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M4.5 10h15l-1.2-4.5H5.7L4.5 10Z" />
+          <path d="M5.3 10v8.5h13.4V10" />
+          <path d="M9 18.5v-5h6v5" />
+          <path d="M4.5 10c.4 1.2 1.4 2 2.7 2s2.3-.8 2.7-2c.4 1.2 1.4 2 2.7 2s2.3-.8 2.7-2c.4 1.2 1.4 2 2.7 2s2.3-.8 2.7-2" />
+        </svg>
+      );
     case "monitor":
       return (
         <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -209,6 +223,32 @@ function renderIcon(name: AppIconName, title?: string) {
           <path d="M5 19h14" />
         </svg>
       );
+    case "edit":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M5 19h4.2L18.6 9.6a2.1 2.1 0 0 0-3-3L6.2 16 5 19Z" />
+          <path d="m13.8 8.4 3 3" />
+          <path d="M4 21h16" />
+        </svg>
+      );
+    case "save":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M5 4h11l3 3v13H5Z" />
+          <path d="M8 4v6h7V4" />
+          <path d="M8 20v-6h8v6" />
+        </svg>
+      );
+    case "search":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <circle cx="10.5" cy="10.5" r="5.8" />
+          <path d="m15 15 4.2 4.2" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -216,11 +256,8 @@ function renderIcon(name: AppIconName, title?: string) {
 
 function LetterIcon({ letter, title }: { letter: string; title?: string }) {
   return (
-    <svg {...baseSvgProps} viewBox="0 0 24 24">
-      {title ? <title>{title}</title> : null}
-      <text x="12" y="12.8" textAnchor="middle" className="uiIconText">
-        {letter}
-      </text>
-    </svg>
+    <span className="uiIconLetter" title={title}>
+      {letter}
+    </span>
   );
 }

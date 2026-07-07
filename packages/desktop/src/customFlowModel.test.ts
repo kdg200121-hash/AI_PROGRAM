@@ -7,9 +7,11 @@ import {
   flowNodeDisplayIconName,
   flowNodeWidth,
   normalizeStoredBasicFlowNode,
+  insertStoredFlowGraphAsGroup,
   parseDraggedFlowTool,
   removeNodeIdsFromFlowGroups,
   flowToolPalette,
+  type FlowSnapshot,
   type FlowNode
 } from "./customFlowModel";
 
@@ -257,6 +259,66 @@ describe("customFlowModel", () => {
       )
     ).toEqual([
       { id: "group-1", name: "Group 1", color: "#bfdbfe", nodeIds: ["node-b"] }
+    ]);
+  });
+
+  it("inserts a saved flow as a grouped set of cloned nodes", () => {
+    const sourceNodes = defaultFlowNodes();
+    const snapshot: FlowSnapshot = {
+      nodes: [],
+      connections: [],
+      groups: [],
+      notes: []
+    };
+
+    const next = insertStoredFlowGraphAsGroup(
+      snapshot,
+      {
+        nodes: sourceNodes,
+        connections: [
+          {
+            id: "source-connection",
+            fromNodeId: sourceNodes[0].nodeId,
+            fromPortId: "objects",
+            toNodeId: sourceNodes[1].nodeId,
+            toPortId: "objects"
+          }
+        ],
+        groups: [],
+        notes: [],
+        scale: 1,
+        pan: { x: 0, y: 0 }
+      },
+      {
+        flowName: "CAD to Excel",
+        x: 200,
+        y: 120,
+        now: 1234
+      }
+    );
+
+    expect(next.nodes).toHaveLength(2);
+    expect(next.nodes.map((node) => node.nodeId)).toEqual([
+      "import-1234-node-cad-read",
+      "import-1234-node-excel-export"
+    ]);
+    expect(next.nodes[0]).toMatchObject({ x: 200, y: 120 });
+    expect(next.connections).toEqual([
+      {
+        id: "import-1234-source-connection",
+        fromNodeId: "import-1234-node-cad-read",
+        fromPortId: "objects",
+        toNodeId: "import-1234-node-excel-export",
+        toPortId: "objects"
+      }
+    ]);
+    expect(next.groups).toEqual([
+      {
+        id: "group-import-1234",
+        name: "CAD to Excel",
+        color: "#bfdbfe",
+        nodeIds: ["import-1234-node-cad-read", "import-1234-node-excel-export"]
+      }
     ]);
   });
 });

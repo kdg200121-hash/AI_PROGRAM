@@ -164,6 +164,106 @@ settings:
     });
   });
 
+  it("hides select-like settings that only expose one possible option", () => {
+    const schema = parseToolRuntimeSchema(`---
+tool: true
+toolName: 단일 선택 제거
+settings:
+  - id: fixed_order
+    label: 고정 순서
+    type: select
+    required: true
+    default: top_left_to_bottom_right
+    options:
+      - value: top_left_to_bottom_right
+        label: 좌상단 → 우하단
+  - id: prefix
+    label: 접두어
+    type: text
+    required: true
+    default: P-
+---`);
+
+    expect(schema.settings.map((field) => field.id)).toEqual(["fixed_order", "prefix"]);
+    expect(schema.settings[0].hidden).toBe(true);
+    expect(schema.settings[1].hidden).toBe(false);
+  });
+
+  it("parses tool execution actions for preview/apply buttons", () => {
+    const schema = parseToolRuntimeSchema(`---
+tool: true
+toolName: 실행 액션 테스트
+actions:
+  - id: preview
+    label: 분석 미리보기
+    runtimeAction: preview
+    primary: true
+    description: 저장 없이 변경 예정 목록만 계산합니다.
+  - id: apply
+    label: 원본에 적용
+    runtimeAction: apply
+    requiresPreview: true
+    confirm: true
+    description: 미리보기 확인 후 원본에 적용합니다.
+---`);
+
+    expect(schema.actions).toEqual([
+      {
+        id: "preview",
+        label: "분석 미리보기",
+        runtimeAction: "preview",
+        description: "저장 없이 변경 예정 목록만 계산합니다.",
+        primary: true,
+        requiresPreview: false,
+        confirm: false
+      },
+      {
+        id: "apply",
+        label: "원본에 적용",
+        runtimeAction: "apply",
+        description: "미리보기 확인 후 원본에 적용합니다.",
+        primary: false,
+        requiresPreview: true,
+        confirm: true
+      }
+    ]);
+  });
+
+  it("ignores learningLog metadata when building runtime schema", () => {
+    const schema = parseToolRuntimeSchema(`---
+tool: true
+toolName: Learning Log Test
+learningLog:
+  schemaVersion: "1"
+  sourceSkill: "save-tool"
+  observedFriction:
+    - "사용자가 옵션 선택 기준을 다시 물어봄"
+  suggestedOptions:
+    - "1. 기본 설정 저장"
+  selectedOptions:
+    - "기본 설정 저장"
+  deferredImprovements:
+    - "설정창 목업 질문을 더 세분화"
+settings:
+  - id: dwg_files
+    label: DWG 파일 목록
+    type: repeatable-list
+    itemType: file
+    valueKey: file_path
+    required: true
+    default: []
+actions:
+  - id: preview
+    label: 분석 미리보기
+    runtimeAction: preview
+    primary: true
+---`);
+
+    expect(Object.prototype.hasOwnProperty.call(schema, "learningLog")).toBe(false);
+    expect(schema.settings.map((field) => field.id)).toEqual(["dwg_files"]);
+    expect(schema.actions.map((action) => action.id)).toEqual(["preview"]);
+  });
+
   it("maps executable result types to Custom Flow port types", () => {
     expect(flowPortTypeFromToolType("cad_object_handles")).toBe("cad");
     expect(flowPortTypeFromToolType("revit_element_ids")).toBe("revit");

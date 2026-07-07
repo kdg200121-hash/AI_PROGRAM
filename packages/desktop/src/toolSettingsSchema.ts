@@ -45,6 +45,7 @@ export interface ToolSettingField {
   advanced?: boolean;
   preview?: boolean;
   confirmOnChange?: boolean;
+  hidden?: boolean;
 }
 
 export interface ToolSettingsSection {
@@ -83,6 +84,17 @@ export interface ToolMcpCommand {
   command: string;
   status: "available" | "planned" | "manual";
   params?: Record<string, string>;
+  condition?: string;
+}
+
+export interface ToolExecutionAction {
+  id: string;
+  label: string;
+  runtimeAction: string;
+  description: string;
+  primary: boolean;
+  requiresPreview: boolean;
+  confirm: boolean;
 }
 
 export interface ToolTestCase {
@@ -107,6 +119,7 @@ export interface ToolRuntimeSchema {
   failurePolicy: ToolFailurePolicy;
   settingsLayout: ToolSettingsLayout;
   settings: ToolSettingField[];
+  actions: ToolExecutionAction[];
   inputs: ToolResultField[];
   outputs: ToolResultField[];
   testCases: ToolTestCase[];
@@ -122,6 +135,7 @@ export const defaultToolRuntimeSchema: ToolRuntimeSchema = {
   failurePolicy: { partialSuccess: "report", rollback: "none", log: true },
   settingsLayout: { mode: "simple", sections: [] },
   settings: [],
+  actions: [],
   inputs: [],
   outputs: [],
   testCases: []
@@ -514,9 +528,33 @@ function normalizeSettings(content: string) {
         preview: Boolean(item.preview ?? false),
         confirmOnChange: Boolean(item.confirmOnChange ?? false)
       };
+      const options = defaultSettingOptions(field);
+      field.hidden =
+        Boolean(item.hidden ?? false) ||
+        ((isSelectLikeSetting(field.type) || field.type === "multi-select") && options.length === 1);
       return field;
     })
     .filter((field): field is ToolSettingField => Boolean(field));
+}
+
+function normalizeActions(content: string): ToolExecutionAction[] {
+  return parseObjectArray(content, "actions")
+    .map((item) => {
+      const id = String(item.id ?? "");
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        label: String(item.label ?? id),
+        runtimeAction: String(item.runtimeAction ?? id),
+        description: String(item.description ?? ""),
+        primary: Boolean(item.primary ?? false),
+        requiresPreview: Boolean(item.requiresPreview ?? false),
+        confirm: Boolean(item.confirm ?? false)
+      };
+    })
+    .filter((action): action is ToolExecutionAction => Boolean(action));
 }
 
 function normalizeResultFields(content: string, key: string): ToolResultField[] {
@@ -646,7 +684,8 @@ export function parseToolRuntimeSchema(content: string): ToolRuntimeSchema {
       status: ["available", "manual"].includes(String(item.status ?? "planned"))
         ? (String(item.status) as ToolMcpCommand["status"])
         : "planned",
-      params: normalizeStringRecord(item.params)
+      params: normalizeStringRecord(item.params),
+      condition: item.condition ? String(item.condition) : undefined
     })),
     preflightChecks: parseObjectArray(content, "preflightChecks").map((item) => ({
       id: String(item.id ?? ""),
@@ -662,6 +701,7 @@ export function parseToolRuntimeSchema(content: string): ToolRuntimeSchema {
     failurePolicy: parseFailurePolicy(content),
     settingsLayout: parseSettingsLayout(content),
     settings: normalizeSettings(content),
+    actions: normalizeActions(content),
     inputs: normalizeResultFields(content, "inputs"),
     outputs: normalizeResultFields(content, "outputs"),
     testCases: parseObjectArray(content, "testCases").map((item) => ({

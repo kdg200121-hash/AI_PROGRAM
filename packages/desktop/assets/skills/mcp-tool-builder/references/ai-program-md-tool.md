@@ -60,6 +60,19 @@ outputs:
   - id: result
     label: 결과
     type: text
+learningLog:
+  schemaVersion: "1"
+  sourceSkill: "mcp-tool-builder"
+  observedFriction: []
+  suggestedOptions: []
+  selectedOptions: []
+  deferredImprovements: []
+actions:
+  - id: preview
+    label: 분석 미리보기
+    runtimeAction: preview
+    primary: true
+    description: 원본을 수정하지 않고 결과를 계산합니다.
 settings:
   - id: source_file
     label: 원본 파일
@@ -70,7 +83,7 @@ settings:
 ---
 ```
 
-Use `risk: caution` when the tool can create, delete, move, rename, overwrite, export, batch edit, change model parameters, or modify user data.
+Use a specific risk level when the tool can create, delete, move, rename, overwrite, export, batch edit, change model parameters, or modify user data. Prefer `create`, `modify`, `bulk-modify`, or `delete` instead of the older generic `caution`.
 
 Use `toolName` and `sectionId` as the primary app-facing metadata. `name` and `program` may be included for compatibility or readability, but AI Program reads `toolName` and `sectionId` first.
 
@@ -191,6 +204,18 @@ resultSchema:
 
 Every settings field should be explicit enough for the UI to render it and for another user to reproduce the same result.
 
+Only user-editable choices belong in `settings`. Before adding a setting, classify the value:
+
+- `visible setting`: the user can choose or edit it, and different choices are meaningful.
+- `fixed constant`: the tool always uses this value, such as increment `1`, Text/MText target types, or a fixed tolerance.
+- `single-option value`: a select-like value with only one possible option.
+- `derived result`: the UI displays it after analysis, such as `미분석`, `미리보기 필요`, 도곽 수, or 번호 범위.
+- `runtime action`: the value comes from the clicked button, such as `분석 미리보기` versus `원본에 적용`.
+
+Only `visible setting` belongs in frontmatter `settings`. Fixed constants belong in MCP params/body text, derived results belong in row summaries/result schema, and runtime actions belong in command conditions or runtime parameter mapping.
+
+Do not create select/select-like settings with only one option. They cannot be meaningfully chosen and should not take space in the settings window.
+
 Required keys:
 
 - `id`: stable machine-readable key in snake_case or kebab-case.
@@ -227,7 +252,7 @@ Supported field types:
 - `textarea`: long text, prompt, memo, rule description.
 - `number`: numeric value.
 - `checkbox`: true/false option.
-- `dry-run`: safe test-run checkbox.
+- `dry-run`: exceptional safe test-run checkbox. Prefer separate actions such as `분석 미리보기` and `원본에 적용` for preview/apply workflows; use `dry-run` only when the user truly needs one execution button with a selectable preview-only mode.
 - `select`: choose one option.
 - `multi-select`: choose multiple options.
 - `file`: file path.
@@ -280,6 +305,33 @@ settings:
 
 When a tool previews per-file results, fill each row with those summary keys. For example, a CAD drawing-number tool can update each row to `{ file_path, title_block_count, number_range }` so the UI shows `도곽 2개` and `P-101~P-102` beside that DWG.
 
+For tools that modify user data after preview, model preview/apply as actions:
+
+```yaml
+actions:
+  - id: preview
+    label: 분석 미리보기
+    runtimeAction: preview
+    primary: true
+    description: 원본을 수정하지 않고 변경 예정 목록만 계산합니다.
+  - id: apply
+    label: 원본에 적용
+    runtimeAction: apply
+    requiresPreview: true
+    confirm: true
+    description: 미리보기 결과 확인 후 원본에 저장합니다.
+mcpCommands:
+  - server: cad
+    command: cad.update_text_values
+    status: planned
+    params:
+      previewOnly: 'runtime.action == "preview"'
+  - server: cad
+    command: cad.save_dwg
+    status: planned
+    condition: 'runtime.action == "apply"'
+```
+
 ## Settings Layout
 
 Use `settingsLayout` to keep complex tools understandable. Prefer a simple layout for simple tools and grouped layouts for tools with many settings.
@@ -290,6 +342,14 @@ Supported modes:
 - `sections`: grouped sections such as 입력, 필터, 실행 옵션, 결과, 고급 설정.
 - `steps`: step-by-step settings for workflows where order matters.
 - `table`: repeatable row-based settings, usually with `repeatable-list`.
+
+Choose the layout by actual workflow, especially for AI CAD/Revit add-ins:
+
+- Use `simple` for read-only checks, quick exports, report generation, or one-shot create tools with only a few inputs.
+- Use `sections` when the user edits several independent groups of settings.
+- Use `actions` with a workflow panel (`입력` → `분석 미리보기` → `원본에 적용`) when the tool analyzes a drawing/model first and then modifies original CAD/Revit data.
+- Use `steps` only when later choices depend on earlier choices and the order is truly required.
+- Never expose fixed add-in choices as settings just to fill the page.
 
 Recommended section labels:
 
@@ -395,6 +455,19 @@ Use this shape:
 
 Then ask whether to proceed, add fields, remove fields, or reorganize sections. For destructive or broad tools, ask for one explicit risk confirmation even if the user approved the mockup.
 
+## Learning Log
+
+`learningLog` is optional metadata for improving the tool-building skills later. AI Program must not use it to decide how a tool executes.
+
+Use it when the creation conversation revealed useful patterns:
+
+- `observedFriction`: where the user got stuck, corrected the agent, or needed repeated clarification.
+- `suggestedOptions`: option sets proposed by the agent, including the recommended option.
+- `selectedOptions`: options the user chose, changed, or rejected.
+- `deferredImprovements`: improvements worth reviewing in a later skill upgrade.
+
+Keep entries short and anonymized. Do not store secrets, personal chat excerpts, tokens, file contents, or Codex session IDs.
+
 ## Body Template
 
 ```markdown
@@ -474,6 +547,9 @@ Then ask whether to proceed, add fields, remove fields, or reorganize sections. 
 Before finalizing, verify:
 
 - Same input values produce the same output.
+- Every `settings` item is a meaningful user-editable choice.
+- No select-like `settings` item has only one possible option.
+- Fixed constants, derived preview badges, and runtime button states are not modeled as settings.
 - Required fields are marked `required: true`.
 - Defaults are explicit.
 - Selection scope is explicit.
@@ -510,6 +586,8 @@ Missing information to ask:
 - “실행 전 확인창이 필요한 변경인가요?”
 - “결과를 Revit 안에서만 보여주나요, 파일로 저장하나요?”
 
+Use the workflow/action pattern for Revit tools that collect elements, preview affected IDs/parameter values, and then write to the model. Use simple or sectioned settings for read-only schedules, exports, clash checks, report generation, or tools that only create an external file.
+
 ## AI CAD Add-in Conversion
 
 When converting CAD add-ins or AutoLISP tools to MD tools, look for:
@@ -519,6 +597,8 @@ When converting CAD add-ins or AutoLISP tools to MD tools, look for:
 - Model Space / Paper Space.
 - Selection scope and object types.
 - Layer, color, linetype, block name, text style.
+
+Use the workflow/action pattern for CAD tools that scan a drawing, show affected handles/text/block counts, and then modify or save the DWG. Use simple or sectioned settings for read-only inspection, selection reports, layer/object exports, block counts, or tools that only create a separate output file.
 - Coordinate basis, units, tolerance.
 - Duplicate or proximity threshold.
 - Whether to only mark results or modify/delete/move objects.

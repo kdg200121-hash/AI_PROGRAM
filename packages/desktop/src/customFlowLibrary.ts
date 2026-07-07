@@ -5,6 +5,7 @@ import {
 } from "./customFlowModel";
 
 export const savedCustomFlowsStorageKey = "mcp-registry:saved-custom-flows";
+export const sharedCustomFlowsStorageKey = "mcp-registry:shared-custom-flows";
 
 export interface SavedCustomFlow {
   id: string;
@@ -178,9 +179,8 @@ export function cloneStoredFlowGraph(graph: StoredFlowGraph): StoredFlowGraph {
   return JSON.parse(JSON.stringify(graph)) as StoredFlowGraph;
 }
 
-export function loadSavedFlows(storage: Storage = window.localStorage): SavedCustomFlow[] {
+function parseSavedFlowList(raw: string | null): SavedCustomFlow[] {
   try {
-    const raw = storage.getItem(savedCustomFlowsStorageKey);
     if (!raw) {
       return [];
     }
@@ -209,8 +209,64 @@ export function loadSavedFlows(storage: Storage = window.localStorage): SavedCus
   }
 }
 
+export function loadSavedFlows(storage: Storage = window.localStorage): SavedCustomFlow[] {
+  return parseSavedFlowList(storage.getItem(savedCustomFlowsStorageKey));
+}
+
 export function saveSavedFlows(flows: SavedCustomFlow[], storage: Storage = window.localStorage) {
   storage.setItem(savedCustomFlowsStorageKey, JSON.stringify(flows));
+}
+
+export function loadSharedFlows(storage: Storage = window.localStorage): SavedCustomFlow[] {
+  return parseSavedFlowList(storage.getItem(sharedCustomFlowsStorageKey));
+}
+
+export function saveSharedFlows(flows: SavedCustomFlow[], storage: Storage = window.localStorage) {
+  storage.setItem(sharedCustomFlowsStorageKey, JSON.stringify(flows));
+}
+
+export function upsertSharedFlow(
+  sharedFlows: SavedCustomFlow[],
+  flow: SavedCustomFlow,
+  now = Date.now()
+) {
+  const sharedFlow: SavedCustomFlow = {
+    ...flow,
+    graph: cloneStoredFlowGraph(flow.graph),
+    updatedAt: now
+  };
+  const exists = sharedFlows.some((item) => item.id === flow.id);
+  return exists
+    ? sharedFlows.map((item) => (item.id === flow.id ? sharedFlow : item))
+    : [sharedFlow, ...sharedFlows];
+}
+
+export function serializeSavedFlowForDrag(flow: SavedCustomFlow) {
+  return JSON.stringify(flow);
+}
+
+export function parseDraggedSavedFlow(raw: string): SavedCustomFlow | null {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<SavedCustomFlow>;
+    if (!parsed.id || !parsed.name || !parsed.graph) {
+      return null;
+    }
+
+    return {
+      id: String(parsed.id),
+      name: String(parsed.name),
+      description: String(parsed.description ?? ""),
+      graph: parsed.graph as StoredFlowGraph,
+      createdAt: Number(parsed.createdAt ?? Date.now()),
+      updatedAt: Number(parsed.updatedAt ?? parsed.createdAt ?? Date.now())
+    };
+  } catch {
+    return null;
+  }
 }
 
 function sampleGraph(): StoredFlowGraph {

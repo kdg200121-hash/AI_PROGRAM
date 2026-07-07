@@ -4,11 +4,14 @@ import {
   duplicateSavedFlow,
   listWorkflowMenuFlowItems,
   listSavedFlows,
+  parseDraggedSavedFlow,
   parseWorkflowMenuFlowId,
   removeSavedFlow,
   renameSavedFlow,
+  serializeSavedFlowForDrag,
   updateSavedFlowDetails,
   updateSavedFlowGraph,
+  upsertSharedFlow,
   isStoredFlowGraphDirty,
   workflowMenuFlowId,
   type SavedCustomFlow
@@ -105,5 +108,30 @@ describe("customFlowLibrary", () => {
     expect(updated[0].updatedAt).toBe(300);
     expect(isStoredFlowGraphDirty(flow.graph, changedGraph)).toBe(true);
     expect(isStoredFlowGraphDirty(changedGraph, changedGraph)).toBe(false);
+  });
+
+  it("upserts shared flows without mutating the original graph", () => {
+    const flow = createSavedFlow("Shared flow", graph, 100, "Ready to share");
+    const shared = upsertSharedFlow([], flow, 300);
+
+    expect(shared).toHaveLength(1);
+    expect(shared[0]).toMatchObject({
+      id: flow.id,
+      name: "Shared flow",
+      description: "Ready to share",
+      updatedAt: 300
+    });
+    expect(shared[0].graph).not.toBe(flow.graph);
+  });
+
+  it("serializes saved flows for canvas drag and drop", () => {
+    const flow = createSavedFlow("Drag flow", graph, 100, "Canvas group");
+
+    expect(parseDraggedSavedFlow(serializeSavedFlowForDrag(flow))).toMatchObject({
+      id: flow.id,
+      name: "Drag flow",
+      description: "Canvas group"
+    });
+    expect(parseDraggedSavedFlow("not-json")).toBeNull();
   });
 });

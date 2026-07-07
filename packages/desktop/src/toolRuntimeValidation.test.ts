@@ -35,6 +35,7 @@ const baseSchema: ToolRuntimeSchema = {
     fields: [{ id: "handle", label: "핸들", type: "text" }]
   },
   failurePolicy: { partialSuccess: "report", rollback: "none", log: true },
+  actions: [],
   settingsLayout: {
     mode: "sections",
     sections: [{ id: "input", label: "입력", defaultOpen: true }]

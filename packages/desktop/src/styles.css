@@ -24,6 +24,22 @@ button.primary {
   border-color: #2d5f9f;
   background: #2d5f9f;
   color: #fff;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.08s ease;
+}
+
+button.primary:hover,
+button.primary:focus-visible {
+  border-color: #234d82;
+  background: #234d82;
+  outline: none;
+}
+
+button.primary:active {
+  transform: translateY(1px);
 }
 
 .appShell {
@@ -1503,6 +1519,18 @@ button.primary {
   line-height: 1;
 }
 
+.uiIconLetter {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: currentColor;
+  font-size: 0.72em;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-0.02em);
+}
+
 .uiIconSvg {
   display: block;
   width: 100%;
@@ -2349,7 +2377,9 @@ tbody tr {
 }
 
 .selectedRow {
-  background: #eef5ff;
+  position: relative;
+  background: #e7f1ff;
+  box-shadow: inset 3px 0 0 #2d5f9f;
 }
 
 .overviewGrid {
@@ -2490,6 +2520,137 @@ tbody tr {
 
 .toolPageSchemaSettings .schemaSettingsFields {
   grid-template-columns: repeat(2, minmax(220px, 1fr));
+}
+
+.compactToolRunner {
+  display: grid;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  margin-top: -12px;
+  border-top-color: transparent;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  overflow: hidden;
+}
+
+.expandedToolItem {
+  border-bottom-color: transparent;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+  background: #eef5ff;
+}
+
+.compactToolRunnerHeader {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-bottom: 1px solid #e1eaf5;
+  background: #ffffff;
+}
+
+.compactToolRunnerHeader > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.compactToolRunnerHeader strong {
+  min-width: 0;
+  color: #172033;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactToolRunnerHeader span,
+.compactToolRunnerHeader small {
+  color: #617086;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.compactToolRunnerHeader span {
+  flex: 0 0 auto;
+  color: #2d5f9f;
+  font-size: 11px;
+}
+
+.compactToolRunnerActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e1eaf5;
+  background: #f8fbff;
+}
+
+.compactToolRunnerActions button {
+  min-width: 0;
+  min-height: 34px;
+}
+
+.compactToolRunnerSettings {
+  min-height: 0;
+  padding: 12px 14px 14px;
+  overflow: visible;
+}
+
+.compactToolRunnerSettings .schemaSettingsSection {
+  background: #ffffff;
+}
+
+.compactToolRunnerSettings .schemaSettingsFields {
+  grid-template-columns: 1fr;
+}
+
+.compactToolRunnerSettings .flowSchemaSettings,
+.compactToolRunnerSettings .schemaSettingsSection,
+.compactToolRunnerSettings .schemaSettingsFields,
+.compactToolRunnerSettings .schemaSettingControl,
+.compactToolRunnerSettings .schemaSettingControl input,
+.compactToolRunnerSettings .schemaSettingControl select,
+.compactToolRunnerSettings .schemaSettingControl textarea,
+.compactToolRunnerSettings .schemaPresetList,
+.compactToolRunnerSettings .schemaPresetItem,
+.compactToolRunnerSettings .schemaReviewDetails {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.compactToolRunnerSettings .schemaRiskBar {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.compactToolRunnerSettings .schemaRiskBar small {
+  width: 100%;
+  white-space: normal;
+}
+
+.compactToolRunnerSettings .schemaPresetItem {
+  grid-template-columns: minmax(0, 1fr) 34px 28px;
+}
+
+.compactToolRunnerSettings .schemaPresetEdit {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.compactToolRunnerSettings .schemaPresetEdit button {
+  min-height: 30px;
+}
+
+.compactToolRunnerSettings .schemaActionButtons button,
+.compactToolRunnerSettings .schemaSettingsSection header button {
+  min-width: 0;
+}
+
+.compactToolFallbackSettings {
+  padding: 0;
 }
 
 .submenuEditor {
@@ -3382,6 +3543,18 @@ tbody tr {
 
 .flowNodeIssueBadge.error {
   background: #dc2626;
+  font-size: 0;
+}
+
+.flowNodeIssueBadge.error::before {
+  content: "×";
+  display: block;
+  color: #fff;
+  font-family: "Segoe UI Symbol", "Segoe UI", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-0.5px);
 }
 
 .flowNodeIssueTooltip {
@@ -3611,8 +3784,9 @@ tbody tr {
   background: rgba(255, 255, 255, 0.86);
   color: #64748b;
   font-size: 12px;
+  font-family: Arial, sans-serif;
   font-weight: 900;
-  line-height: 1;
+  line-height: 20px;
   cursor: pointer;
 }
 
@@ -3697,7 +3871,7 @@ tbody tr {
 
 .flowNodeDetailTabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   padding: 3px;
   border: 1px solid #d8e3f1;
@@ -3706,13 +3880,19 @@ tbody tr {
 }
 
 .flowNodeDetailTabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 28px;
+  min-width: 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: #475569;
   font-size: 12px;
   font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -3814,6 +3994,37 @@ tbody tr {
   background: #fff1f2;
 }
 
+.toolPrincipleRiskSummary {
+  margin-bottom: 8px;
+}
+
+.flowNodePrincipleList {
+  display: grid;
+  gap: 7px;
+}
+
+.flowNodePrincipleList > div {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #dbe5f0;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.flowNodePrincipleList span {
+  color: #18324f;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.flowNodePrincipleList small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
 .schemaSettingsSection {
   display: grid;
   gap: 8px;
@@ -3867,12 +4078,12 @@ tbody tr {
 
 .schemaPresetItem {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
+  grid-template-columns: minmax(0, 1fr) 38px 28px;
   gap: 5px;
   align-items: stretch;
 }
 
-.schemaPresetItem > button:first-child {
+.schemaPresetLoad {
   display: grid;
   gap: 2px;
   min-height: 42px;
@@ -3883,6 +4094,124 @@ tbody tr {
   color: #1f2a3d;
   text-align: left;
   cursor: pointer;
+}
+
+.schemaPresetItem.selected .schemaPresetLoad {
+  border-color: #78a8e8;
+  background: #eaf3ff;
+  box-shadow: inset 3px 0 0 #2d5f9f;
+}
+
+.schemaPresetEdit {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
+  gap: 5px;
+  align-items: center;
+}
+
+.schemaPresetEdit input {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid #bdd0e7;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #1f2a3d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.schemaPresetEdit button,
+.schemaPresetRename {
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid #d7e2f0;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #2d5f9f;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.schemaPresetToolbar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.schemaSplitSave {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.schemaSplitSave .schemaPresetSaveButton {
+  min-height: 30px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.schemaSplitSave .schemaPresetArrowButton {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-left-color: rgba(255, 255, 255, 0.28);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.schemaPresetLoadButton {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.schemaPresetDropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 35;
+  min-width: 134px;
+  padding: 5px;
+  border: 1px solid #cbd9ea;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.schemaPresetDropdown button {
+  width: 100%;
+  justify-content: flex-start;
+  min-height: 30px;
+  border: 0;
+  background: transparent;
+  color: #234466;
+  text-align: left;
+}
+
+.schemaPresetDropdown button:hover,
+.schemaPresetDropdown button:focus-visible {
+  background: #eef5ff;
+  outline: none;
+}
+
+.schemaPresetEdit button {
+  min-height: 34px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.schemaPresetRename {
+  display: grid;
+  place-items: center;
+}
+
+.schemaPresetRename .uiIcon {
+  width: 16px;
+  height: 16px;
 }
 
 .schemaPresetItem strong {
@@ -4112,6 +4441,226 @@ tbody tr {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.schemaActionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.schemaWorkflowSteps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.schemaWorkflowStep {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+  align-items: center;
+  border: 1px solid #dbe5f0;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 8px;
+}
+
+.schemaWorkflowStep strong {
+  grid-row: span 2;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.schemaWorkflowStep span {
+  min-width: 0;
+  color: #18324f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schemaWorkflowStep small {
+  min-width: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schemaWorkflowStep.active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.schemaWorkflowStep.complete strong {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.schemaActionButtons button {
+  border: 1px solid #cbd9ea;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #234466;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.schemaActionButtons .schemaActionButton {
+  min-height: 34px;
+}
+
+.schemaActionButtons button.primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.schemaActionButtons button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.schemaActionHint {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.schemaActionResult {
+  border: 1px solid #dbe5f0;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.schemaActionResult p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.schemaCandidatePanel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #cbd9ea;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.schemaCandidatePanel header {
+  display: grid;
+  gap: 2px;
+}
+
+.schemaCandidatePanel header span {
+  color: #18324f;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.schemaCandidatePanel header small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.schemaCandidateList {
+  display: grid;
+  gap: 6px;
+}
+
+.schemaCandidateList button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 50px;
+  padding: 8px 10px;
+  border: 1px solid #d7e2f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2a3d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schemaCandidateList button:hover,
+.schemaCandidateList button:focus-visible {
+  border-color: #9fbfe8;
+  background: #eef6ff;
+  outline: none;
+}
+
+.schemaCandidateList button.selected {
+  border-color: #2d5f9f;
+  background: #eaf3ff;
+  box-shadow: inset 3px 0 0 #2d5f9f;
+}
+
+.schemaCandidateList strong {
+  font-size: 12px;
+}
+
+.schemaCandidateList span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.schemaPreviewResultRows {
+  display: grid;
+  gap: 6px;
+}
+
+.schemaPreviewResultRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 30px;
+  border-bottom: 1px solid #edf2f7;
+  padding-bottom: 6px;
+}
+
+.schemaPreviewResultRow:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.schemaPreviewResultRow span,
+.schemaPreviewResultRow small,
+.schemaPreviewResultRow strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schemaPreviewResultRow span {
+  color: #18324f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schemaPreviewResultRow small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.schemaPreviewResultRow strong {
+  color: #0f766e;
+  font-size: 12px;
 }
 
 .schemaReviewActions button {
@@ -4894,9 +5443,15 @@ tbody tr {
 }
 
 .flowSearchButton {
-  width: 62px !important;
+  width: 36px !important;
   color: #334155 !important;
   font-size: 11px !important;
+}
+
+.flowToolbarIconButton .uiIcon,
+.flowSearchButton .uiIcon {
+  width: 17px;
+  height: 17px;
 }
 
 .flowSearchMenu {
@@ -5010,9 +5565,14 @@ tbody tr {
 }
 
 .basicToolsTabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
+  padding-bottom: 6px;
+  background: #ffffff;
 }
 
 .flowToolbarMenu .basicToolsTabs button {
@@ -5023,6 +5583,87 @@ tbody tr {
   font-size: 12px;
   font-weight: 800;
   text-align: center;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.flowToolbarMenu .basicToolsTabs button.selected {
+  border-color: #93b5e8;
+  background: #e9f3ff;
+  color: #1f4d82;
+  box-shadow: inset 0 0 0 1px rgba(45, 95, 159, 0.12);
+}
+
+.basicPortFilterPanel {
+  position: sticky;
+  top: 43px;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  margin: -2px 0 6px;
+  padding: 4px 0;
+  background: #ffffff;
+}
+
+.flowToolbarMenu .basicPortFilterToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: #f8fbff;
+  text-align: left;
+}
+
+.flowToolbarMenu .basicPortFilterToggle span,
+.flowToolbarMenu .basicPortFilterToggle strong {
+  display: inline-flex;
+  align-items: center;
+  color: #42526a;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.flowToolbarMenu .basicPortFilterToggle strong {
+  font-weight: 900;
+}
+
+.basicPortFilterChevron {
+  transition: transform 0.14s ease;
+}
+
+.basicPortFilterPanel.open .basicPortFilterChevron {
+  transform: rotate(180deg);
+}
+
+.basicPortFilterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+}
+
+.flowToolbarMenu .basicPortFilterBar button {
+  display: inline-grid;
+  place-items: center;
+  width: auto;
+  min-height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.flowToolbarMenu .basicPortFilterBar button.selected {
+  border-color: #93b5e8;
+  background: #e9f3ff;
+  color: #1f4d82;
 }
 
 .basicToolsList {
@@ -5058,7 +5699,7 @@ tbody tr {
 }
 
 .basicPortToolButton .basicToolProgramTag {
-  grid-column: 1 / -1;
+  grid-column: 1;
   grid-row: 2;
 }
 
@@ -5849,10 +6490,9 @@ tbody tr {
 
 .customFlowHomeView {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
+  grid-template-rows: minmax(0, 1fr);
   padding: 14px 18px 16px;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .customFlowHomeHeader {
@@ -5900,8 +6540,9 @@ tbody tr {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 12px;
+  min-height: 66px;
+  padding: 14px 16px;
   border-bottom: 1px solid #e6eef8;
 }
 
@@ -5913,13 +6554,15 @@ tbody tr {
 
 .customFlowLibraryPanel > header strong {
   color: #111827;
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.25;
 }
 
 .customFlowLibraryPanel > header span {
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.45;
 }
 
 .customFlowCardList {
@@ -5945,6 +6588,24 @@ tbody tr {
   gap: 5px;
 }
 
+.customFlowDisplayMeta {
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: start;
+}
+
+.customFlowDisplayMeta > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.customFlowEditableActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .customFlowEditableMeta input,
 .customFlowEditableMeta textarea {
   width: 100%;
@@ -5965,7 +6626,7 @@ tbody tr {
 
 .customFlowEditableMeta textarea {
   min-height: 42px;
-  resize: vertical;
+  resize: none;
   padding: 5px 6px;
   color: #64748b;
   font-size: 12px;
@@ -5983,7 +6644,8 @@ tbody tr {
 
 .customFlowCard strong {
   color: #142033;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.3;
 }
 
 .customFlowCard span,
@@ -5992,6 +6654,31 @@ tbody tr {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.45;
+}
+
+.clickableFlowCard {
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.clickableFlowCard:hover,
+.clickableFlowCard:focus-within {
+  border-color: #b8cbe4;
+  background: #f1f7ff;
+  box-shadow: 0 8px 18px rgba(44, 76, 118, 0.08);
+}
+
+.customFlowEditableMeta input,
+.customFlowEditableMeta textarea {
+  cursor: text;
+}
+
+.flowCardContextMenu {
+  width: 128px;
 }
 
 .customFlowCard button,
@@ -6358,16 +7045,17 @@ tbody tr {
 .customToolItemTitle {
   display: flex !important;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
   margin-top: 0 !important;
+  line-height: 1.2;
 }
 
 .customToolTitleLeft {
   display: inline-flex !important;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
   margin-top: 0 !important;
 }
@@ -6379,14 +7067,17 @@ tbody tr {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 22px;
 }
 
-.customToolItemTitle small {
+.customToolItemTitle .toolItemMeta {
   display: inline-flex;
+  align-items: center;
   flex: 0 0 auto;
   color: #2d5f9f;
   font-size: 11px;
   font-weight: 800;
+  line-height: 22px;
   white-space: nowrap;
 }
 
@@ -6619,6 +7310,33 @@ tbody tr {
   grid-template-columns: 1fr;
 }
 
+.customFlowCardEditButton {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.customFlowCardEditButton .uiIcon {
+  width: 15px;
+  height: 15px;
+}
+
+.compactMode .customFlowHomeView {
+  padding: 10px;
+  overflow: auto;
+}
+
+.compactMode .customFlowHomeGrid {
+  grid-template-columns: 1fr;
+  align-content: start;
+}
+
+.compactMode .customFlowLibraryPanel {
+  min-height: 260px;
+}
+
 .compactMode .overviewGrid,
 .compactMode .workflowRail,
 .compactMode .workflowBoardGrid,
@@ -6833,7 +7551,125 @@ tbody tr {
 }
 
 .customToolDialog {
-  width: min(860px, 100%);
+  width: min(920px, 100%);
+}
+
+.marketDialogBody {
+  min-height: min(620px, calc(100vh - 160px));
+}
+
+.marketDialogNav {
+  min-width: 128px;
+}
+
+.marketDialogContent {
+  padding: 0;
+  overflow: auto;
+}
+
+.marketFlowPanel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
+  min-height: 100%;
+  background: #eef6ff;
+}
+
+.marketFlowSection {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid #d4e1f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.marketFlowSection > header {
+  display: grid;
+  gap: 5px;
+  min-height: 72px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e4edf8;
+  background: #f8fbff;
+}
+
+.marketFlowSection > header strong {
+  color: #172033;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.marketFlowSection > header span {
+  color: #617086;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.marketFlowList {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.marketFlowCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 82px;
+  padding: 12px;
+  border: 1px solid #d6e1ef;
+  border-radius: 8px;
+  background: #f8fbff;
+  cursor: grab;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.marketFlowCard:hover,
+.marketFlowCard:focus-within {
+  border-color: #b7cbe5;
+  background: #f1f7ff;
+  box-shadow: 0 8px 18px rgba(44, 76, 118, 0.08);
+}
+
+.marketFlowCard:active {
+  cursor: grabbing;
+}
+
+.marketFlowCard.registered {
+  background: #f0fdf4;
+}
+
+.marketFlowCard > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.marketFlowCard strong {
+  color: #172033;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.marketFlowCard span,
+.marketFlowCard small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.marketFlowCard small {
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .customToolFormDialog {
@@ -7072,6 +7908,12 @@ tbody tr {
   font-weight: 700;
 }
 
+.registerToolButton.active {
+  border-color: #9fbce8;
+  background: #eaf3ff;
+  color: #1f4d82;
+}
+
 .dialogHeaderButtonLabel {
   display: inline-flex;
   align-items: center;
@@ -7088,40 +7930,92 @@ tbody tr {
 
 .customToolToolbarRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
   align-items: center;
 }
 
-.customToolFilterBar {
+.customToolFilterIconBar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
 }
 
-.customToolFilterBar button {
-  min-height: 28px;
-  padding: 0 10px;
+.customToolFilterIconBar button {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #d4deeb;
-  border-radius: 999px;
+  border-radius: 8px;
   background: #ffffff;
   color: #526071;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
+  line-height: 1;
   cursor: pointer;
 }
 
-.customToolFilterBar button:hover,
-.customToolFilterBar button:focus-visible {
+.schemaPresetCurrent {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.schemaPresetCurrent strong {
+  color: #1f2a3d;
+}
+
+.schemaPresetSaveAs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #d7e2f0;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.schemaPresetSaveAs input {
+  min-width: 0;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid #cbd9ea;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #1f2a3d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schemaPresetDialog {
+  width: min(540px, calc(100vw - 48px));
+}
+
+.schemaPresetDialogBody {
+  display: grid;
+  gap: 10px;
+  max-height: min(460px, calc(100vh - 190px));
+  padding: 14px;
+  overflow: auto;
+}
+
+.customToolFilterIconBar button:hover,
+.customToolFilterIconBar button:focus-visible {
   border-color: #abc1dc;
+  background: #f4f8fd;
   color: #1f4d82;
   outline: none;
 }
 
-.customToolFilterBar button.active {
+.customToolFilterIconBar button.active {
   border-color: #9fbce8;
   background: #eaf3ff;
   color: #1f4d82;
+  box-shadow: inset 0 0 0 1px rgba(45, 95, 159, 0.12);
 }
 
 .customToolToolbar input {
@@ -7181,6 +8075,69 @@ tbody tr {
 .customToolTable {
   width: calc(100% - 28px);
   margin: 14px;
+}
+
+.customToolTable th {
+  position: relative;
+}
+
+.customToolTable th:nth-child(1),
+.customToolTable th:nth-child(2),
+.scopedCustomToolTable th:nth-child(1) {
+  overflow: visible;
+}
+
+.toolNameHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.toolNameHeader .sortHeaderButton {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.toolNameHeader .sortHeaderButton span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tableFilterMenuWrap {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.tableFilterSelect {
+  box-sizing: border-box;
+  width: 58px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.tableFilterSelect:hover,
+.tableFilterSelect:focus-visible,
+.tableFilterSelect.active {
+  border-color: #b9c9dd;
+  background: #eef5ff;
+  color: #1f4d82;
+  outline: none;
 }
 
 .compactCustomToolTable {
@@ -7258,6 +8215,24 @@ tbody tr {
   white-space: nowrap;
 }
 
+.toolApprovalBadge.pending {
+  border-color: #e7c46a;
+  background: #fff6d7;
+  color: #8a5a00;
+}
+
+.toolApprovalBadge.approved {
+  border-color: #abd8bd;
+  background: #edf9f1;
+  color: #207143;
+}
+
+.toolApprovalBadge.githubPending {
+  border-color: #b8cdec;
+  background: #eef6ff;
+  color: #275f9d;
+}
+
 button.toolRiskBadge:hover,
 button.toolRiskBadge:focus-visible {
   border-color: #bd7d12;
@@ -7266,6 +8241,7 @@ button.toolRiskBadge:focus-visible {
 }
 
 .inlineRiskBadge {
+  align-self: center;
   flex: 0 0 auto;
   margin-left: 0;
   vertical-align: middle;
@@ -7479,6 +8455,18 @@ button.toolRiskBadge:focus-visible {
   padding: 0 14px 14px;
 }
 
+.openAiSettingsForm {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.openAiSettingsMessage {
+  margin: 0;
+  color: #3f5f86;
+  font-size: 12px;
+}
+
 .adminSegmentedControl {
   width: 100%;
   margin-top: 2px;
@@ -7643,6 +8631,60 @@ button.toolRiskBadge:focus-visible {
   border: 1px solid #dde4ee;
   border-radius: 8px;
   background: #fff;
+}
+
+.collapsibleSettingsPanel {
+  display: grid;
+}
+
+.settingsCollapseHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 68px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 0;
+  background: #f4f9ff;
+  color: #172033;
+  text-align: left;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.settingsCollapseHeader:hover,
+.settingsCollapseHeader:focus-visible {
+  background: #eef5ff;
+  box-shadow: inset 0 0 0 1px #c8d8ed;
+  outline: none;
+}
+
+.settingsCollapseHeader h2 {
+  margin: 0 0 5px;
+  color: inherit;
+  font-size: 16px;
+}
+
+.settingsCollapseHeader .panelHeaderNote {
+  display: block;
+  color: #617086;
+}
+
+.collapseChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cfd9e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #526071;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .dialogPanel .details {
@@ -7834,6 +8876,27 @@ button.toolRiskBadge:focus-visible {
   border-color: #2c3442;
   background: #171c24;
   color: #e8edf5;
+}
+
+.darkMode .settingsCollapseHeader {
+  background: #1d2531;
+  color: #e8edf5;
+}
+
+.darkMode .settingsCollapseHeader:hover,
+.darkMode .settingsCollapseHeader:focus-visible {
+  background: #232d3b;
+  box-shadow: inset 0 0 0 1px #3c4a5f;
+}
+
+.darkMode .settingsCollapseHeader .panelHeaderNote {
+  color: #aab6c7;
+}
+
+.darkMode .collapseChevron {
+  border-color: #3c4a5f;
+  background: #151a23;
+  color: #d8e2f0;
 }
 
 .darkMode .main,
@@ -8166,6 +9229,11 @@ button.toolRiskBadge:focus-visible {
   color: #d7dde8;
 }
 
+.darkMode .expandedToolItem {
+  border-bottom-color: transparent;
+  background: #243049;
+}
+
 .darkMode .toolRiskBadge {
   border-color: #7a5a1d;
   background: #332714;
@@ -8192,6 +9260,146 @@ button.toolRiskBadge:focus-visible {
 
 .darkMode .flowNodeDetails {
   border-color: #303948;
+  background: #151a22;
+}
+
+.darkMode .customFlowHomeHeader,
+.darkMode .customFlowLibraryPanel {
+  border-color: #303948;
+  background: #151a22;
+  color: #e8edf5;
+}
+
+.darkMode .marketFlowPanel {
+  background: #101720;
+}
+
+.darkMode .marketFlowSection {
+  border-color: #303948;
+  background: #151a22;
+}
+
+.darkMode .marketFlowSection > header {
+  border-color: #2c3442;
+  background: #171f2d;
+}
+
+.darkMode .marketFlowSection > header strong,
+.darkMode .marketFlowCard strong {
+  color: #f4f7fb;
+}
+
+.darkMode .marketFlowSection > header span,
+.darkMode .marketFlowCard span,
+.darkMode .marketFlowCard small {
+  color: #aab5c5;
+}
+
+.darkMode .marketFlowCard {
+  border-color: #343f52;
+  background: #1b2432;
+}
+
+.darkMode .marketFlowCard:hover,
+.darkMode .marketFlowCard:focus-within {
+  border-color: #4a5d78;
+  background: #1a2a3d;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.darkMode .marketFlowCard.registered {
+  border-color: #2d6a46;
+  background: #172a22;
+}
+
+.darkMode .customFlowHomeHeader h2,
+.darkMode .customFlowLibraryPanel > header strong,
+.darkMode .customFlowCard strong,
+.darkMode .customFlowDisplayMeta strong,
+.darkMode .customFlowEditableMeta input {
+  color: #f4f7fb;
+}
+
+.darkMode .customFlowHomeHeader span,
+.darkMode .customFlowLibraryPanel > header span,
+.darkMode .customFlowCard span,
+.darkMode .customFlowCard small,
+.darkMode .customFlowDisplayMeta span,
+.darkMode .customFlowDisplayMeta small,
+.darkMode .customFlowEditableMeta textarea {
+  color: #aab5c5;
+}
+
+.darkMode .customFlowLibraryPanel > header {
+  border-color: #2c3442;
+  background: #171f2d;
+}
+
+.darkMode .customFlowCard {
+  border-color: #343f52;
+  background: #1b2432;
+}
+
+.darkMode .customFlowEditableMeta input,
+.darkMode .customFlowEditableMeta textarea {
+  background: transparent;
+}
+
+.darkMode .customFlowEditableMeta input:hover,
+.darkMode .customFlowEditableMeta textarea:hover,
+.darkMode .customFlowEditableMeta input:focus,
+.darkMode .customFlowEditableMeta textarea:focus {
+  border-color: #496b98;
+  background: #111824;
+}
+
+.darkMode .clickableFlowCard:hover,
+.darkMode .clickableFlowCard:focus-within {
+  border-color: #4a5d78;
+  background: #1a2a3d;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.darkMode .customFlowCard button,
+.darkMode .customFlowCardActions button {
+  border-color: #40516c;
+  background: #1b2432;
+  color: #dbeafe;
+}
+
+.darkMode .customFlowCard button:hover,
+.darkMode .customFlowCard button:focus-visible,
+.darkMode .customFlowCardActions button:hover,
+.darkMode .customFlowCardActions button:focus-visible {
+  border-color: #5d7fab;
+  background: #253348;
+  color: #f4f7fb;
+  outline: none;
+}
+
+.darkMode .compactToolRunnerHeader {
+  border-color: #2c3442;
+  background: #151a22;
+}
+
+.darkMode .compactToolRunnerHeader strong {
+  color: #f4f7fb;
+}
+
+.darkMode .compactToolRunnerHeader span {
+  color: #9bc1f7;
+}
+
+.darkMode .compactToolRunnerHeader small {
+  color: #aab5c5;
+}
+
+.darkMode .compactToolRunnerActions {
+  border-color: #2c3442;
+  background: #111824;
+}
+
+.darkMode .compactToolRunnerSettings .schemaSettingsSection {
   background: #151a22;
 }
 
@@ -8235,6 +9443,21 @@ button.toolRiskBadge:focus-visible {
 .darkMode .schemaStructuredRow.fileListColumns > span,
 .darkMode .schemaStructuredRow.fileListColumns > small,
 .darkMode .schemaFileAddButton,
+.darkMode .schemaActionButtons button,
+.darkMode .schemaWorkflowStep,
+.darkMode .schemaActionResult,
+.darkMode .schemaCandidatePanel,
+.darkMode .schemaCandidateList button,
+.darkMode .schemaPresetLoad,
+.darkMode .schemaPresetRename,
+.darkMode .schemaPresetEdit input,
+.darkMode .schemaPresetEdit button,
+.darkMode .schemaPresetDelete,
+.darkMode .schemaPresetDropdown,
+.darkMode .schemaPresetSaveAs,
+.darkMode .schemaPresetSaveAs input,
+.darkMode .schemaPresetDialogBody,
+.darkMode .flowNodePrincipleList > div,
 .darkMode .schemaReviewActions button,
 .darkMode .schemaReviewDetails,
 .darkMode .schemaTestCaseItem,
@@ -8252,6 +9475,10 @@ button.toolRiskBadge:focus-visible {
 }
 
 .darkMode .schemaRiskBar span,
+.darkMode .schemaCandidatePanel header span,
+.darkMode .schemaCandidateList strong,
+.darkMode .schemaPresetCurrent strong,
+.darkMode .flowNodePrincipleList span,
 .darkMode .schemaSettingsSection header span,
 .darkMode .schemaSectionToggle span,
 .darkMode .schemaExecutionPlan header span,
@@ -8266,6 +9493,10 @@ button.toolRiskBadge:focus-visible {
 }
 
 .darkMode .schemaRiskBar small,
+.darkMode .schemaCandidatePanel header small,
+.darkMode .schemaCandidateList span,
+.darkMode .schemaPresetCurrent,
+.darkMode .flowNodePrincipleList small,
 .darkMode .schemaSectionToggle small,
 .darkMode .schemaExecutionPlan header small,
 .darkMode .schemaReadyNote,
@@ -8278,8 +9509,64 @@ button.toolRiskBadge:focus-visible {
 .darkMode .schemaPreviewSection dt,
 .darkMode .schemaCheckItem span,
 .darkMode .schemaCheckItem small,
-.darkMode .schemaTestCaseItem span {
+.darkMode .schemaTestCaseItem span,
+.darkMode .schemaActionHint,
+.darkMode .schemaActionResult p,
+.darkMode .schemaWorkflowStep small,
+.darkMode .schemaPreviewResultRow small {
   color: #aab5c5;
+}
+
+.darkMode .schemaActionButtons button.primary {
+  border-color: #3b82f6;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.darkMode .schemaActionButtons .primaryAction {
+  border-color: #3b82f6;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.darkMode .schemaPresetDropdown button {
+  color: #d9e5f6;
+}
+
+.darkMode .schemaPresetDropdown button:hover,
+.darkMode .schemaPresetDropdown button:focus-visible,
+.darkMode .schemaCandidateList button:hover,
+.darkMode .schemaCandidateList button:focus-visible {
+  border-color: #3f638e;
+  background: #14253c;
+}
+
+.darkMode .schemaWorkflowStep.active {
+  border-color: #2d5f98;
+  background: #102239;
+}
+
+.darkMode .schemaWorkflowStep strong {
+  background: #17375e;
+  color: #8ec5ff;
+}
+
+.darkMode .schemaWorkflowStep.complete strong {
+  background: #123822;
+  color: #8ee7a8;
+}
+
+.darkMode .schemaWorkflowStep span,
+.darkMode .schemaPreviewResultRow span {
+  color: #d7dfeb;
+}
+
+.darkMode .schemaPreviewResultRow {
+  border-bottom-color: #243247;
+}
+
+.darkMode .schemaPreviewResultRow strong {
+  color: #5eead4;
 }
 
 .darkMode .schemaSettingControl > span,
@@ -8301,6 +9588,18 @@ button.toolRiskBadge:focus-visible {
   border-color: #3b82f6;
   background: #14253c;
   color: #dbeafe;
+}
+
+.darkMode .schemaPresetItem.selected .schemaPresetLoad {
+  border-color: #5b8ed2;
+  background: #14253c;
+  box-shadow: inset 3px 0 0 #60a5fa;
+}
+
+.darkMode .schemaCandidateList button.selected {
+  border-color: #5b8ed2;
+  background: #14253c;
+  box-shadow: inset 3px 0 0 #60a5fa;
 }
 
 .darkMode .schemaRiskBar.risk-create,
@@ -8352,6 +9651,27 @@ button.toolRiskBadge:focus-visible {
   border-color: #37465d;
   background: rgba(20, 26, 36, 0.94);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+}
+
+.darkMode .basicToolsTabs,
+.darkMode .basicPortFilterPanel {
+  background: rgba(20, 26, 36, 0.94);
+}
+
+.darkMode .flowToolbarMenu .basicPortFilterToggle {
+  border-color: #37465d;
+  background: #161f2c;
+}
+
+.darkMode .flowToolbarMenu .basicPortFilterToggle span,
+.darkMode .flowToolbarMenu .basicPortFilterToggle strong {
+  color: #c8d6ea;
+}
+
+.darkMode .flowToolbarMenu .basicPortFilterBar button.selected {
+  border-color: #496b98;
+  background: #1b2b42;
+  color: #cfe1fb;
 }
 
 .darkMode .flowGroupNameInput {
@@ -8822,20 +10142,30 @@ button.toolRiskBadge:focus-visible {
   box-shadow: 0 0 0 3px rgba(83, 133, 196, 0.18);
 }
 
-.darkMode .customToolFilterBar button {
+.darkMode .customToolFilterIconBar button {
   border-color: #3a4658;
   background: #17202d;
   color: #aab5c5;
 }
 
-.darkMode .customToolFilterBar button:hover,
-.darkMode .customToolFilterBar button:focus-visible {
+.darkMode .customToolFilterIconBar button:hover,
+.darkMode .customToolFilterIconBar button:focus-visible {
   border-color: #526985;
+  background: #1c2736;
   color: #dbeafe;
 }
 
-.darkMode .customToolFilterBar button.active {
+.darkMode .customToolFilterIconBar button.active {
   border-color: #5b7cab;
+  background: #1d3554;
+  color: #dbeafe;
+}
+
+.darkMode .registerToolButton.active,
+.darkMode .tableFilterSelect:hover,
+.darkMode .tableFilterSelect:focus-visible,
+.darkMode .tableFilterSelect.active {
+  border-color: #526985;
   background: #1d3554;
   color: #dbeafe;
 }
@@ -8882,6 +10212,10 @@ button.toolRiskBadge:focus-visible {
 .darkMode .accountLockedPanel span,
 .darkMode .licenseGatePanel span {
   color: #b8c0cb;
+}
+
+.darkMode .openAiSettingsMessage {
+  color: #9fb3cf;
 }
 
 .darkMode .accountUserList,
@@ -8982,6 +10316,24 @@ button.toolRiskBadge:focus-visible {
   border-color: #4b5c70;
   background: #1f2937;
   color: #cbd5e1;
+}
+
+.darkMode .toolApprovalBadge.pending {
+  border-color: #846b2d;
+  background: #332b16;
+  color: #f6d98b;
+}
+
+.darkMode .toolApprovalBadge.approved {
+  border-color: #2f7a52;
+  background: #183226;
+  color: #9ae6b4;
+}
+
+.darkMode .toolApprovalBadge.githubPending {
+  border-color: #416890;
+  background: #182a3d;
+  color: #a8cff7;
 }
 
 .darkMode .toolApprovalBadge.rejected {

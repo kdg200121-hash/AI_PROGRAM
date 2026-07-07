@@ -200,6 +200,25 @@ logs
 - 실행/중지 버튼은 Electron main의 MCP 프로세스 IPC와 연결되어 있습니다. 등록 서버의 `launchCommand`, `workingDirectory`, `environment`로 child process를 실행하고 stdout/stderr/오류/종료 로그를 Process Monitor에 표시합니다.
 - 현재 프로세스 관리는 이 앱이 실행한 child process 기준입니다. 이미 외부에서 실행 중인 MCP 서버를 OS 프로세스 기준으로 찾아 중지하는 기능은 아직 없습니다.
 - Settings의 MCP 서버 목록은 전체 서버를 보여주며, 이 창이 열려 있을 때 서버 선택도 전체 목록 기준으로 유지합니다. 일반 화면의 서버 상세 선택은 계속 현재 작업공간 필터 기준으로 동작합니다.
+- Settings의 MCP 서버 상세는 읽기 전용입니다. 서버 등록/수정은 앱 설정 UI에서 직접 하지 않고 `/등록` 스킬이 registry 항목을 만들거나 앱 시작 시 bundled bridge 항목을 병합하는 흐름을 기준으로 합니다.
+- registry JSON은 UTF-8 BOM이 있어도 core `loadRegistry`가 제거한 뒤 파싱합니다. `mcp-processes:get-snapshot`에서 `Unexpected token '﻿'` 오류가 나면 userData registry 파일이 BOM 또는 깨진 JSON인지 먼저 확인하세요.
+- Custom Flow에서 새 플로우 `+`는 빈 캔버스를 열고 저장 목록에 즉시 추가하지 않습니다. 사용자가 저장하지 않고 나가면 내 플로우 목록에 남지 않는 것이 의도입니다.
+- Custom Flow 캔버스 툴바에는 Home/메인 이동 버튼이 없습니다. 저장은 디스크 아이콘, 노드 검색은 돋보기 아이콘 버튼입니다.
+- Custom Flow 노드 상세 탭은 `작동 원리`, `설정`, `결과` 3개가 한 줄에 표시되는 것이 현재 기준입니다.
+- 툴 업데이트는 처음 등록한 제작자만 가능합니다. 현재 로그인한 닉네임 또는 GitHub ID가 기존 툴의 `author`와 일치해야 버전 업데이트가 진행됩니다.
+- More Tools/Custom Tools에서 로컬 원본 파일 삭제는 사용자가 승인한 툴 폴더와 앱/프로젝트 `tools` 폴더 안에서만 허용됩니다. 임의 경로 삭제는 계속 막아야 합니다.
+- 툴 삭제 시 이미 존재하지 않는 로컬 원본 파일은 성공 처리합니다. localStorage에 오래된 sourcePath/installedPath가 남아 있을 수 있으므로, 존재 여부 확인을 허용 루트 검사보다 먼저 수행하는 구조를 유지해야 합니다.
+- More Tools/Custom Tools 필터는 `툴 이름` 테이블 헤더 옆 작은 아이콘 버튼 기준입니다. 다시 큰 필터 줄로 되돌리면 목록 영역이 좁아져 사용자가 싫어했던 상태가 됩니다.
+- Player view에서 툴을 선택하면 탭을 새로 열지 않고 클릭한 툴 카드 바로 아래에서 그 자리 확장 방식으로 실행 패널이 펼쳐집니다. 이 패널은 버튼 한 줄과 설정값 입력 영역을 기준으로 유지해야 합니다.
+- Custom Flow 메인 화면은 다른 메인 페이지와 같은 카드 기준을 사용합니다. 공유 플로우/내 플로우 헤더는 제목과 설명을 같은 세로 그룹으로 묶고, 카드 선택은 클릭으로 열기, 내 플로우 복제/삭제는 우클릭 메뉴 기준입니다.
+- Custom Flow 메인 화면의 Share Flow는 `내 플로우로 가져오기` 버튼을 쓰지 않습니다. Share Flow 카드를 클릭하면 바로 캔버스로 열고, 저장할 때 새 My Flow로 저장하는 흐름이 기준입니다.
+- Custom Flow에서 저장하지 않고 나갈 때는 브라우저 기본 `confirm`을 쓰지 않고 앱 디자인에 맞춘 확인 모달을 사용해야 합니다.
+- Custom Flow 기본 도구 창의 `툴`/`연결값 도구` 탭은 스크롤 중에도 상단에 고정합니다. 연결값 도구는 프로그램 필터와 공용/입력/출력 필터를 함께 지원합니다.
+- Custom Flow `연결값 도구` 필터는 기본 접힘 상태가 기준입니다. 도구 목록이 좁아 보이지 않도록 현재 필터 요약만 보이고, 사용자가 눌렀을 때만 작은 필터 칩을 펼칩니다.
+- 기본 전체 창 크기는 1440x900입니다. 사용자가 캔버스 작업 공간이 작다고 했기 때문에 임의로 다시 줄이지 마세요.
+- Settings에는 `AI 연결` 탭이 있습니다. OpenAI API 키는 Electron main process에서만 다루고 userData `openai-settings.json`에 `safeStorage`로 암호화 저장합니다. 렌더러, localStorage, Git, 툴 MD, 로그에는 키 원문을 남기지 마세요.
+- OpenAI 실행 키 우선순위는 앱 저장 키, `AI_PROGRAM_OPENAI_API_KEY`/`OPENAI_API_KEY` 환경 변수 순서입니다. 모델은 앱 저장값, `AI_PROGRAM_OPENAI_MODEL`, 기본 `openAiToolRunnerDefaultModel` 순서로 결정합니다.
+- `/등록` 스킬은 MCP 서버 등록/검증뿐 아니라 `Settings > AI 연결`에서 API 키 상태를 확인하도록 안내합니다. 다른 컴퓨터에서는 앱의 Home > Other Tools 또는 Settings에서 `/등록` 스킬을 설치한 뒤 API 키를 설정하면 됩니다.
 - Custom Flow 입력/출력 포트 안쪽에는 타입 아이콘을 표시하지 않습니다. 포트 타입 구분은 포트 네모와 연결선 색상을 주된 신호로 사용합니다.
 - Custom Flow 연결선 좌표는 렌더링된 `.flowPortConnector` DOM의 실제 중심을 측정해 사용합니다. `customFlowModel.ts`의 `flowConnectionEndpoint`/`flowPortLocalY`는 측정값이 아직 없는 첫 렌더 시점의 fallback입니다.
 - 포트 행 높이, 노드 헤더 여백, compact/expanded 레이아웃을 바꿔도 연결선은 DOM 측정값을 따라가야 합니다. 다시 고정 숫자만으로 선 좌표를 맞추면 같은 중심 어긋남이 재발할 수 있습니다.
@@ -207,4 +226,16 @@ logs
 - `App.tsx`는 여전히 큽니다. 이번에는 `MonitorView`, Process Monitor 타입, Custom Flow 검증 로직을 먼저 분리했습니다. 이후에는 `WorkflowView`, `ToolMarketDialog`, `TabStrip`, Settings 세부 패널 순서로 계속 분리하는 것이 좋습니다.
 - `node_modules` 안에 100MB 이상 Electron 실행 파일이 있으나 Git 제외 대상입니다.
 - Codex 채팅 기록은 GitHub로 넘어가지 않습니다. 중요한 내용은 `WORK_LOG.md`, `TODO.md`, `README_HANDOFF.md`에 남겨야 합니다.
+- 앱 내장 `/등록` 스킬(`program-mcp-registrar`)은 이제 MCP 등록값만 안내하지 않고, 브리지 스캐폴드 생성, AI Program 등록, URL/포트 확인, 명령 목록 확인, 안전한 읽기 테스트까지 진행하는 기준으로 작성되어 있습니다. 단, 실제 AutoCAD/Revit/Excel SDK 호출 브리지 템플릿은 아직 TODO로 남아 있으므로 스킬 실행 시 검증된 단계와 미검증 단계를 분리해서 보고해야 합니다.
+- 삭제한 GitHub 원본 툴은 localStorage tombstone(`mcp-registry:deleted-github-tool-paths`)으로 다시 표시되지 않게 막습니다. 단, 원격 저장소에서 실제 파일 삭제가 실패하면 다른 컴퓨터에서는 해당 파일이 다시 보일 수 있으므로, 장기적으로는 관리자 삭제 PR/commit 흐름이 필요합니다.
+- Electron main과 보안 경로 검증 파일에 깨진 한글 문자열이 재발하지 않도록, 큰 수정 뒤에는 `rg -n '쨌|�|濡|寃|뚯|젣|꾩|媛|鍮|紐|醫|愼' packages/desktop/electron/main.ts packages/desktop/src packages/core/src packages/shared/src`를 확인하세요.
+- GitHub 로그인 scope는 `read:user repo`입니다. 기존 `public_repo` 토큰으로 로그인된 상태에서 툴 등록이 `git/refs` 404로 실패하면 앱에서 로그아웃 후 다시 GitHub 로그인을 해야 합니다.
+- GitHub 원격 삭제는 직접 삭제가 막히면 삭제 PR을 생성합니다. 삭제한 툴은 현재 PC에서는 tombstone으로 즉시 숨겨지지만, 다른 PC에서 안 보이려면 PR이 머지되어야 합니다.
+- 툴 MD의 `learningLog` frontmatter는 `/save`/`/make` 사용 경험 개선용 메타데이터입니다. 앱 실행 로직은 이 값을 사용하지 않아야 하며, 사용자가 막힌 지점, 제시된 선택지, 실제 선택, 추후 개선점을 익명 요약으로만 기록합니다.
+- 저장한 설정 프리셋은 실제 설정값이 현재 값과 같을 때 선택 상태로 표시됩니다. Custom Flow 노드는 노드 ID와 실제 툴 ID를 함께 조회해 일반 툴 페이지에서 저장한 설정도 불러올 수 있어야 합니다.
+- 설정 프리셋은 중첩 배열/객체까지 깊은 복사로 저장해야 합니다. DWG 목록, 행 순서, 매핑표처럼 사용자가 저장 시점에 만든 설정은 저장 뒤 화면에서 바뀌어도 저장본이 같이 변하면 안 됩니다.
+- 툴 페이지, Player view, Custom Flow 노드의 설정 프리셋 UI 기준은 동일합니다. 설정 헤더 오른쪽에 `저장` split 버튼, 화살표의 `다른 이름으로 저장`, `불러오기` 버튼을 두고, 저장본 선택/이름 변경/삭제는 불러오기 dialog에서 처리합니다.
+- MD action 라벨이 무엇이든 앱 버튼은 기본적으로 `미리보기`, `실행`으로 표시합니다. 위험도/필요 MCP 요약은 설정 입력칸이 아니라 작동 원리 영역에 표시하고, 도곽 후보가 필요한 도구는 미리보기 뒤 후보 선택 단계를 노출해야 합니다.
+- Player view 창 기준은 560x780, 최소 폭은 520입니다. 좁은 창에서 설정 패널이 잘리면 컨텐츠를 잘라내기보다 Player view 기준 폭을 재검토하세요.
+- Custom Flow 내 플로우 카드의 이름/설명은 평소 읽기 전용 텍스트로 표시하고, 연필 아이콘을 눌렀을 때만 편집 입력칸을 보여주는 기준입니다.
 

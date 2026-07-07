@@ -22,6 +22,9 @@ await cp(join(desktopDir, "dist"), join(appDir, "dist"), { recursive: true });
 await cp(join(desktopDir, "dist-electron"), join(appDir, "dist-electron"), { recursive: true });
 await cp(join(desktopDir, "assets"), join(appDir, "assets"), { recursive: true });
 await cp(join(repoRoot, "data"), join(appDir, "data"), { recursive: true });
+await cp(join(repoRoot, "tools", "mcp-bridges"), join(appDir, "tools", "mcp-bridges"), {
+  recursive: true
+});
 await writeFile(
   join(appDir, "package.json"),
   `${JSON.stringify(

@@ -2,6 +2,8 @@ import type { RegistryFile } from "@mcp-registry/shared";
 import type { NewMcpServerInput, UpdateMcpServerInput } from "@mcp-registry/core";
 import type { ServerProcessResult } from "./processMonitor";
 import type { ToolRuntimeSchema } from "./toolSettingsSchema";
+import type { ToolExecutionRequest, ToolExecutionResult } from "./toolExecutionModel";
+import type { OpenAiSettingsStatus } from "./openAiSettings";
 
 declare global {
   interface Window {
@@ -20,6 +22,14 @@ declare global {
       getSnapshot: () => Promise<ServerProcessResult>;
       startServer: (serverId: string) => Promise<ServerProcessResult>;
       stopServer: (serverId: string) => Promise<ServerProcessResult>;
+    };
+    toolExecution?: {
+      run: (request: ToolExecutionRequest) => Promise<ToolExecutionResult>;
+    };
+    openAiSettings?: {
+      get: () => Promise<OpenAiSettingsStatus>;
+      save: (input: { apiKey?: string; model?: string }) => Promise<OpenAiSettingsStatus>;
+      clear: () => Promise<OpenAiSettingsStatus>;
     };
     skillInstaller?: {
       installSaveTool: () => Promise<{ installedPath: string }>;
@@ -173,7 +183,15 @@ declare global {
       }>;
       deleteToolFiles: (
         paths: string[]
-      ) => Promise<{ path: string; status: "deleted" | "skipped" | "failed"; message: string }[]>;
+      ) => Promise<
+        {
+          path: string;
+          status: "deleted" | "skipped" | "failed" | "requested";
+          message: string;
+          pullRequestUrl?: string;
+          pullRequestNumber?: number;
+        }[]
+      >;
       copyMarkdownFile: (
         sourcePath: string,
         targetDirectory: string,

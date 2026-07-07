@@ -665,6 +665,84 @@ export function removeNodeIdsFromFlowGroups(groups: FlowGroup[], nodeIds: string
     .filter((group) => group.nodeIds.length > 0);
 }
 
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+export function insertStoredFlowGraphAsGroup(
+  snapshot: FlowSnapshot,
+  graph: StoredFlowGraph,
+  options: {
+    flowName: string;
+    x: number;
+    y: number;
+    now?: number;
+    color?: string;
+  }
+): FlowSnapshot {
+  if (graph.nodes.length === 0) {
+    return snapshot;
+  }
+
+  const stamp = options.now ?? Date.now();
+  const minX = Math.min(...graph.nodes.map((node) => node.x));
+  const minY = Math.min(...graph.nodes.map((node) => node.y));
+  const nodeIdMap = new Map<string, string>();
+  const importedNodeIds: string[] = [];
+
+  const nodes = graph.nodes.map((sourceNode) => {
+    const nodeId = `import-${stamp}-${sourceNode.nodeId}`;
+    nodeIdMap.set(sourceNode.nodeId, nodeId);
+    importedNodeIds.push(nodeId);
+
+    return {
+      ...cloneJson(sourceNode),
+      nodeId,
+      x: options.x + (sourceNode.x - minX),
+      y: options.y + (sourceNode.y - minY)
+    };
+  });
+
+  const connections = graph.connections
+    .map((connection) => {
+      const fromNodeId = nodeIdMap.get(connection.fromNodeId);
+      const toNodeId = nodeIdMap.get(connection.toNodeId);
+      if (!fromNodeId || !toNodeId) {
+        return null;
+      }
+
+      return {
+        ...cloneJson(connection),
+        id: `import-${stamp}-${connection.id}`,
+        fromNodeId,
+        toNodeId
+      };
+    })
+    .filter((connection): connection is FlowConnection => Boolean(connection));
+
+  const notes = (graph.notes ?? []).map((note, index) => ({
+    ...cloneJson(note),
+    id: `import-${stamp}-${note.id || `note-${index}`}`,
+    x: options.x + (note.x - minX),
+    y: options.y + (note.y - minY)
+  }));
+
+  return {
+    nodes: [...snapshot.nodes, ...nodes],
+    connections: [...snapshot.connections, ...connections],
+    groups: [
+      ...snapshot.groups,
+      {
+        id: `group-import-${stamp}`,
+        name: options.flowName.trim() || "Imported Flow",
+        color: options.color ?? "#bfdbfe",
+        nodeIds: importedNodeIds
+      }
+    ],
+    notes: [...snapshot.notes, ...notes]
+  };
+}
+
 export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
   if (node.id === "basic-result-preview") {
     return {

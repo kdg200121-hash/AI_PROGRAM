@@ -1,6 +1,6 @@
 ---
 name: mcp-tool-builder
-description: Create or refine AI Program MCP tool Markdown files for Custom Tools or More Tools. Use when the user types `/make <tool name>` or asks to design an MCP/MD tool, convert an add-in or chat workflow into a reusable tool, define deterministic inputs/outputs, design flexible settings-panel fields, or be guided with detailed Korean questions before writing a `.md` tool file.
+description: Use when creating or refining AI Program MCP tool Markdown files for Custom Tools, More Tools, add-in conversion, or `/make` requests.
 ---
 
 # MCP Tool Builder
@@ -22,6 +22,19 @@ The approved Korean tool name is the display name. Put it exactly in frontmatter
 Do not guess missing execution-critical information. If a missing value can change the result, ask the user. If the user is non-technical, propose 2-4 clear candidates and ask them to choose.
 
 The finished tool must be deterministic: another person using the same settings, same input files/objects, and same MCP environment should get the same result.
+
+Only put a value in `settings` when the user should actually choose or edit it in the settings window. If the value is fixed by the tool design, derived from other inputs, or represents which button the user clicked, keep it out of `settings` and document it as a fixed constant, derived preview value, or `runtime` action in the MCP command mapping.
+
+If a select-like field has only one possible option, it is not a setting. Do not create a visible field for it. Put that single value directly in MCP params/body text as a fixed constant.
+
+Preview/analyze flows must be modeled as actions, not as user settings. For example, use buttons such as `분석 미리보기` and `원본에 적용`; map the preview button to `runtime.action == "preview"` or an equivalent execution state. Do not add a `preview_only` / `dry-run` checkbox unless the user genuinely needs to choose between preview-only and applying from the same execution button.
+
+When converting AI CAD or AI Revit add-ins, choose the UI pattern from the add-in's actual behavior:
+
+- Read-only, export, report, or one-shot create tools: use a simple or sectioned settings form plus a result panel.
+- Bulk modify, delete, overwrite, model-changing, or file-changing tools: use a workflow panel with `입력` → `분석 미리보기` → `원본에 적용`; the apply action stays disabled until preview exists.
+- Tools that require user picking in CAD/Revit before execution: show the pick state as an input/source control, not as a free-text setting.
+- Add-in constants such as Revit version support, fixed object type, fixed sort order, fixed tolerance, or increment `1` belong in body text and MCP params, not in visible settings.
 
 Always generate a short Korean `description` automatically when the user did not explicitly provide one. Derive it from the target program, input/source, core action, and output/result. Use one sentence under 120 Korean characters when possible. Example: `여러 DWG에서 도곽 기준 위치의 Text/MText 도면번호를 순서대로 일괄 변경합니다.`
 
@@ -64,7 +77,8 @@ Starter flow for a novice:
 2. “읽기만 하나요, 새로 만들거나 수정하나요?” 읽기 전용, 파일 생성, 원본 수정, 대량 수정, 삭제/덮어쓰기.
 3. “대상은 어디서 가져올까요?” 현재 선택, 현재 파일 전체, 현재 뷰, 파일 선택, 폴더 선택, 이전 노드 결과.
 4. “결과는 어디로 보낼까요?” 화면 표시, Excel/CSV/JSON 파일, 다음 노드, CAD/Revit 모델 수정, 로그.
-5. Then propose the settings layout, MCP command plan, ports, and preflight checks for confirmation.
+5. Decide the UI pattern: simple form, sectioned form, or workflow actions (`입력` → `분석 미리보기` → `원본에 적용`) based on read/create/modify risk.
+6. Then propose the settings layout, MCP command plan, ports, and preflight checks for confirmation.
 
 Minimum information before writing:
 
@@ -122,6 +136,8 @@ First ask which layout fits best:
 3. 단계별 설정: 입력 선택, 필터, 실행 옵션, 결과 저장처럼 순서가 중요한 툴에 적합합니다.
 4. 반복 테이블 설정: 레이어-파라미터 매핑처럼 여러 줄을 추가해야 하는 툴에 적합합니다.
 
+For AI CAD/Revit add-ins, do not force every add-in into the same layout. Use `simple` or `sections` for read/export/report tools. Use a workflow/action layout for tools that first analyze the active drawing/model and then modify original CAD/Revit data. Use `steps` only when the user must complete real sequential choices, not merely because the tool is important.
+
 For every setting field ask:
 
 - 화면에 보일 이름은 무엇인가요?
@@ -134,6 +150,16 @@ For every setting field ask:
 - 어느 섹션에 들어가야 하나요? 예: 입력, 필터, 실행 옵션, 결과, 고급 설정.
 - 고급 설정으로 접어둘까요?
 - 실행 전 미리보기나 요약에 표시해야 하나요?
+
+Before accepting a field as a visible setting, classify it:
+
+- `visible setting`: the user can choose it and different choices are meaningful.
+- `single-option value`: a select/select-like value with only one possible option; treat it as a fixed constant, not a visible setting.
+- `fixed constant`: the tool always uses this value, such as increment `1` or a fixed Text/MText target.
+- `derived result`: the UI displays it after analysis, such as `미분석`, `미리보기 필요`, 도곽 수, or 번호 범위.
+- `runtime action`: the value comes from the clicked button, such as `분석 미리보기` versus `원본에 적용`.
+
+Only `visible setting` belongs in frontmatter `settings`. The other categories belong in descriptions, row summary metadata, result schema, or MCP parameter mapping.
 
 ### 3-1. Full Tool Spec Confirmation
 
@@ -177,6 +203,7 @@ HTML mockup requirements:
 - For list-based tools, show add/delete/reorder controls when relevant.
 - For file-list settings, `항목 추가` must open a file picker and store the selected file paths as list item values. Use `type: repeatable-list`, `itemType: file`, `valueKey: file_path`, and an `accept` filter such as `.dwg,.dxf` when the list is a set of files.
 - When a file-list tool can calculate per-file preview results, add row summary metadata such as `showItemSummary: true`, `summaryCountKey: title_block_count`, `summaryRangeKey: number_range`, `pendingSummaryLabel`, and `pendingRangeLabel`. Show these badges in the HTML mockup beside each file row, not as a separate long table.
+- For tools with a safe analysis step and a later modifying step, show two clear actions: `분석 미리보기` for non-saving analysis and `원본에 적용` for the confirmed modification. The apply action should look disabled until preview results exist.
 - Keep dense review-only information compact. Put execution summary, preflight checks, validation, and test summary behind one compact review/icon area, and expand each detail only when the user clicks its icon.
 - For destructive, overwrite, bulk edit, delete, or model-changing tools, show a visible warning and final confirmation area.
 - Keep the mockup self-contained with inline CSS so it opens directly in a browser.
@@ -226,13 +253,30 @@ Ask enough to make the tool executable later:
 Before writing or saying the tool is ready, check:
 
 - A novice can understand what to click or select.
+- Every visible `settings` field is something the user can meaningfully choose. Fixed values, derived preview badges, and clicked-button states are not settings.
+- No select-like setting has only one option. Single-option values are fixed constants and must not take space in the settings window.
+- Preview/analyze behavior is represented as an execution action or runtime state, not as an unnecessary `preview_only` checkbox.
 - The approved Korean tool name appears exactly in frontmatter `toolName`; any English slug is used only for filename/id.
 - Frontmatter `description` is filled with a Korean one-sentence summary. Do not leave it blank or as `Short description`.
 - No execution-critical value is hidden in prose only; it is represented in frontmatter or a clear section.
+- CAD/Revit add-ins use the correct UI pattern: simple/sectioned for read or export, workflow actions for analyze-then-modify.
 - `risk`, `requiredServers`, `mcpCommands`, `preflightChecks`, `settingsLayout`, `settings`, `inputs`, `outputs`, `resultSchema`, `failurePolicy`, and `testCases` are either filled or intentionally empty with a reason.
 - All destructive or broad changes require confirmation.
 - Units, scope, overwrite behavior, and result path are explicit when relevant.
 - The body includes an “아직 구현/확인 필요” note for any `planned` command.
+
+## Learning Log Metadata
+
+When `/make` or tool conversion reveals repeated confusion, user corrections, or useful choice patterns, add a compact `learningLog` block to frontmatter. This is for future analytics and skill improvement, not for tool execution.
+
+Capture:
+
+- `observedFriction`: what slowed the user down or required repeated clarification.
+- `suggestedOptions`: option sets the agent proposed and which one was recommended.
+- `selectedOptions`: what the user chose or rejected.
+- `deferredImprovements`: safe improvements to consider for future versions.
+
+Never store secrets, personal chat snippets, file contents, tokens, or Codex thread identifiers in `learningLog`.
 
 ## Add-in Conversion Checklist
 

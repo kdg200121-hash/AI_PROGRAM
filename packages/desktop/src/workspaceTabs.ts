@@ -41,5 +41,13 @@ export function filterServersByWorkspace(
     return servers.filter((server) => server.target === "revit");
   }
 
+  if (tabId === "excel") {
+    return servers.filter((server) => server.target === "excel");
+  }
+
+  if (tabId === "tekla") {
+    return servers.filter((server) => server.target === "tekla");
+  }
+
   return servers;
 }

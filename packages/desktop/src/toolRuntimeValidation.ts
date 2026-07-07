@@ -22,6 +22,7 @@ export interface ToolExecutionCommandPlan {
   command: string;
   status: ToolMcpCommand["status"];
   params: Record<string, string>;
+  condition?: string;
 }
 
 export interface ToolExecutionPlan {
@@ -172,10 +173,11 @@ export function buildToolExecutionPlan(
       server: command.server,
       command: command.command,
       status: command.status,
-      params
+      params,
+      condition: command.condition
     };
   });
-  const previewFields = schema.settings.filter((field) => field.preview || field.required);
+  const previewFields = schema.settings.filter((field) => !field.hidden && (field.preview || field.required));
   const summary = [
     ...schema.requiredServers.map((server) => `${server.toUpperCase()} MCP 연결 확인`),
     ...schema.preflightChecks.map((check) => check.label),

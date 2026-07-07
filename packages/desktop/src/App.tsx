@@ -44,8 +44,6 @@ import {
   createServerDraft,
   getSelectedServerId,
   serverDraftFromRecord,
-  serverInputFromDraft,
-  validateServerDraft,
   type ServerDraft
 } from "./registryEditor";
 import { AppIcon, type AppIconName } from "./uiIcons";
@@ -63,22 +61,28 @@ import {
   isStoredFlowGraphDirty,
   listWorkflowMenuFlowItems,
   listSavedFlows,
+  loadSharedFlows,
   loadSavedFlows,
+  parseDraggedSavedFlow,
   parseWorkflowMenuFlowId,
   removeSavedFlow,
-  renameSavedFlow,
   sampleSharedFlows,
+  saveSharedFlows,
   saveSavedFlows,
+  serializeSavedFlowForDrag,
+  upsertSharedFlow,
   updateSavedFlowDetails,
   updateSavedFlowGraph,
   workflowMenuFlowId,
   type SavedCustomFlow
 } from "./customFlowLibrary";
 import {
+  cloneSettingValues,
   createSettingPreset,
   listSettingPresetsForTool,
   loadSettingPresets,
   removeSettingPreset,
+  renameSettingPreset,
   saveSettingPresets,
   upsertSettingPreset,
   type SettingPreset
@@ -100,6 +104,7 @@ import {
   flowPortIconName,
   flowToolIdFromMenuItem,
   flowToolPalette,
+  insertStoredFlowGraphAsGroup,
   isFlowTypeCompatible,
   loadStoredFlowGraph,
   normalizeStoredBasicFlowNode,
@@ -132,6 +137,7 @@ import {
 } from "./customFlowRunModel";
 import { validateFlowGraph, type FlowValidationIssue } from "./customFlowValidation";
 import {
+  defaultToolRuntimeSchema,
   defaultSettingOptions,
   isSelectLikeSetting,
   settingDefaultValue,
@@ -139,6 +145,13 @@ import {
   type ToolSettingField,
   type ToolSettingValue
 } from "./toolSettingsSchema";
+import { buildToolPreviewSummary } from "./toolActionPreview";
+import {
+  buildToolExecutionRequest,
+  type TitleBlockCandidate
+} from "./toolExecutionModel";
+import { openAiToolRunnerDefaultModel } from "./openAiToolRunner";
+import type { OpenAiSettingsStatus } from "./openAiSettings";
 import {
   buildToolExecutionPlan,
   validateToolRuntimeSchema,
@@ -150,6 +163,35 @@ import {
   type ProcessSnapshot,
   type ServerProcessResult
 } from "./processMonitor";
+
+function normalizeToolRuntimeSchemaForRender(schema: ToolRuntimeSchema): ToolRuntimeSchema {
+  return {
+    ...defaultToolRuntimeSchema,
+    ...schema,
+    requiredServers: schema.requiredServers ?? [],
+    mcpCommands: schema.mcpCommands ?? [],
+    preflightChecks: schema.preflightChecks ?? [],
+    resultSchema: {
+      ...defaultToolRuntimeSchema.resultSchema,
+      ...(schema.resultSchema ?? {}),
+      fields: schema.resultSchema?.fields ?? []
+    },
+    failurePolicy: {
+      ...defaultToolRuntimeSchema.failurePolicy,
+      ...(schema.failurePolicy ?? {})
+    },
+    settingsLayout: {
+      ...defaultToolRuntimeSchema.settingsLayout,
+      ...(schema.settingsLayout ?? {}),
+      sections: schema.settingsLayout?.sections ?? []
+    },
+    settings: schema.settings ?? [],
+    actions: schema.actions ?? [],
+    inputs: schema.inputs ?? [],
+    outputs: schema.outputs ?? [],
+    testCases: schema.testCases ?? []
+  };
+}
 
 const flowGroupColorOptions = [
   "#60a5fa",
@@ -255,6 +297,7 @@ function syncActiveFileSelections(
 }
 
 type FlowBasicPortDirection = "input" | "output" | "both";
+type FlowBasicPortFilter = "all" | "common" | "cad" | "revit" | "excel" | "tekla";
 type FlowNodeDetailTab = "content" | "settings" | "result";
 
 const flowBasicPortTools: Array<{
@@ -283,6 +326,26 @@ const flowBasicPortTools: Array<{
 
 type FlowBasicPortTool = (typeof flowBasicPortTools)[number];
 
+const flowBasicPortFilters: Array<{ id: FlowBasicPortFilter; label: string }> = [
+  { id: "all", label: "전체" },
+  { id: "common", label: "공용" },
+  { id: "cad", label: "CAD" },
+  { id: "revit", label: "Revit" },
+  { id: "excel", label: "Excel" },
+  { id: "tekla", label: "Tekla" }
+];
+
+function flowBasicPortToolMatchesFilter(tool: FlowBasicPortTool, filter: FlowBasicPortFilter) {
+  const scope = tool.programScope.toLowerCase();
+  if (filter === "all") {
+    return true;
+  }
+  if (filter === "common") {
+    return scope.includes("모든") || scope.includes("all");
+  }
+  return scope.includes("모든") || scope.includes(filter);
+}
+
 const flowRunScopeLabels: Record<FlowRunScope, string> = {
   all: "전체 흐름",
   selected: "선택 노드만",
@@ -307,6 +370,7 @@ const submenuOrderStorageKey = "mcp-registry:submenu-order";
 const customSubmenusStorageKey = "mcp-registry:custom-submenus";
 const submenuMetaStorageKey = "mcp-registry:submenu-meta";
 const customToolsStorageKey = "mcp-registry:custom-tools";
+const deletedGithubToolPathsStorageKey = "mcp-registry:deleted-github-tool-paths";
 const accountUsersStorageKey = "mcp-registry:account-users";
 const accountPolicyStorageKey = "mcp-registry:account-policy";
 
@@ -420,9 +484,15 @@ interface CustomToolVersion {
 }
 
 type CustomToolSortField = "section" | "name" | "version" | "author" | "usageCount";
-type CustomToolFilter = "all" | "risk" | "pending" | "registered" | "unregistered";
+type CustomToolFilter = "all" | "risk" | "pending";
+const customToolFilterOptions: Array<{ filter: CustomToolFilter; label: string; icon: string }> = [
+  { filter: "all", label: "전체", icon: "A" },
+  { filter: "risk", label: "주의", icon: "!" },
+  { filter: "pending", label: "대기", icon: "P" }
+];
 type SortDirection = "desc" | "asc";
 type CustomToolFormMode = "new" | "update";
+type MarketDialogTab = "tools" | "flows";
 type AccountUserSortField = "githubId" | "nickname" | "status" | "license" | "joinedAt";
 
 interface CustomToolDraft {
@@ -520,6 +590,10 @@ function hashString(value: string) {
   return Math.abs(hash).toString(36);
 }
 
+function compareToolVersionDesc(left: string, right: string) {
+  return right.localeCompare(left, "ko", { numeric: true, sensitivity: "base" });
+}
+
 type ContextMenuState =
   | { type: "section"; sectionId: SidebarSectionId; x: number; y: number }
   | {
@@ -588,6 +662,7 @@ function isSubmenuId(value: string): value is SubmenuId {
   return (
     staticSubmenuIds.includes(value) ||
     value.startsWith("custom-") ||
+    value.startsWith("github-tool-") ||
     value.startsWith("share-") ||
     Boolean(parseWorkflowMenuFlowId(value))
   );
@@ -761,6 +836,16 @@ function loadCustomTools(): CustomToolItem[] {
   }
 }
 
+function loadDeletedGithubToolPaths() {
+  try {
+    const raw = window.localStorage.getItem(deletedGithubToolPathsStorageKey);
+    const paths = raw ? (JSON.parse(raw) as string[]) : [];
+    return paths.filter((path): path is string => typeof path === "string" && path.startsWith("github:"));
+  } catch {
+    return [];
+  }
+}
+
 function loadAccountPolicy(): AccountPolicy {
   try {
     const raw = window.localStorage.getItem(accountPolicyStorageKey);
@@ -897,7 +982,7 @@ function connectionScopeForPage(sectionId: SidebarSectionId, tabId: WorkspaceTab
   }
 
   if (sectionId === "workflow") {
-    return { label: "MCP", targets: ["cad", "revit"] as McpTarget[] };
+    return { label: "MCP", targets: ["cad", "revit", "excel"] as McpTarget[] };
   }
 
   if (sectionId === "revit") {
@@ -908,12 +993,20 @@ function connectionScopeForPage(sectionId: SidebarSectionId, tabId: WorkspaceTab
     return { label: "CAD MCP", targets: ["cad"] as McpTarget[] };
   }
 
+  if (sectionId === "excel") {
+    return { label: "Excel MCP", targets: ["excel"] as McpTarget[] };
+  }
+
+  if (sectionId === "tekla") {
+    return { label: "Tekla MCP", targets: ["tekla"] as McpTarget[] };
+  }
+
   return { label: `${sidebarLabel(sectionId)} MCP`, targets: ["other"] as McpTarget[] };
 }
 
 function requiredMcpTargetsForSection(sectionId: SidebarSectionId): McpTarget[] | null {
   if (sectionId === "workflow") {
-    return ["cad", "revit"];
+    return ["cad", "revit", "excel"];
   }
 
   if (sectionId === "revit") {
@@ -924,8 +1017,12 @@ function requiredMcpTargetsForSection(sectionId: SidebarSectionId): McpTarget[] 
     return ["cad"];
   }
 
-  if (sectionId === "excel" || sectionId === "tekla") {
-    return ["other"];
+  if (sectionId === "excel") {
+    return ["excel"];
+  }
+
+  if (sectionId === "tekla") {
+    return ["tekla"];
   }
 
   return null;
@@ -1061,10 +1158,16 @@ function SidebarIcon({ sectionId }: { sectionId: SidebarSectionId }) {
 }
 
 function submenuIconName(submenuId: SubmenuId): AppIconName {
-  if (parseWorkflowMenuFlowId(submenuId)) {
+  const workflowFlow = parseWorkflowMenuFlowId(submenuId);
+  if (workflowFlow?.source === "saved") {
+    return "customTools";
+  }
+  if (workflowFlow) {
     return "workflow";
   }
-  return submenuId.startsWith("custom-tool-") ? "customTools" : "shareTools";
+  return submenuId.startsWith("custom-tool-") || submenuId.startsWith("github-tool-")
+    ? "customTools"
+    : "shareTools";
 }
 
 const fallbackRegistry: RegistryFile = {
@@ -1207,13 +1310,16 @@ export function App() {
   const [isRegistryDialogOpen, setIsRegistryDialogOpen] = useState(false);
   const [isMonitorDialogOpen, setIsMonitorDialogOpen] = useState(false);
   const [isCustomToolDialogOpen, setIsCustomToolDialogOpen] = useState(false);
+  const [isMyToolManagerDialogOpen, setIsMyToolManagerDialogOpen] = useState(false);
   const [isCustomToolFormOpen, setIsCustomToolFormOpen] = useState(false);
+  const [marketDialogTab, setMarketDialogTab] = useState<MarketDialogTab>("tools");
   const [customToolDialogScope, setCustomToolDialogScope] = useState<SidebarSectionId | "all">(
     "servers"
   );
   const [customToolDraft, setCustomToolDraft] = useState<CustomToolDraft>(() =>
     createCustomToolDraft()
   );
+  const [isSavingCustomTool, setIsSavingCustomTool] = useState(false);
   const [customToolSort, setCustomToolSort] = useState<{
     field: CustomToolSortField;
     direction: SortDirection;
@@ -1221,6 +1327,12 @@ export function App() {
   const [activeSettingsSection, setActiveSettingsSection] =
     useState<SettingsSectionId>("servers");
   const [colorMode, setColorMode] = useState<ColorMode>("light");
+  const [openAiSettingsStatus, setOpenAiSettingsStatus] =
+    useState<OpenAiSettingsStatus | null>(null);
+  const [openAiApiKeyDraft, setOpenAiApiKeyDraft] = useState("");
+  const [openAiModelDraft, setOpenAiModelDraft] = useState(openAiToolRunnerDefaultModel);
+  const [openAiSettingsMessage, setOpenAiSettingsMessage] = useState("");
+  const [isOpenAiSettingsBusy, setIsOpenAiSettingsBusy] = useState(false);
   const [favoriteSectionIds, setFavoriteSectionIds] = useState<SidebarSectionId[]>(() =>
     loadFavoriteSections()
   );
@@ -1240,6 +1352,7 @@ export function App() {
   >(() => loadCustomSubmenus());
   const [submenuMeta, setSubmenuMeta] = useState<SubmenuMetaMap>(() => loadSubmenuMeta());
   const [customTools, setCustomTools] = useState<CustomToolItem[]>(() => loadCustomTools());
+  const [sharedFlows, setSharedFlows] = useState<SavedCustomFlow[]>(() => loadSharedFlows());
   const [githubUser, setGithubUser] = useState<GitHubUserProfile | null>(null);
   const [accountUsers, setAccountUsers] = useState<AccountUser[]>(() => loadAccountUsers());
   const [accountPolicy, setAccountPolicy] = useState<AccountPolicy>(() => loadAccountPolicy());
@@ -1259,6 +1372,9 @@ export function App() {
   const [isGithubToolSyncing, setIsGithubToolSyncing] = useState(false);
   const [customToolSearch, setCustomToolSearch] = useState("");
   const [customToolFilter, setCustomToolFilter] = useState<CustomToolFilter>("all");
+  const [deletedGithubToolPaths, setDeletedGithubToolPaths] = useState<string[]>(() =>
+    loadDeletedGithubToolPaths()
+  );
   const [expandedCustomToolIds, setExpandedCustomToolIds] = useState<string[]>([]);
   const [pendingDeleteCustomToolId, setPendingDeleteCustomToolId] = useState<string | null>(null);
   const [draggedSectionId, setDraggedSectionId] = useState<SidebarSectionId | null>(null);
@@ -1483,6 +1599,23 @@ export function App() {
     if (!storageWritesReadyRef.current) {
       return;
     }
+    saveSharedFlows(sharedFlows);
+  }, [sharedFlows]);
+
+  useEffect(() => {
+    if (!storageWritesReadyRef.current) {
+      return;
+    }
+    window.localStorage.setItem(
+      deletedGithubToolPathsStorageKey,
+      JSON.stringify(deletedGithubToolPaths)
+    );
+  }, [deletedGithubToolPaths]);
+
+  useEffect(() => {
+    if (!storageWritesReadyRef.current) {
+      return;
+    }
     window.localStorage.setItem(accountUsersStorageKey, JSON.stringify(accountUsers));
   }, [accountUsers]);
 
@@ -1493,14 +1626,18 @@ export function App() {
     window.localStorage.setItem(accountPolicyStorageKey, JSON.stringify(accountPolicy));
   }, [accountPolicy]);
 
+  const isCurrentAdmin = githubUser?.githubId === githubToolSource.owner;
+  const currentAccountUser = accountUsers.find((user) => user.githubId === githubUser?.githubId);
+  const currentUserNickname = currentAccountUser?.nickname || githubUser?.nickname || "";
+
   useEffect(() => {
     if (!githubUser || !isCustomToolFormOpen) {
       return;
     }
     setCustomToolDraft((draft) =>
-      draft.author === githubUser.nickname ? draft : { ...draft, author: githubUser.nickname }
+      draft.author === currentUserNickname ? draft : { ...draft, author: currentUserNickname }
     );
-  }, [githubUser?.nickname, isCustomToolFormOpen]);
+  }, [currentUserNickname, githubUser, isCustomToolFormOpen]);
 
   useEffect(() => {
     storageWritesReadyRef.current = true;
@@ -1545,7 +1682,7 @@ export function App() {
           user.githubId === githubUser.githubId
             ? {
                 ...user,
-                nickname: githubUser.nickname,
+                nickname: user.nickname || githubUser.nickname,
                 role: isAdmin ? "admin" : user.role,
                 license: isAdmin ? true : user.license,
                 status: isAdmin ? "active" : user.status
@@ -1568,8 +1705,6 @@ export function App() {
     });
   }, [accountPolicy.signupMode, githubUser]);
 
-  const isCurrentAdmin = githubUser?.githubId === githubToolSource.owner;
-  const currentAccountUser = accountUsers.find((user) => user.githubId === githubUser?.githubId);
   const isLoggedIn = Boolean(githubUser);
   const isLicenseAllowed =
     isLoggedIn &&
@@ -1591,7 +1726,7 @@ export function App() {
 
     const newReviewTools = customTools.filter((tool) => {
       const needsReview = tool.approvalStatus === "pending" || tool.reviewState === "open";
-      const isOwnTool = Boolean(githubUser?.nickname && tool.author === githubUser.nickname);
+      const isOwnTool = Boolean(currentUserNickname && tool.author === currentUserNickname);
       return needsReview && !isOwnTool && !notifiedPendingToolIdsRef.current.has(tool.id);
     });
 
@@ -1606,7 +1741,7 @@ export function App() {
         message: `${tool.author}님이 ${tool.name} ${tool.version} 툴을 등록했습니다.`
       });
     });
-  }, [customTools, githubUser?.nickname, isCurrentAdmin]);
+  }, [customTools, currentUserNickname, isCurrentAdmin]);
 
   useEffect(() => {
     if (!storageWritesReadyRef.current) {
@@ -1692,6 +1827,7 @@ export function App() {
           isRegistryDialogOpen ||
           isMonitorDialogOpen ||
           isCustomToolDialogOpen ||
+          isMyToolManagerDialogOpen ||
           isCustomToolFormOpen ||
           isAuthDialogOpen ||
           isTabOverflowOpen
@@ -1701,6 +1837,7 @@ export function App() {
           setIsRegistryDialogOpen(false);
           setIsMonitorDialogOpen(false);
           setIsCustomToolDialogOpen(false);
+          setIsMyToolManagerDialogOpen(false);
           setIsCustomToolFormOpen(false);
           setIsAuthDialogOpen(false);
           setIsTabOverflowOpen(false);
@@ -1729,6 +1866,7 @@ export function App() {
     isAuthDialogOpen,
     isCustomToolDialogOpen,
     isCustomToolFormOpen,
+    isMyToolManagerDialogOpen,
     isTabOverflowOpen,
     isMonitorDialogOpen,
     isRegistryDialogOpen,
@@ -1779,14 +1917,88 @@ export function App() {
     }
   };
 
+  const refreshOpenAiSettings = async () => {
+    const api = window.openAiSettings;
+    if (!api) {
+      setOpenAiSettingsMessage("데스크톱 앱에서만 AI 연결 설정을 저장할 수 있습니다.");
+      return;
+    }
+
+    try {
+      const status = await api.get();
+      setOpenAiSettingsStatus(status);
+      setOpenAiModelDraft(status.model || openAiToolRunnerDefaultModel);
+    } catch (error) {
+      setOpenAiSettingsMessage(
+        error instanceof Error ? error.message : "AI 연결 설정을 불러오지 못했습니다."
+      );
+    }
+  };
+
+  const saveOpenAiSettings = async () => {
+    const api = window.openAiSettings;
+    if (!api) {
+      setOpenAiSettingsMessage("데스크톱 앱에서만 AI 연결 설정을 저장할 수 있습니다.");
+      return;
+    }
+
+    if (!openAiApiKeyDraft.trim() && !openAiSettingsStatus?.configured) {
+      setOpenAiSettingsMessage("OpenAI API 키를 입력해주세요.");
+      return;
+    }
+
+    setIsOpenAiSettingsBusy(true);
+    setOpenAiSettingsMessage("");
+    try {
+      const status = await api.save({
+        apiKey: openAiApiKeyDraft.trim() || undefined,
+        model: openAiModelDraft.trim() || openAiToolRunnerDefaultModel
+      });
+      setOpenAiSettingsStatus(status);
+      setOpenAiModelDraft(status.model || openAiToolRunnerDefaultModel);
+      setOpenAiApiKeyDraft("");
+      setOpenAiSettingsMessage("AI 연결 설정을 저장했습니다.");
+    } catch (error) {
+      setOpenAiSettingsMessage(
+        error instanceof Error ? error.message : "AI 연결 설정을 저장하지 못했습니다."
+      );
+    } finally {
+      setIsOpenAiSettingsBusy(false);
+    }
+  };
+
+  const clearOpenAiSettings = async () => {
+    const api = window.openAiSettings;
+    if (!api) {
+      setOpenAiSettingsMessage("데스크톱 앱에서만 AI 연결 설정을 삭제할 수 있습니다.");
+      return;
+    }
+
+    setIsOpenAiSettingsBusy(true);
+    setOpenAiSettingsMessage("");
+    try {
+      const status = await api.clear();
+      setOpenAiSettingsStatus(status);
+      setOpenAiModelDraft(status.model || openAiToolRunnerDefaultModel);
+      setOpenAiApiKeyDraft("");
+      setOpenAiSettingsMessage("저장된 API 키를 삭제했습니다.");
+    } catch (error) {
+      setOpenAiSettingsMessage(
+        error instanceof Error ? error.message : "저장된 API 키를 삭제하지 못했습니다."
+      );
+    } finally {
+      setIsOpenAiSettingsBusy(false);
+    }
+  };
+
   const installProgramMcpRegistrarSkill = async () => {
     try {
       const result = await window.skillInstaller?.installProgramMcpRegistrar();
       pushAppNotification({
         title: "/등록 스킬 설치 완료",
         message: result?.installedPath
-          ? `이 컴퓨터에서 /등록 명령으로 프로그램 MCP 연결값을 만들고 검증할 수 있습니다. 설치 위치: ${result.installedPath}`
-          : "이 컴퓨터에서 /등록 명령으로 프로그램 MCP 연결값을 만들고 검증할 수 있습니다."
+          ? `이 컴퓨터에서 /등록 명령으로 프로그램 MCP 브리지를 생성, 등록, 연결, 검증할 수 있습니다. 설치 위치: ${result.installedPath}`
+          : "이 컴퓨터에서 /등록 명령으로 프로그램 MCP 브리지를 생성, 등록, 연결, 검증할 수 있습니다."
       });
     } catch {
       pushAppNotification({
@@ -1826,7 +2038,7 @@ export function App() {
         return;
       }
 
-      if (!registry.servers.some((server) => server.id === selectedId)) {
+      if (selectedId && !registry.servers.some((server) => server.id === selectedId)) {
         setSelectedId(registry.servers[0].id);
       }
       return;
@@ -1837,10 +2049,16 @@ export function App() {
       return;
     }
 
-    if (!visibleServers.some((server) => server.id === selectedId)) {
+    if (selectedId && !visibleServers.some((server) => server.id === selectedId)) {
       setSelectedId(visibleServers[0].id);
     }
   }, [activeSettingsSection, isRegistryDialogOpen, registry.servers, selectedId, visibleServers]);
+
+  useEffect(() => {
+    if (isRegistryDialogOpen && activeSettingsSection === "ai") {
+      void refreshOpenAiSettings();
+    }
+  }, [activeSettingsSection, isRegistryDialogOpen]);
 
   const selected = useMemo<McpServerRecord | undefined>(
     () => visibleServers.find((server) => server.id === selectedId),
@@ -2016,7 +2234,7 @@ export function App() {
     if (sectionId === "workflow" && workflowFlowMenu) {
       const flow =
         workflowFlowMenu.source === "shared"
-          ? sampleSharedFlows.find((item) => item.id === workflowFlowMenu.flowId)
+          ? sharedFlowCatalog.find((item) => item.id === workflowFlowMenu.flowId)
           : workflowSavedFlowsForMenu.find((item) => item.id === workflowFlowMenu.flowId);
       if (flow) {
         return {
@@ -2042,17 +2260,15 @@ export function App() {
       }
     }
 
-    if (submenuId.startsWith("custom-tool-")) {
-      const customTool = customTools.find((tool) => tool.id === submenuId);
-      if (customTool) {
-        return {
-          id: submenuId,
-          label: customTool.name,
-          description: customTool.description || `${customTool.author} 쨌 v${customTool.version}`,
-          settingsSchema: customTool.toolSchema,
-          ...submenuMeta[key]
-        };
-      }
+    const customTool = customTools.find((tool) => tool.id === submenuId);
+    if (customTool) {
+      return {
+        id: submenuId,
+        label: customTool.name,
+        description: customTool.description || `${customTool.author} · v${customTool.version}`,
+        settingsSchema: customTool.toolSchema,
+        ...submenuMeta[key]
+      };
     }
 
     const base =
@@ -2081,7 +2297,7 @@ export function App() {
     const savedOrder = submenuOrder[sectionId] ?? [];
     if (sectionId === "workflow") {
       const workflowItems = [
-        ...listWorkflowMenuFlowItems(sampleSharedFlows, workflowSavedFlowsForMenu),
+        ...listWorkflowMenuFlowItems(sharedFlowCatalog, workflowSavedFlowsForMenu),
         ...getDefaultSubmenuItemsForSection(sectionId)
       ];
       const workflowIds = workflowItems.map((item) => item.id);
@@ -2107,7 +2323,7 @@ export function App() {
         .map((tool) => ({
           id: tool.id,
           label: tool.name,
-          description: tool.description || `${tool.author} 쨌 v${tool.version}`,
+          description: tool.description || `${tool.author} · v${tool.version}`,
           settingsSchema: tool.toolSchema
         }))
     ];
@@ -2141,7 +2357,7 @@ export function App() {
     if (sectionId === "workflow" && workflowFlowMenu) {
       const flow =
         workflowFlowMenu.source === "shared"
-          ? sampleSharedFlows.find((item) => item.id === workflowFlowMenu.flowId)
+          ? sharedFlowCatalog.find((item) => item.id === workflowFlowMenu.flowId)
           : workflowSavedFlowsForMenu.find((item) => item.id === workflowFlowMenu.flowId);
       if (!flow) {
         return;
@@ -2230,7 +2446,7 @@ export function App() {
     setAuthDialogMode(mode);
     setAuthDraft({
       githubId: githubUser?.githubId ?? githubToolSource.owner,
-      nickname: githubUser?.nickname ?? ""
+      nickname: currentUserNickname
     });
     setAuthDevice(null);
     setAuthMessage("");
@@ -2312,6 +2528,11 @@ export function App() {
       const profile = await window.githubAuth?.updateNickname(nickname);
       if (profile) {
         setGithubUser(profile);
+        setAccountUsers((users) =>
+          users.map((user) =>
+            user.githubId === profile.githubId ? { ...user, nickname: profile.nickname } : user
+          )
+        );
       }
       setIsAuthDialogOpen(false);
     } finally {
@@ -2375,8 +2596,12 @@ export function App() {
     setAccountUsers((users) => users.filter((user) => user.githubId !== githubId));
   };
 
-  const openCustomToolDialog = (scope: SidebarSectionId | "all") => {
+  const openCustomToolDialog = (
+    scope: SidebarSectionId | "all",
+    tab: MarketDialogTab = "tools"
+  ) => {
     setCustomToolDialogScope(scope);
+    setMarketDialogTab(tab);
     setIsCustomToolDialogOpen(true);
     void syncCustomToolsFromGitHub();
     void refreshToolReviewStates();
@@ -2389,9 +2614,17 @@ export function App() {
     }
     setCustomToolDraft({
       ...createCustomToolDraft(),
-      author: githubUser.nickname
+      author: currentUserNickname || githubUser.githubId
     });
     setIsCustomToolFormOpen(true);
+  };
+
+  const registerSharedFlow = (flow: SavedCustomFlow) => {
+    setSharedFlows((items) => upsertSharedFlow(items, flow));
+    pushAppNotification({
+      title: "Share Flow 등록",
+      message: `${flow.name} 플로우를 Share Flow에 추가했습니다.`
+    });
   };
 
   const syncCustomToolsFromGitHub = async () => {
@@ -2405,57 +2638,81 @@ export function App() {
 
     try {
       const githubTools = await window.customTools.listGithubTools(githubToolSource);
+      const visibleGithubTools = githubTools.filter(
+        (tool) => !deletedGithubToolPaths.includes(tool.path)
+      );
       setCustomTools((items) => {
         const existingGithubItems = items.filter((item) =>
           item.installedPath?.startsWith(githubToolPathPrefix)
         );
+        const groupedTools = new Map<
+          string,
+          {
+            sectionId: SidebarSectionId;
+            name: string;
+            versions: CustomToolVersion[];
+          }
+        >();
 
-        return [
-          ...githubTools.map((tool) => {
-            const sectionId = isSidebarSectionId(tool.sectionId) ? tool.sectionId : "servers";
-            const existing = existingGithubItems.find((item) => item.installedPath === tool.path);
-
-            return {
-              id: existing?.id ?? `github-tool-${hashString(tool.path)}`,
+        visibleGithubTools.forEach((tool) => {
+          const sectionId = isSidebarSectionId(tool.sectionId) ? tool.sectionId : "servers";
+          const groupKey = `${sectionId}:${tool.name}`;
+          const group =
+            groupedTools.get(groupKey) ??
+            {
               sectionId,
               name: tool.name,
-              description: tool.description,
-              version: tool.version,
-              author: tool.author || githubToolSource.owner,
+              versions: []
+            };
+
+          group.versions.push({
+            id: tool.id,
+            version: tool.version,
+            author: tool.author || githubToolSource.owner,
+            description: tool.description,
+            sourcePath: tool.path,
+            installedPath: tool.path,
+            isToolLike: tool.isToolLike,
+            riskWarnings: tool.riskWarnings,
+            toolSchema: tool.toolSchema
+          });
+          groupedTools.set(groupKey, group);
+        });
+
+        return [
+          ...[...groupedTools.values()].map((tool) => {
+            const versions = [...tool.versions].sort((left, right) =>
+              compareToolVersionDesc(left.version, right.version)
+            );
+            const activeVersion = versions[0];
+            const existing = existingGithubItems.find(
+              (item) => item.sectionId === tool.sectionId && item.name === tool.name
+            );
+
+            return {
+              id: existing?.id ?? `github-tool-${hashString(`${tool.sectionId}:${tool.name}`)}`,
+              sectionId: tool.sectionId,
+              name: tool.name,
+              description: activeVersion.description,
+              version: activeVersion.version,
+              author: activeVersion.author || githubToolSource.owner,
               createdAt: existing?.createdAt ?? new Date().toISOString(),
               usageCount: existing?.usageCount ?? 0,
               pinned: existing?.pinned ?? false,
               registered: existing?.registered ?? false,
               approvalStatus: existing?.approvalStatus ?? "approved",
-              isToolLike: tool.isToolLike,
-              riskWarnings: tool.riskWarnings,
-              toolSchema: tool.toolSchema,
-              sourcePath: tool.path,
-              installedPath: tool.path,
+              isToolLike: activeVersion.isToolLike,
+              riskWarnings: activeVersion.riskWarnings,
+              toolSchema: activeVersion.toolSchema,
+              sourcePath: activeVersion.sourcePath,
+              installedPath: activeVersion.installedPath,
               reviewUrl: existing?.reviewUrl,
-              versions: [
-                {
-                  id: tool.id,
-                  version: tool.version,
-                  author: tool.author || githubToolSource.owner,
-                  description: tool.description,
-                  sourcePath: tool.path,
-                  installedPath: tool.path,
-                  reviewUrl: existing?.reviewUrl,
-                  isToolLike: tool.isToolLike,
-                  riskWarnings: tool.riskWarnings,
-                  toolSchema: tool.toolSchema
-                }
-              ]
+              versions: [activeVersion]
             };
           })
         ];
       });
-      setGithubToolStatus(
-        githubTools.length > 0
-          ? `GitHub에서 ${githubTools.length}개의 MD 툴을 가져왔습니다.`
-          : "GitHub tools 폴더에 등록된 MD 툴이 없습니다."
-      );
+      setGithubToolStatus("");
     } catch {
       setGithubToolStatus("GitHub 툴 목록을 읽지 못했습니다. 저장소 공개 여부와 tools 폴더를 확인해주세요.");
     } finally {
@@ -2594,7 +2851,7 @@ export function App() {
         ...remainingItems,
         ...[...groupedTools.values()].map((tool) => {
           const versions = [...tool.versions].sort((left, right) =>
-            right.version.localeCompare(left.version, "ko", { numeric: true })
+            compareToolVersionDesc(left.version, right.version)
           );
           const activeVersion = versions[0];
           const existing = items.find(
@@ -2622,7 +2879,7 @@ export function App() {
             approvalStatus: existing?.approvalStatus ?? "approved",
             sourcePath: activeVersion.sourcePath,
             installedPath: activeVersion.installedPath,
-            versions
+            versions: [activeVersion]
           };
         })
       ];
@@ -2660,7 +2917,7 @@ export function App() {
       name: tool?.name ?? draft.name,
       description: tool?.description ?? draft.description,
       version: tool?.version ?? draft.version,
-      author: githubUser?.nickname ?? draft.author,
+      author: currentUserNickname || draft.author,
       isToolLike: tool?.isToolLike ?? draft.isToolLike,
       riskWarnings: tool?.riskWarnings ?? draft.riskWarnings,
       toolSchema: tool?.toolSchema ?? draft.toolSchema,
@@ -2673,10 +2930,14 @@ export function App() {
   };
 
   const saveCustomToolDraft = async () => {
+    if (isSavingCustomTool) {
+      return;
+    }
+
     const name = customToolDraft.name.trim();
     const description = customToolDraft.description.trim();
     const version = customToolDraft.version.trim();
-    const author = githubUser?.nickname.trim() ?? "";
+    const author = currentUserNickname.trim() || githubUser?.githubId.trim() || "";
 
     if (!githubUser) {
       setCustomToolDraft((draft) => ({
@@ -2735,6 +2996,19 @@ export function App() {
       return;
     }
 
+    if (customToolDraft.mode === "update" && target) {
+      const currentAuthorNames = [currentUserNickname, githubUser?.githubId]
+        .filter((item): item is string => Boolean(item?.trim()))
+        .map((item) => item.trim());
+      if (!currentAuthorNames.includes(target.author.trim())) {
+        setCustomToolDraft((draft) => ({
+          ...draft,
+          error: "처음 등록한 제작자만 이 툴을 업데이트할 수 있습니다."
+        }));
+        return;
+      }
+    }
+
     if (
       customToolDraft.mode === "update" &&
       target?.installedPath &&
@@ -2778,6 +3052,7 @@ export function App() {
       riskWarnings: customToolDraft.riskWarnings
     });
 
+    setIsSavingCustomTool(true);
     try {
       if (!window.customTools?.publishGithubTool) {
         throw new Error("현재 실행 환경에서는 GitHub 툴 등록을 사용할 수 없습니다.");
@@ -2805,7 +3080,10 @@ export function App() {
     } catch (error) {
       const message =
         error instanceof Error
-          ? error.message.includes("403")
+          ? error.message.includes("403") ||
+            error.message.includes("404") ||
+            error.message.includes("GitHub 브랜치") ||
+            error.message.includes("repo 권한")
             ? "GitHub 권한이 부족합니다. 로그아웃 후 다시 로그인해서 저장소 권한을 승인해주세요."
             : error.message
           : "GitHub 툴 등록에 실패했습니다.";
@@ -2814,6 +3092,8 @@ export function App() {
         error: message
       }));
       return;
+    } finally {
+      setIsSavingCustomTool(false);
     }
 
     const installedPath = publishResult.path;
@@ -2839,25 +3119,22 @@ export function App() {
                 reviewUrl,
                 reviewNumber,
                 reviewState,
-                versions: item.versions
-                  ? [
-                      ...item.versions.filter((itemVersion) => itemVersion.version !== version),
-                      {
-                        id: `${item.id}-${version}`,
-                        version,
-                        author,
-                        description,
-                        sourcePath: customToolDraft.filePath,
-                        installedPath: installedPath ?? customToolDraft.filePath,
-                        reviewUrl,
-                        reviewNumber,
-                        reviewState,
-                        isToolLike: customToolDraft.isToolLike,
-                        riskWarnings: customToolDraft.riskWarnings,
-                        toolSchema: customToolDraft.toolSchema
-                      }
-                    ]
-                  : item.versions
+                versions: [
+                  {
+                    id: `${item.id}-${version}`,
+                    version,
+                    author,
+                    description,
+                    sourcePath: customToolDraft.filePath,
+                    installedPath: installedPath ?? customToolDraft.filePath,
+                    reviewUrl,
+                    reviewNumber,
+                    reviewState,
+                    isToolLike: customToolDraft.isToolLike,
+                    riskWarnings: customToolDraft.riskWarnings,
+                    toolSchema: customToolDraft.toolSchema
+                  }
+                ]
               }
             : item
         )
@@ -3037,8 +3314,20 @@ export function App() {
     );
   };
 
+  function isCustomToolOwnedByCurrentUser(tool: CustomToolItem) {
+    const author = tool.author.trim().toLowerCase();
+    return [currentUserNickname, githubUser?.githubId]
+      .filter((value): value is string => Boolean(value))
+      .some((value) => value.trim().toLowerCase() === author);
+  }
+
+  function canDeleteCustomTool(tool: CustomToolItem) {
+    return isCurrentAdmin || isCustomToolOwnedByCurrentUser(tool);
+  }
+
   const requestDeleteCustomTool = (toolId: string) => {
-    if (!isCurrentAdmin) {
+    const target = customTools.find((tool) => tool.id === toolId);
+    if (!target || !canDeleteCustomTool(target)) {
       return;
     }
 
@@ -3050,7 +3339,7 @@ export function App() {
   };
 
   const confirmDeleteCustomTool = async () => {
-    if (!isCurrentAdmin || !pendingDeleteCustomToolId) {
+    if (!pendingDeleteCustomToolId) {
       return;
     }
 
@@ -3059,23 +3348,44 @@ export function App() {
       setPendingDeleteCustomToolId(null);
       return;
     }
+    if (!canDeleteCustomTool(target)) {
+      setPendingDeleteCustomToolId(null);
+      return;
+    }
 
     const deletePaths = [target.installedPath, target.sourcePath].filter(
       (path): path is string => Boolean(path)
     );
+    const githubDeletePaths = deletePaths.filter((path) => path.startsWith("github:"));
+    if (githubDeletePaths.length > 0) {
+      setDeletedGithubToolPaths((paths) => [
+        ...paths,
+        ...githubDeletePaths.filter((path) => !paths.includes(path))
+      ]);
+    }
     const deleteResults =
       deletePaths.length > 0 && window.customTools?.deleteToolFiles
         ? await window.customTools.deleteToolFiles(deletePaths)
         : [];
-    const failedResults = deleteResults.filter((result) => result.status === "failed");
+    const failedResults = deleteResults.filter(
+      (result) => result.status === "failed" && !result.path.startsWith("github:")
+    );
+    const deleteRequestResults = deleteResults.filter((result) => result.status === "requested");
 
     removeCustomToolFromUi(target.id);
     setPendingDeleteCustomToolId(null);
     pushAppNotification({
-      title: failedResults.length > 0 ? "툴 삭제 일부 실패" : "툴 삭제 완료",
+      title:
+        failedResults.length > 0
+          ? "툴 삭제 일부 실패"
+          : deleteRequestResults.length > 0
+            ? "툴 삭제 PR 생성"
+            : "툴 삭제 완료",
       message:
         failedResults.length > 0
-          ? `${target.name}은 목록에서 제거됐지만 원본 파일 ${failedResults.length}개 삭제에 실패했습니다.`
+          ? `${target.name}은 목록에서 제거됐지만 원본 파일 ${failedResults.length}개 삭제에 실패했습니다. 실패 경로: ${failedResults.map((result) => result.path).join(", ")}`
+          : deleteRequestResults.length > 0
+            ? `${target.name}은 내 목록에서 숨겼고, GitHub 원본 삭제는 PR 승인 후 반영됩니다.`
           : `${target.name}과 연결된 원본 파일을 삭제했습니다.`
     });
   };
@@ -3277,30 +3587,6 @@ export function App() {
     setIsMonitorDialogOpen(true);
   };
 
-  const updateServerDraft = (field: keyof ServerDraft, value: ServerDraft[keyof ServerDraft]) => {
-    setServerDraft((draft) => ({ ...draft, [field]: value }));
-    setRegistryError("");
-  };
-
-  const startCreatingServer = (target: McpTarget = activeTab === "revit" ? "revit" : "cad") => {
-    setIsCreatingServer(true);
-    setSelectedId("");
-    setServerDraft(createServerDraft(target));
-    setRegistryError("");
-  };
-
-  const cancelServerEdit = () => {
-    setIsCreatingServer(false);
-    setRegistryError("");
-    if (selectedRegistryServer) {
-      setSelectedId(selectedRegistryServer.id);
-      setServerDraft(serverDraftFromRecord(selectedRegistryServer));
-      return;
-    }
-
-    setSelectedId(registry.servers[0]?.id ?? "");
-  };
-
   const applyRegistryResult = (next: RegistryFile, preferredId: string) => {
     setRegistry(next);
     setSelectedId(getSelectedServerId(next, preferredId));
@@ -3340,115 +3626,6 @@ export function App() {
       setProcessActionMessage("서버 중지 요청을 보냈습니다.");
     } catch (error) {
       setProcessActionMessage(error instanceof Error ? error.message : "서버 중지에 실패했습니다.");
-    }
-  };
-
-  const saveServer = async () => {
-    const errors = validateServerDraft(serverDraft);
-    if (errors.length > 0) {
-      setRegistryError(errors.join(" "));
-      return;
-    }
-
-    const input = serverInputFromDraft(serverDraft);
-    const api = window.mcpRegistry;
-    setRegistryError("");
-
-    try {
-      if (isCreatingServer) {
-        if (api) {
-          const next = await api.addServer(input);
-          applyRegistryResult(next, next.servers.at(-1)?.id ?? "");
-        } else {
-          const now = new Date().toISOString();
-          const server: McpServerRecord = {
-            ...input,
-            id: crypto.randomUUID(),
-            status: "unknown",
-            createdAt: now,
-            updatedAt: now
-          };
-          applyRegistryResult({ ...registry, servers: [...registry.servers, server] }, server.id);
-        }
-        setIsCreatingServer(false);
-        return;
-      }
-
-      if (!selectedRegistryServer) {
-        return;
-      }
-
-      if (api) {
-        const next = await api.updateServer(selectedRegistryServer.id, input);
-        applyRegistryResult(next, selectedRegistryServer.id);
-      } else {
-        const now = new Date().toISOString();
-        const next = {
-          ...registry,
-          servers: registry.servers.map((server) =>
-            server.id === selectedRegistryServer.id
-              ? { ...server, ...input, id: server.id, updatedAt: now }
-              : server
-          )
-        };
-        applyRegistryResult(next, selectedRegistryServer.id);
-      }
-    } catch (error) {
-      setRegistryError(error instanceof Error ? error.message : "저장에 실패했습니다.");
-    }
-  };
-
-  const deleteSelectedServer = async () => {
-    if (!selectedRegistryServer || isCreatingServer) {
-      return;
-    }
-
-    const api = window.mcpRegistry;
-    setRegistryError("");
-
-    try {
-      if (api) {
-        const next = await api.deleteServer(selectedRegistryServer.id);
-        applyRegistryResult(next, "");
-      } else {
-        const next = {
-          ...registry,
-          servers: registry.servers.filter((server) => server.id !== selectedRegistryServer.id)
-        };
-        applyRegistryResult(next, "");
-      }
-    } catch (error) {
-      setRegistryError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
-    }
-  };
-
-  const autoAddServers = async () => {
-    const api = window.mcpRegistry;
-    setRegistryError("");
-    setAutoAddMessage("");
-
-    if (!api) {
-      const message = "자동 추가 테스트는 데스크톱 프로그램에서 사용할 수 있습니다.";
-      setRegistryError(message);
-      setAutoAddMessage(message);
-      return;
-    }
-
-    try {
-      const beforeCount = registry.servers.length;
-      const next = await api.autoAddServers();
-      applyRegistryResult(next, next.servers.at(-1)?.id ?? selectedId);
-      setIsCreatingServer(false);
-      const message =
-        next.servers.length === beforeCount
-          ? "새로 감지된 MCP 서버가 없습니다."
-          : `${next.servers.length - beforeCount}개 서버를 자동 추가했습니다.`;
-      setRegistryError(message);
-      setAutoAddMessage(message);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "자동 추가에 실패했습니다.";
-      setRegistryError(message);
-      setAutoAddMessage(message);
     }
   };
 
@@ -3679,6 +3856,17 @@ export function App() {
               setDraggedSubmenu({ sectionId: section.id, submenuId: submenu.id });
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", key);
+              const workflowFlowMenu = parseWorkflowMenuFlowId(submenu.id);
+              if (section.id === "workflow" && workflowFlowMenu) {
+                const flow =
+                  workflowFlowMenu.source === "shared"
+                    ? sharedFlowCatalog.find((item) => item.id === workflowFlowMenu.flowId)
+                    : workflowSavedFlowsForMenu.find((item) => item.id === workflowFlowMenu.flowId);
+                if (flow) {
+                  event.dataTransfer.effectAllowed = "copyMove";
+                  event.dataTransfer.setData("application/x-custom-flow", serializeSavedFlowForDrag(flow));
+                }
+              }
               const flowToolId = flowToolIdFromMenuItem(section.id, submenu);
               if (flowToolId) {
                 event.dataTransfer.effectAllowed = "copyMove";
@@ -3782,7 +3970,7 @@ export function App() {
     ? topbarSubtitle(displayServerWorkspace, activeCompactSection)
     : activePageSubtitle;
   const displayCustomTool =
-    displaySubmenuInfo && displaySubmenuInfo.submenuId.startsWith("custom-tool-")
+    displaySubmenuInfo
       ? customTools.find((tool) => tool.id === displaySubmenuInfo.submenuId)
       : undefined;
   const canEditDisplayHeader =
@@ -3837,12 +4025,6 @@ export function App() {
       if (customToolFilter === "pending") {
         return tool.approvalStatus === "pending";
       }
-      if (customToolFilter === "registered") {
-        return tool.registered;
-      }
-      if (customToolFilter === "unregistered") {
-        return !tool.registered;
-      }
       return true;
     })
     .filter((tool) =>
@@ -3857,8 +4039,20 @@ export function App() {
     .sort(compareCustomTools);
   const customToolDialogTitle =
     customToolDialogScope === "all"
-      ? "More Tools"
+      ? "Market"
       : `${sidebarLabel(customToolDialogScope)} Custom Tools`;
+  const isMarketDialog = customToolDialogScope === "all";
+  const sharedFlowCatalog = useMemo(() => {
+    const seen = new Set<string>();
+    return [...sampleSharedFlows, ...listSavedFlows(sharedFlows)].filter((flow) => {
+      if (seen.has(flow.id)) {
+        return false;
+      }
+      seen.add(flow.id);
+      return true;
+    });
+  }, [sharedFlows]);
+  const myCustomTools = customTools.filter((tool) => isCustomToolOwnedByCurrentUser(tool)).sort(compareCustomTools);
   const showCompactCustomToolColumns = isCompact;
 
   const toggleCustomToolSort = (field: CustomToolSortField) => {
@@ -3880,6 +4074,27 @@ export function App() {
         <span className="sortArrow">{customToolSort.direction === "desc" ? "↓" : "↑"}</span>
       ) : null}
     </button>
+  );
+
+  const renderToolNameHeader = () => (
+    <div className="toolNameHeader">
+      {renderSortHeader("name", "툴 이름")}
+      <div className="tableFilterMenuWrap">
+        <select
+          className={customToolFilter === "all" ? "tableFilterSelect" : "tableFilterSelect active"}
+          aria-label="툴 이름 필터"
+          title="툴 이름 필터"
+          value={customToolFilter}
+          onChange={(event) => setCustomToolFilter(event.target.value as CustomToolFilter)}
+        >
+          {customToolFilterOptions.map(({ filter, label }) => (
+            <option key={filter} value={filter}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 
   const getAccountStatusLabel = (user: AccountUser) => {
@@ -3938,11 +4153,7 @@ export function App() {
   };
 
   const visibleAccountUsers = [...accountUsers].sort(compareAccountUsers);
-  const pendingReviewTools = customTools.filter(
-    (tool) =>
-      tool.approvalStatus !== "rejected" &&
-      (tool.approvalStatus === "pending" || tool.reviewState === "open")
-  );
+  const pendingReviewTools = customTools.filter((tool) => tool.approvalStatus === "pending");
 
   const toggleAccountUserSort = (field: AccountUserSortField) => {
     setAccountUserSort((current) => {
@@ -3980,6 +4191,35 @@ export function App() {
       return "닫힘";
     }
     return "PR 대기";
+  };
+
+  const getMyToolStatusClass = (tool: CustomToolItem) => {
+    if (tool.approvalStatus === "pending") {
+      return "pending";
+    }
+    if (tool.approvalStatus === "rejected" || tool.reviewState === "closed") {
+      return "rejected";
+    }
+    if (tool.reviewState === "open") {
+      return "githubPending";
+    }
+    return "approved";
+  };
+
+  const getMyToolStatusLabel = (tool: CustomToolItem) => {
+    if (tool.approvalStatus === "pending") {
+      return "승인 대기";
+    }
+    if (tool.approvalStatus === "rejected") {
+      return "관리자 거절";
+    }
+    if (tool.reviewState === "closed") {
+      return "GitHub 닫힘";
+    }
+    if (tool.reviewState === "open") {
+      return "GitHub 승인 대기";
+    }
+    return "승인";
   };
 
   const getTabWorkStatus = (_tab: AppTab): "running" | "done" | "error" | null => null;
@@ -4300,7 +4540,7 @@ export function App() {
               onClick={() => openAuthDialog(githubUser ? "profile" : "login")}
               title={githubUser ? "회원 정보" : "로그인"}
             >
-              {githubUser ? `${githubUser.nickname}님` : "로그인"}
+              {githubUser ? `${currentUserNickname || githubUser.githubId}님` : "로그인"}
             </button>
           </div>
         </div>
@@ -4575,11 +4815,11 @@ export function App() {
           onClick={() => openCustomToolDialog("all")}
         >
           <span className="navShort" aria-hidden="true">
-            <AppIcon name="moreTools" className="utilityIcon" />
+            <AppIcon name="market" className="utilityIcon" />
           </span>
           <span className="navFull">
-            <AppIcon name="moreTools" className="utilityIcon" />
-            <span>More Tools</span>
+            <AppIcon name="market" className="utilityIcon" />
+            <span>Market</span>
           </span>
         </button>
         <div className="sidebarUtilityGrid">
@@ -4739,7 +4979,9 @@ export function App() {
               homeRequestId={workflowHomeRequestId}
               openRequest={workflowOpenRequest}
               detailsUpdateRequest={workflowDetailsUpdateRequest}
+              sharedFlows={sharedFlowCatalog}
               onCreateRequestConsumed={() => setWorkflowCreateRequest(null)}
+              onOpenFlowMarket={() => openCustomToolDialog("all", "flows")}
               onNotify={pushAppNotification}
               onSavedFlowsChange={setWorkflowSavedFlowsForMenu}
               onSavedFlowOpened={(flow, source) => {
@@ -4774,6 +5016,7 @@ export function App() {
             customTools={customTools.filter(
               (tool) => tool.sectionId === displaySidebarSection && tool.registered
             )}
+            isCompact={isCompact}
             isMcpReady={displayMcpReady}
             disabledReason={displayDisabledToolReason}
             onAddCustomTool={() => openCustomToolDialog(displaySidebarSection)}
@@ -5056,187 +5299,257 @@ export function App() {
               <div className="dialogContent">
                 {activeSettingsSection === "servers" ? (
                   <>
-                    <div className="dialogSummary">
-                      <Metric label="등록 서버" value={registry.servers.length} />
-                      <Metric label="연결 서버" value={runningCount} />
-                      <Metric label="미연결 서버" value={disconnectedCount} />
-                    </div>
-                    <div className="dialogServerGrid">
-                      <section className="dialogPanel">
-                        <div className="panelHeader">
-                          <h2>서버 목록</h2>
-                          <span className="panelHeaderNote">자동 감지 또는 수동 추가로 연결할 MCP 서버를 등록합니다.</span>
-                          <div className="panelHeaderActions">
-                            <button className="secondaryAction" type="button" onClick={autoAddServers}>
-                              자동 추가
-                            </button>
-                            <button className="secondaryAction" type="button" onClick={() => startCreatingServer()}>
-                              수동 추가
-                            </button>
+                    <section className="dialogPanel collapsibleSettingsPanel">
+                      <div className="settingsCollapseHeader staticSettingsHeader">
+                        <div>
+                          <h2>MCP 서버</h2>
+                          <span className="panelHeaderNote">
+                            등록 {registry.servers.length}개 · 연결 {runningCount}개 · 미연결 {disconnectedCount}개
+                          </span>
+                        </div>
+                      </div>
+                          <div className="dialogSummary">
+                            <Metric label="등록 서버" value={registry.servers.length} />
+                            <Metric label="연결 서버" value={runningCount} />
+                            <Metric label="미연결 서버" value={disconnectedCount} />
                           </div>
-                        </div>
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>이름</th>
-                              <th>대상</th>
-                              <th>상태</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {registry.servers.map((server) => (
-                              <tr
-                                key={server.id}
-                                className={!isCreatingServer && server.id === selectedId ? "selectedRow" : ""}
-                                onClick={() => {
-                                  setIsCreatingServer(false);
-                                  setSelectedId(server.id);
-                                  setRegistryError("");
-                                }}
-                              >
-                                <td>{server.name}</td>
-                                <td>{targetLabel(server.target)}</td>
-                                <td>{statusLabel(server.status)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {isCreatingServer || selectedRegistryServer ? (
-                        <div className="inlineServerDetail">
-                        <div className="panelHeader">
-                          <h2>{isCreatingServer ? "새 서버 추가" : "선택 서버 상세"}</h2>
-                        </div>
-                          <div className="details serverEditor">
-                            <label className="field">
-                              <span>서버 이름</span>
-                              <input
-                                value={serverDraft.name}
-                                onChange={(event) => updateServerDraft("name", event.target.value)}
-                              />
-                            </label>
-                            <label className="field">
-                              <span>대상</span>
-                              <select
-                                value={serverDraft.target}
-                                onChange={(event) =>
-                                  updateServerDraft("target", event.target.value as McpTarget)
-                                }
-                              >
+                          <div className="dialogServerGrid">
+                            <section className="dialogPanel">
+                              <div className="panelHeader">
+                                <h2>서버 목록</h2>
+                                <span className="panelHeaderNote">등록된 MCP 서버를 선택하면 상세 정보를 확인할 수 있습니다.</span>
+                              </div>
+                              <table>
+                                <thead>
+                                  <tr>
+                                    <th>이름</th>
+                                    <th>대상</th>
+                                    <th>상태</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {registry.servers.map((server) => (
+                                    <tr
+                                      key={server.id}
+                                      className={!isCreatingServer && server.id === selectedId ? "selectedRow" : ""}
+                                      onClick={() => {
+                                        setIsCreatingServer(false);
+                                        setSelectedId((current) => (current === server.id ? "" : server.id));
+                                        setRegistryError("");
+                                      }}
+                                    >
+                                      <td>{server.name}</td>
+                                      <td>{targetLabel(server.target)}</td>
+                                      <td>{statusLabel(server.status)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              {selectedRegistryServer ? (
+                              <div className="inlineServerDetail">
+                              <div className="panelHeader">
+                                <h2>선택 서버 상세</h2>
+                              </div>
+                                <div className="details serverEditor">
+                                  <label className="field">
+                                    <span>서버 이름</span>
+                                    <input
+                                      value={serverDraft.name}
+                                      readOnly
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>대상</span>
+                                    <select
+                                      value={serverDraft.target}
+                                      disabled
+                                    >
                                 <option value="cad">CAD</option>
                                 <option value="revit">Revit</option>
+                                <option value="excel">Excel</option>
+                                <option value="tekla">Tekla</option>
                                 <option value="other">Other</option>
                               </select>
-                            </label>
-                            <label className="field">
-                              <span>연결 방식</span>
-                              <select
-                                value={serverDraft.connectionType}
-                                onChange={(event) =>
-                                  updateServerDraft(
-                                    "connectionType",
-                                    event.target.value as ServerDraft["connectionType"]
-                                  )
-                                }
-                              >
-                                <option value="http">HTTP</option>
-                                <option value="sse">SSE</option>
-                                <option value="stdio">STDIO</option>
-                              </select>
-                            </label>
-                            <label className="field">
-                              <span>연결 URL</span>
-                              <input
-                                value={serverDraft.url}
-                                onChange={(event) => updateServerDraft("url", event.target.value)}
-                              />
-                            </label>
-                            <label className="field">
-                              <span>포트</span>
-                              <input
-                                inputMode="numeric"
-                                value={serverDraft.port}
-                                onChange={(event) => updateServerDraft("port", event.target.value)}
-                              />
-                            </label>
-                            <label className="field">
-                              <span>실행 명령</span>
-                              <input
-                                value={serverDraft.launchCommand}
-                                onChange={(event) =>
-                                  updateServerDraft("launchCommand", event.target.value)
-                                }
-                              />
-                            </label>
-                            <label className="field">
-                              <span>작업 폴더</span>
-                              <input
-                                value={serverDraft.workingDirectory}
-                                onChange={(event) =>
-                                  updateServerDraft("workingDirectory", event.target.value)
-                                }
-                              />
-                            </label>
-                            <label className="field">
-                              <span>메모</span>
-                              <textarea
-                                value={serverDraft.notes}
-                                onChange={(event) => updateServerDraft("notes", event.target.value)}
-                              />
-                            </label>
-                            {registryError ? <p className="formError">{registryError}</p> : null}
-                            {processActionMessage ? (
-                              <p className="processActionMessage">{processActionMessage}</p>
-                            ) : null}
-                            <div className="serverEditorActions">
-                              <button className="primary" type="button" onClick={saveServer}>
-                                저장
-                              </button>
-                              <button
-                                className="secondaryAction"
-                                type="button"
-                                disabled={
-                                  isCreatingServer ||
-                                  isSelectedServerRunning ||
-                                  !selectedRegistryServer?.launchCommand.trim()
-                                }
-                                onClick={() =>
-                                  selectedRegistryServer
-                                    ? startServerProcess(selectedRegistryServer.id)
-                                    : undefined
-                                }
-                              >
-                                실행
-                              </button>
-                              <button
-                                className="secondaryAction"
-                                type="button"
-                                disabled={isCreatingServer || !isSelectedServerRunning}
-                                onClick={() =>
-                                  selectedRegistryServer
-                                    ? stopServerProcess(selectedRegistryServer.id)
-                                    : undefined
-                                }
-                              >
-                                중지
-                              </button>
-                              <button className="secondaryAction" type="button" onClick={cancelServerEdit}>
-                                초기화
-                              </button>
-                              <button
-                                className="dangerAction"
-                                type="button"
-                                disabled={isCreatingServer}
-                                onClick={deleteSelectedServer}
-                              >
-                                삭제
-                              </button>
-                            </div>
+                                  </label>
+                                  <label className="field">
+                                    <span>연결 방식</span>
+                                    <select
+                                      value={serverDraft.connectionType}
+                                      disabled
+                                    >
+                                      <option value="http">HTTP</option>
+                                      <option value="sse">SSE</option>
+                                      <option value="stdio">STDIO</option>
+                                    </select>
+                                  </label>
+                                  <label className="field">
+                                    <span>연결 URL</span>
+                                    <input
+                                      value={serverDraft.url}
+                                      readOnly
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>포트</span>
+                                    <input
+                                      inputMode="numeric"
+                                      value={serverDraft.port}
+                                      readOnly
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>실행 명령</span>
+                                    <input
+                                      value={serverDraft.launchCommand}
+                                      readOnly
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>작업 폴더</span>
+                                    <input
+                                      value={serverDraft.workingDirectory}
+                                      readOnly
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>메모</span>
+                                    <textarea
+                                      value={serverDraft.notes}
+                                      readOnly
+                                    />
+                                  </label>
+                                  {registryError ? <p className="formError">{registryError}</p> : null}
+                                  {processActionMessage ? (
+                                    <p className="processActionMessage">{processActionMessage}</p>
+                                  ) : null}
+                                  <div className="serverEditorActions">
+                                    <button
+                                      className="secondaryAction"
+                                      type="button"
+                                      disabled={
+                                        isSelectedServerRunning ||
+                                        !selectedRegistryServer?.launchCommand.trim()
+                                      }
+                                      onClick={() =>
+                                        selectedRegistryServer
+                                          ? startServerProcess(selectedRegistryServer.id)
+                                          : undefined
+                                      }
+                                    >
+                                      실행
+                                    </button>
+                                    <button
+                                      className="secondaryAction"
+                                      type="button"
+                                      disabled={!isSelectedServerRunning}
+                                      onClick={() =>
+                                        selectedRegistryServer
+                                          ? stopServerProcess(selectedRegistryServer.id)
+                                          : undefined
+                                      }
+                                    >
+                                      중지
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                              ) : null}
+                            </section>
                           </div>
-                        </div>
-                        ) : null}
-                      </section>
-                    </div>
+                    </section>
                   </>
+                ) : activeSettingsSection === "ai" ? (
+                  <section className="dialogPanel accountSettingsPanel aiSettingsPanel">
+                    <div className="panelHeader">
+                      <h2>AI 연결</h2>
+                      <span className="panelHeaderNote">
+                        실행 버튼에서 OpenAI API를 직접 호출할 수 있도록 이 컴퓨터의 API 키와 모델을 설정합니다.
+                      </span>
+                    </div>
+                    <div className="accountInfoGrid aiInfoGrid">
+                      <div className="accountInfoCard">
+                        <strong>
+                          {openAiSettingsStatus?.configured ? "연결 준비됨" : "API 키 필요"}
+                        </strong>
+                        <span>
+                          {openAiSettingsStatus?.source === "stored"
+                            ? "설정창에 저장된 API 키를 사용합니다."
+                            : openAiSettingsStatus?.source === "environment"
+                              ? "환경 변수 API 키를 사용합니다."
+                              : "API 키를 저장하면 툴 실행 시 AI 계획을 생성합니다."}
+                        </span>
+                      </div>
+                      <div className="accountInfoCard">
+                        <strong>{openAiSettingsStatus?.model ?? openAiModelDraft}</strong>
+                        <span>사용 모델</span>
+                      </div>
+                      <div className="accountInfoCard">
+                        <strong>
+                          {openAiSettingsStatus?.encryptionAvailable === false
+                            ? "암호화 불가"
+                            : "암호화 저장"}
+                        </strong>
+                        <span>
+                          {openAiSettingsStatus?.updatedAt
+                            ? `마지막 저장: ${new Date(openAiSettingsStatus.updatedAt).toLocaleString()}`
+                            : "API 키 값은 화면에 다시 표시하지 않습니다."}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="openAiSettingsForm">
+                      <label className="field">
+                        <span>OpenAI API 키</span>
+                        <input
+                          autoComplete="off"
+                          placeholder={
+                            openAiSettingsStatus?.configured
+                              ? "새 키를 입력하면 기존 키를 교체합니다."
+                              : "sk-..."
+                          }
+                          type="password"
+                          value={openAiApiKeyDraft}
+                          onChange={(event) => setOpenAiApiKeyDraft(event.target.value)}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>모델</span>
+                        <input
+                          placeholder={openAiToolRunnerDefaultModel}
+                          value={openAiModelDraft}
+                          onChange={(event) => setOpenAiModelDraft(event.target.value)}
+                        />
+                      </label>
+                      {openAiSettingsMessage ? (
+                        <p className="openAiSettingsMessage">{openAiSettingsMessage}</p>
+                      ) : null}
+                      <div className="accountSettingsActions">
+                        <button
+                          className="secondaryAction"
+                          disabled={isOpenAiSettingsBusy}
+                          type="button"
+                          onClick={() => void saveOpenAiSettings()}
+                        >
+                          저장
+                        </button>
+                        <button
+                          className="secondaryAction"
+                          disabled={isOpenAiSettingsBusy}
+                          type="button"
+                          onClick={() => void refreshOpenAiSettings()}
+                        >
+                          새로고침
+                        </button>
+                        <button
+                          className="secondaryAction dangerAction"
+                          disabled={isOpenAiSettingsBusy || openAiSettingsStatus?.source !== "stored"}
+                          type="button"
+                          onClick={() => void clearOpenAiSettings()}
+                        >
+                          저장된 키 삭제
+                        </button>
+                      </div>
+                    </div>
+                  </section>
                 ) : activeSettingsSection === "display" ? (
                   <section className="dialogPanel displayModePanel">
                     <div className="panelHeader">
@@ -5269,7 +5582,7 @@ export function App() {
                     </div>
                     <div className="accountInfoGrid">
                       <div className="accountInfoCard">
-                        <strong>{githubUser ? `${githubUser.nickname}님` : "로그인이 필요합니다."}</strong>
+                        <strong>{githubUser ? `${currentUserNickname || githubUser.githubId}님` : "로그인이 필요합니다."}</strong>
                         <span>{githubUser ? `GitHub: ${githubUser.githubId}` : "GitHub 계정으로 로그인하세요."}</span>
                       </div>
                       <div className="accountInfoCard">
@@ -5600,18 +5913,35 @@ export function App() {
             <div className="dialogHeader">
               <div>
                 <h2 id="customToolDialogTitle">{customToolDialogTitle}</h2>
-                <span>MD 형태의 커스텀 툴을 가져오고 상단고정으로 관리합니다.</span>
+                <span>
+                  {isMarketDialog
+                    ? "Tools와 Flows를 가져오고 공유 항목을 관리합니다."
+                    : "MD 형태의 커스텀 툴을 가져오고 상단고정으로 관리합니다."}
+                </span>
               </div>
               <div className="dialogHeaderActions">
-                <button
-                  className="secondaryAction registerToolButton"
-                  type="button"
-                  aria-label="툴 등록"
-                  title="툴 등록"
-                  onClick={openCustomToolForm}
-                >
-                  <span className="dialogHeaderButtonLabel">툴 등록</span>
-                </button>
+                {!isMarketDialog || marketDialogTab === "tools" ? (
+                  <>
+                    <button
+                      className="secondaryAction registerToolButton"
+                      type="button"
+                      aria-label="툴 등록"
+                      title="툴 등록"
+                      onClick={openCustomToolForm}
+                    >
+                      <span className="dialogHeaderButtonLabel">툴 등록</span>
+                    </button>
+                    <button
+                      className="secondaryAction registerToolButton"
+                      type="button"
+                      aria-label="내 툴 관리"
+                      title="내 툴 관리"
+                      onClick={() => setIsMyToolManagerDialogOpen(true)}
+                    >
+                      <span className="dialogHeaderButtonLabel">내 툴 관리</span>
+                    </button>
+                  </>
+                ) : null}
                 <button
                   className="dialogWindowButton"
                   aria-label="닫기"
@@ -5622,7 +5952,32 @@ export function App() {
                 </button>
               </div>
             </div>
-            <div className="dialogContent standaloneDialogContent">
+            <div
+              className={
+                isMarketDialog ? "dialogBody marketDialogBody" : "dialogContent standaloneDialogContent"
+              }
+            >
+              {isMarketDialog ? (
+                <nav className="dialogNav marketDialogNav" aria-label="Market 메뉴">
+                  <button
+                    className={marketDialogTab === "tools" ? "dialogNavItem active" : "dialogNavItem"}
+                    type="button"
+                    onClick={() => setMarketDialogTab("tools")}
+                  >
+                    Tools
+                  </button>
+                  <button
+                    className={marketDialogTab === "flows" ? "dialogNavItem active" : "dialogNavItem"}
+                    type="button"
+                    onClick={() => setMarketDialogTab("flows")}
+                  >
+                    Flows
+                  </button>
+                </nav>
+              ) : null}
+              <div className={isMarketDialog ? "dialogContent marketDialogContent" : "customToolStandaloneContent"}>
+              {!isMarketDialog || marketDialogTab === "tools" ? (
+                <>
               <div className="customToolToolbar">
                 <div className="customToolToolbarRow">
                   <input
@@ -5642,24 +5997,6 @@ export function App() {
                   >
                     {isGithubToolSyncing ? "확인 중" : "새로고침"}
                   </button>
-                </div>
-                <div className="customToolFilterBar" aria-label="커스텀 툴 필터">
-                  {[
-                    ["all", "전체"],
-                    ["risk", "주의"],
-                    ["pending", "앱 승인 대기"],
-                    ["registered", "등록됨"],
-                    ["unregistered", "미등록"]
-                  ].map(([filter, label]) => (
-                    <button
-                      key={filter}
-                      className={customToolFilter === filter ? "active" : ""}
-                      type="button"
-                      onClick={() => setCustomToolFilter(filter as CustomToolFilter)}
-                    >
-                      {label}
-                    </button>
-                  ))}
                 </div>
                 {githubToolStatus ? (
                   <div className={isGithubToolSyncing ? "githubToolStatus syncing" : "githubToolStatus"}>
@@ -5681,7 +6018,7 @@ export function App() {
                     {customToolDialogScope === "all" ? (
                     <th>{renderSortHeader("section", "프로그램")}</th>
                     ) : null}
-                    <th>{renderSortHeader("name", "툴 이름")}</th>
+                    <th>{renderToolNameHeader()}</th>
                     <th>{renderSortHeader("version", "버전")}</th>
                     <th>{renderSortHeader("author", "제작자")}</th>
                     <th>{renderSortHeader("usageCount", "사용횟수")}</th>
@@ -5839,6 +6176,86 @@ export function App() {
                   ) : null}
                 </tbody>
               </table>
+                </>
+              ) : (
+                <MarketFlowPanel
+                  sharedFlows={sharedFlowCatalog}
+                  savedFlows={workflowSavedFlowsForMenu}
+                  onRegisterSharedFlow={registerSharedFlow}
+                />
+              )}
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isMyToolManagerDialogOpen ? (
+        <div className="dialogBackdrop" role="presentation">
+          <section
+            className="registryDialog customToolDialog myToolManagerDialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="myToolManagerDialogTitle"
+          >
+            <div className="dialogHeader">
+              <div>
+                <h2 id="myToolManagerDialogTitle">내 툴 관리</h2>
+                <span>내 닉네임으로 등록한 툴의 승인 상태와 삭제 상태를 확인합니다.</span>
+              </div>
+              <div className="dialogHeaderActions">
+                <button
+                  className="dialogWindowButton"
+                  aria-label="닫기"
+                  title="닫기"
+                  onClick={() => setIsMyToolManagerDialogOpen(false)}
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+            <div className="dialogContent standaloneDialogContent">
+              <table className="customToolTable myToolManagerTable">
+                <thead>
+                  <tr>
+                    <th>툴 이름</th>
+                    <th>버전</th>
+                    <th>프로그램</th>
+                    <th>상태</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {myCustomTools.map((tool) => (
+                    <tr key={tool.id}>
+                      <td>{tool.name}</td>
+                      <td>{tool.version}</td>
+                      <td>{sidebarLabel(tool.sectionId)}</td>
+                      <td>
+                        <span className={`toolApprovalBadge ${getMyToolStatusClass(tool)}`}>
+                          {getMyToolStatusLabel(tool)}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="tableActionButton unregisterAction"
+                          type="button"
+                          onClick={() => requestDeleteCustomTool(tool.id)}
+                        >
+                          삭제
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {myCustomTools.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="emptyTableCell">
+                        내 닉네임으로 등록한 툴이 없습니다.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
           </section>
         </div>
@@ -5966,7 +6383,7 @@ export function App() {
                   <span>제작자</span>
                   <input
                     readOnly
-                    value={githubUser?.nickname ?? customToolDraft.author}
+                    value={currentUserNickname || customToolDraft.author}
                     title="제작자는 로그인한 계정의 닉네임으로 자동 입력됩니다."
                   />
                   <small>로그인 닉네임으로 자동 입력되며 수정할 수 없습니다.</small>
@@ -6025,8 +6442,13 @@ export function App() {
                 >
                   취소
                 </button>
-                <button className="primary" type="button" onClick={saveCustomToolDraft}>
-                  저장
+                <button
+                  className="primaryAction"
+                  type="button"
+                  disabled={isSavingCustomTool}
+                  onClick={saveCustomToolDraft}
+                >
+                  {isSavingCustomTool ? "저장 중..." : "저장"}
                 </button>
               </div>
             </div>
@@ -6126,7 +6548,7 @@ export function App() {
                   ? "상단고정 해제"
                   : "상단고정"}
               </button>
-              {isCurrentAdmin ? (
+              {customTools.find((tool) => tool.id === contextMenu.toolId && canDeleteCustomTool(tool)) ? (
                 <button
                   className="danger"
                   onClick={() => {
@@ -6302,10 +6724,65 @@ function EditableText({
   );
 }
 
+function useStandaloneToolPresets(
+  toolId: string,
+  toolName: string,
+  values: Record<string, ToolSettingValue>,
+  setValues: React.Dispatch<React.SetStateAction<Record<string, ToolSettingValue>>>
+) {
+  const [presets, setPresets] = useState<SettingPreset[]>(() => loadSettingPresets());
+
+  useEffect(() => {
+    saveSettingPresets(presets);
+  }, [presets]);
+
+  const savePreset = (options?: { presetId?: string; name?: string }) => {
+    setPresets((items) => {
+      const existing = options?.presetId
+        ? items.find((preset) => preset.id === options.presetId)
+        : undefined;
+      const presetName =
+        options?.name ??
+        existing?.name ??
+        `${toolName} 설정 ${new Date().toLocaleString("ko-KR")}`;
+      const preset = existing
+        ? {
+            ...existing,
+            name: presetName,
+            values: cloneSettingValues(values)
+          }
+        : createSettingPreset(toolId, presetName, values);
+
+      return upsertSettingPreset(items, preset);
+    });
+  };
+
+  const loadPreset = (preset: SettingPreset) => {
+    setValues(cloneSettingValues(preset.values));
+  };
+
+  const deletePreset = (presetId: string) => {
+    setPresets((items) => removeSettingPreset(items, presetId));
+  };
+
+  const renamePreset = (presetId: string, name: string) => {
+    setPresets((items) => renameSettingPreset(items, presetId, name));
+  };
+
+  return {
+    presets: listSettingPresetsForTool(presets, toolId),
+    savePreset,
+    loadPreset,
+    deletePreset,
+    renamePreset
+  };
+}
+
 function ToolWorkspaceView({
   menuLabel,
   tools,
   customTools,
+  isCompact,
   isMcpReady,
   disabledReason,
   onAddCustomTool,
@@ -6315,17 +6792,61 @@ function ToolWorkspaceView({
   menuLabel: string;
   tools: ReturnType<typeof getToolsForWorkspace>;
   customTools: CustomToolItem[];
+  isCompact: boolean;
   isMcpReady: boolean;
   disabledReason: string;
   onAddCustomTool: () => void;
   onCustomToolContext: (event: MouseEvent<HTMLButtonElement>, toolId: string) => void;
   onOpenTool: (submenuId: SubmenuId) => void;
 }) {
+  const [compactToolId, setCompactToolId] = useState<SubmenuId | null>(null);
+  const shareCompactTools = tools.map((tool) => ({
+    id: `share-${tool.name}` as SubmenuId,
+    name: tool.name,
+    description: tool.description,
+    version: tool.version ?? "1.0.0",
+    author: tool.author ?? "MCP Registry",
+    schema: undefined as ToolRuntimeSchema | undefined,
+    kind: "share" as const
+  }));
+  const customCompactTools = customTools.map((tool) => ({
+    id: tool.id as SubmenuId,
+    name: tool.name,
+    description: tool.description || "등록된 설명이 없습니다.",
+    version: tool.version,
+    author: tool.author,
+    schema: tool.toolSchema,
+    kind: "custom" as const
+  }));
+  const compactTools = [
+    ...shareCompactTools,
+    ...customCompactTools
+  ];
+
+  useEffect(() => {
+    if (!isCompact) {
+      setCompactToolId(null);
+      return;
+    }
+
+    if (compactToolId && !compactTools.some((tool) => tool.id === compactToolId)) {
+      setCompactToolId(null);
+    }
+  }, [compactToolId, compactTools, isCompact]);
+
+  const openWorkspaceTool = (submenuId: SubmenuId) => {
+    if (isCompact) {
+      setCompactToolId((current) => (current === submenuId ? null : submenuId));
+      return;
+    }
+
+    onOpenTool(submenuId);
+  };
+
   return (
     <section className="sectionView toolWorkspaceView">
       <div className="toolLibraryGrid">
         <ToolLibrarySection
-          iconName="shareTools"
           title="Share Tools"
           description="모든 사용자에게 기본으로 보이는 공용 MCP 툴입니다."
           tools={tools.map((tool) => ({
@@ -6337,15 +6858,20 @@ function ToolWorkspaceView({
           }))}
           isMcpReady={isMcpReady}
           disabledReason={disabledReason}
-          onOpenTool={onOpenTool}
+          onOpenTool={openWorkspaceTool}
+          selectedCompactToolId={isCompact ? compactToolId : null}
+          compactTools={shareCompactTools}
         />
         <CustomToolSection
           customTools={customTools}
+          isCompact={isCompact}
           isMcpReady={isMcpReady}
           disabledReason={disabledReason}
           onAddCustomTool={onAddCustomTool}
           onCustomToolContext={onCustomToolContext}
-          onOpenTool={onOpenTool}
+          onOpenTool={openWorkspaceTool}
+          selectedCompactToolId={isCompact ? compactToolId : null}
+          compactTools={customCompactTools}
         />
       </div>
       <div className="toolWorkspaceGrid">
@@ -6392,6 +6918,104 @@ function ToolWorkspaceView({
   );
 }
 
+type CompactToolRunnerTool = {
+  id: SubmenuId;
+  name: string;
+  description: string;
+  version: string;
+  author: string;
+  schema?: ToolRuntimeSchema;
+  kind: "share" | "custom";
+};
+
+function CompactToolRunner({
+  tool,
+  isMcpReady,
+  disabledReason
+}: {
+  tool: CompactToolRunnerTool;
+  isMcpReady: boolean;
+  disabledReason: string;
+}) {
+  const [settingValues, setSettingValues] = useState<Record<string, ToolSettingValue>>({});
+  const settingPresetControls = useStandaloneToolPresets(
+    tool.id,
+    tool.name,
+    settingValues,
+    setSettingValues
+  );
+
+  useEffect(() => {
+    setSettingValues(tool.schema ? defaultSettingValuesForSchema(tool.schema) : {});
+  }, [tool.id, tool.schema]);
+
+  return (
+    <section className="panel compactToolRunner">
+      <div className="compactToolRunnerHeader">
+        <div>
+          <strong>{tool.name}</strong>
+          <span>
+            v{tool.version} · {tool.author}
+          </span>
+        </div>
+        <small>{tool.description}</small>
+      </div>
+      <div className="compactToolRunnerActions">
+        <button className="primaryAction" type="button" disabled={!isMcpReady} title={isMcpReady ? undefined : disabledReason}>
+          실행
+        </button>
+        <button
+          className="secondaryAction"
+          type="button"
+          onClick={() => setSettingValues(tool.schema ? defaultSettingValuesForSchema(tool.schema) : {})}
+        >
+          초기화
+        </button>
+      </div>
+      <div className="compactToolRunnerSettings">
+        {tool.schema ? (
+          <FlowNodeSchemaSettings
+            schema={tool.schema}
+            values={settingValues}
+            onChange={(field, value) =>
+              setSettingValues((values) => ({
+                ...values,
+                [field.id]: value
+              }))
+            }
+            onRuntimeValueChange={(key, value) =>
+              setSettingValues((values) => ({
+                ...values,
+                [key]: value
+              }))
+            }
+            presets={settingPresetControls.presets}
+            onSavePreset={settingPresetControls.savePreset}
+            onLoadPreset={settingPresetControls.loadPreset}
+            onDeletePreset={settingPresetControls.deletePreset}
+            onRenamePreset={settingPresetControls.renamePreset}
+          />
+        ) : (
+          <div className="configForm compactToolFallbackSettings">
+            <label className="field">
+              <span>작업 대상</span>
+              <input placeholder={`${tool.name}에서 사용할 파일 또는 선택 범위`} />
+            </label>
+            <label className="field">
+              <span>실행 옵션</span>
+              <input placeholder="필터, 레이어, 객체 조건 등을 입력" />
+            </label>
+            <label className="field">
+              <span>메모</span>
+              <textarea placeholder="실행 전 확인할 내용을 적어둡니다." />
+            </label>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function SubmenuPage({
   menuLabel,
   submenu
@@ -6400,6 +7024,13 @@ function SubmenuPage({
   submenu: SubmenuItem;
 }) {
   const [settingValues, setSettingValues] = useState<Record<string, ToolSettingValue>>({});
+  const principleSteps = operationPrincipleSteps(menuLabel, submenu);
+  const settingPresetControls = useStandaloneToolPresets(
+    submenu.id,
+    submenu.label,
+    settingValues,
+    setSettingValues
+  );
 
   useEffect(() => {
     setSettingValues(
@@ -6419,19 +7050,14 @@ function SubmenuPage({
               </span>
             </div>
           </div>
+          <ToolRiskSummary schema={submenu.settingsSchema} />
           <div className="principleList">
-            <div>
-              <strong>입력 수집</strong>
-              <span>파일, 객체, 선택 범위처럼 실행에 필요한 기준을 먼저 모읍니다.</span>
-            </div>
-            <div>
-              <strong>MCP 명령 연결</strong>
-              <span>정리된 입력값을 연결된 MCP 서버의 실제 명령으로 넘깁니다.</span>
-            </div>
-            <div>
-              <strong>결과 확인</strong>
-              <span>실행 결과와 후속 확인 항목을 기록해 다음 작업으로 이어갑니다.</span>
-            </div>
+            {principleSteps.map((step) => (
+              <div key={step.title}>
+                <strong>{step.title}</strong>
+                <span>{step.description}</span>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -6441,6 +7067,18 @@ function SubmenuPage({
               <h2>설정</h2>
               <span className="panelHeaderNote">툴 실행 전에 필요한 기준값을 입력합니다.</span>
             </div>
+            {submenu.settingsSchema ? (
+              <SettingPresetControls
+                presets={settingPresetControls.presets}
+                values={settingValues}
+                onSavePreset={settingPresetControls.savePreset}
+                onLoadPreset={settingPresetControls.loadPreset}
+                onDeletePreset={settingPresetControls.deletePreset}
+                onRenamePreset={settingPresetControls.renamePreset}
+                showCurrentNote={false}
+                inline
+              />
+            ) : null}
           </div>
           {submenu.settingsSchema ? (
             <div className="toolPageSchemaSettings">
@@ -6453,6 +7091,18 @@ function SubmenuPage({
                     [field.id]: value
                   }))
                 }
+                onRuntimeValueChange={(key, value) =>
+                  setSettingValues((values) => ({
+                    ...values,
+                    [key]: value
+                  }))
+                }
+                presets={settingPresetControls.presets}
+                onSavePreset={settingPresetControls.savePreset}
+                onLoadPreset={settingPresetControls.loadPreset}
+                onDeletePreset={settingPresetControls.deletePreset}
+                onRenamePreset={settingPresetControls.renamePreset}
+                showPresetControls={false}
               />
             </div>
           ) : (
@@ -6579,7 +7229,7 @@ function HomeDashboard({
           <div className="homeListItem homeToolSaveItem">
             <div>
               <strong>프로그램 MCP 등록</strong>
-              <span>/등록 명령으로 AutoCAD, Revit, Excel, Tekla 같은 프로그램 MCP 연결값을 만들고 실행 가능 여부를 점검합니다.</span>
+              <span>/등록 명령으로 MCP 브리지를 만들고 Settings &gt; AI 연결의 API 키 설정까지 확인합니다.</span>
             </div>
             <button
               className="secondaryAction homeDownloadButton"
@@ -6598,47 +7248,65 @@ function HomeDashboard({
 }
 
 function ToolLibrarySection({
-  iconName,
   title,
   description,
   tools,
   isMcpReady,
   disabledReason,
-  onOpenTool
+  onOpenTool,
+  selectedCompactToolId,
+  compactTools
 }: {
-  iconName: AppIconName;
   title: string;
   description: string;
   tools: { id: string; name: string; description: string; version?: string; author?: string }[];
   isMcpReady: boolean;
   disabledReason: string;
   onOpenTool?: (submenuId: SubmenuId) => void;
+  selectedCompactToolId?: SubmenuId | null;
+  compactTools?: CompactToolRunnerTool[];
 }) {
   return (
     <section className="panel toolLibrarySection">
-      <PanelHeader iconName={iconName} title={title} description={description} />
+      <PanelHeader title={title} description={description} />
       <div className="toolList">
-        {tools.map((tool) => (
-          <button
-            className={isMcpReady ? "toolItem toolItemButton" : "toolItem toolItemButton disabledToolItem"}
-            type="button"
-            disabled={!isMcpReady}
-            title={isMcpReady ? undefined : disabledReason}
-            aria-label={isMcpReady ? tool.name : `${tool.name}: ${disabledReason}`}
-            key={tool.id}
-            onClick={() => onOpenTool?.(tool.id)}
-          >
-            <strong className="toolItemTitleLine">
-              <span>{tool.name}</span>
-              {tool.version || tool.author ? (
-                <small className="toolItemMeta">
-                  v{tool.version ?? "1.0.0"} - {tool.author ?? "MCP Registry"}
-                </small>
+        {tools.map((tool) => {
+          const compactTool = compactTools?.find((item) => item.id === tool.id);
+          return (
+            <Fragment key={tool.id}>
+              <button
+                className={[
+                  isMcpReady ? "toolItem toolItemButton" : "toolItem toolItemButton disabledToolItem",
+                  selectedCompactToolId === tool.id ? "expandedToolItem" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                type="button"
+                disabled={!isMcpReady}
+                title={isMcpReady ? undefined : disabledReason}
+                aria-label={isMcpReady ? tool.name : `${tool.name}: ${disabledReason}`}
+                onClick={() => onOpenTool?.(tool.id)}
+              >
+                <strong className="toolItemTitleLine">
+                  <span>{tool.name}</span>
+                  {tool.version || tool.author ? (
+                    <small className="toolItemMeta">
+                      v{tool.version ?? "1.0.0"} - {tool.author ?? "MCP Registry"}
+                    </small>
+                  ) : null}
+                </strong>
+                <span>{tool.description}</span>
+              </button>
+              {compactTool && selectedCompactToolId === tool.id ? (
+                <CompactToolRunner
+                  tool={compactTool}
+                  isMcpReady={isMcpReady}
+                  disabledReason={disabledReason}
+                />
               ) : null}
-            </strong>
-            <span>{tool.description}</span>
-          </button>
-        ))}
+            </Fragment>
+          );
+        })}
       </div>
     </section>
   );
@@ -6646,96 +7314,157 @@ function ToolLibrarySection({
 
 function CustomToolSection({
   customTools,
+  isCompact,
   isMcpReady,
   disabledReason,
   onAddCustomTool,
   onCustomToolContext,
-  onOpenTool
+  onOpenTool,
+  selectedCompactToolId,
+  compactTools
 }: {
   customTools: CustomToolItem[];
+  isCompact: boolean;
   isMcpReady: boolean;
   disabledReason: string;
   onAddCustomTool: () => void;
   onCustomToolContext: (event: MouseEvent<HTMLButtonElement>, toolId: string) => void;
   onOpenTool: (submenuId: SubmenuId) => void;
+  selectedCompactToolId?: SubmenuId | null;
+  compactTools?: CompactToolRunnerTool[];
 }) {
+  const [pendingWarningTool, setPendingWarningTool] = useState<CustomToolItem | null>(null);
+  const warningMessages = pendingWarningTool
+    ? [
+        ...pendingWarningTool.riskWarnings,
+        ...(!pendingWarningTool.isToolLike
+          ? ["이 MD 파일은 툴 문서 형태가 아닐 수 있습니다."]
+          : [])
+      ]
+    : [];
+
+  const openCustomTool = (tool: CustomToolItem) => {
+    if (!isCompact && (tool.riskWarnings.length > 0 || !tool.isToolLike)) {
+      setPendingWarningTool(tool);
+      return;
+    }
+
+    onOpenTool(tool.id);
+  };
+
   return (
-    <section className="panel toolLibrarySection">
-      <PanelHeader
-        iconName="customTools"
-        title="Custom Tools"
-        description="MD 파일로 만든 커스텀 툴을 가져오고 관리합니다."
-        action={
-          <button className="secondaryAction squareAction" type="button" onClick={onAddCustomTool}>
-            +
-          </button>
-        }
-      />
-      <div className="toolList customToolList">
-        {[...customTools]
-          .sort((left, right) => Number(right.pinned) - Number(left.pinned))
-          .map((tool) => (
-            <button
-              className={[
-                "toolItem",
-                "toolItemButton",
-                tool.pinned ? "pinnedToolItem" : "",
-                tool.isToolLike ? "" : "suspectToolItem",
-                isMcpReady ? "" : "disabledToolItem"
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              key={tool.id}
-              type="button"
-              disabled={!isMcpReady}
-              title={
-                !isMcpReady
-                  ? disabledReason
-                  : !tool.isToolLike
-                    ? "이 MD 파일은 툴 문서 형태가 아닐 수 있습니다."
-                    : undefined
-              }
-              aria-label={isMcpReady ? tool.name : `${tool.name}: ${disabledReason}`}
-              onClick={() => {
-                if (
-                  tool.riskWarnings.length > 0 &&
-                  !window.confirm(`주의가 필요한 툴입니다.\n\n${tool.riskWarnings.join("\n")}\n\n그래도 실행하시겠습니까?`)
-                ) {
-                  return;
-                }
-                if (
-                  !tool.isToolLike &&
-                  !window.confirm(
-                    "이 MD 파일은 툴 문서 형태가 아닐 수 있습니다. 그래도 실행하시겠습니까?"
-                  )
-                ) {
-                  return;
-                }
-                onOpenTool(tool.id);
-              }}
-              onContextMenu={(event) => onCustomToolContext(event, tool.id)}
-            >
-              <span className="customToolItemTitle">
-                <span className="customToolTitleLeft">
-                  {tool.riskWarnings.length > 0 ? (
-                    <span className="toolRiskBadge inlineRiskBadge" title={tool.riskWarnings.join("\n")}>
-                      주의
-                    </span>
-                  ) : null}
-                  <strong>{tool.name}</strong>
-                </span>
-                <small>v{tool.version} · {tool.author}</small>
-              </span>
-              <span>{tool.description || "등록된 설명이 없습니다."}</span>
+    <>
+      <section className="panel toolLibrarySection">
+        <PanelHeader
+          title="Custom Tools"
+          description="MD 파일로 만든 커스텀 툴을 가져오고 관리합니다."
+          action={
+            <button className="secondaryAction squareAction" type="button" onClick={onAddCustomTool}>
+              +
             </button>
-          ))}
-        {customTools.length === 0 ? (
-          <p className="emptyState compactEmptyState centeredEmptyState">
-            등록된 커스텀 툴이 없습니다.
-          </p>
+          }
+        />
+        <div className="toolList customToolList">
+          {[...customTools]
+            .sort((left, right) => Number(right.pinned) - Number(left.pinned))
+            .map((tool) => {
+              const compactTool = compactTools?.find((item) => item.id === tool.id);
+              return (
+                <Fragment key={tool.id}>
+                  <button
+                    className={[
+                      "toolItem",
+                      "toolItemButton",
+                      tool.pinned ? "pinnedToolItem" : "",
+                      tool.isToolLike ? "" : "suspectToolItem",
+                      isMcpReady ? "" : "disabledToolItem",
+                      selectedCompactToolId === tool.id ? "expandedToolItem" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    type="button"
+                    disabled={!isMcpReady}
+                    title={
+                      !isMcpReady
+                        ? disabledReason
+                        : !tool.isToolLike
+                          ? "이 MD 파일은 툴 문서 형태가 아닐 수 있습니다."
+                          : undefined
+                    }
+                    aria-label={isMcpReady ? tool.name : `${tool.name}: ${disabledReason}`}
+                    onClick={() => openCustomTool(tool)}
+                    onContextMenu={(event) => onCustomToolContext(event, tool.id)}
+                  >
+                    <span className="customToolItemTitle">
+                      <span className="customToolTitleLeft">
+                        {tool.riskWarnings.length > 0 ? (
+                          <span className="toolRiskBadge inlineRiskBadge" title={tool.riskWarnings.join("\n")}>
+                            주의
+                          </span>
+                        ) : null}
+                        <strong>{tool.name}</strong>
+                        <small className="toolItemMeta">
+                          v{tool.version} · {tool.author}
+                        </small>
+                      </span>
+                    </span>
+                    <span>{tool.description || "등록된 설명이 없습니다."}</span>
+                  </button>
+                  {compactTool && selectedCompactToolId === tool.id ? (
+                    <CompactToolRunner
+                      tool={compactTool}
+                      isMcpReady={isMcpReady}
+                      disabledReason={disabledReason}
+                    />
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          {customTools.length === 0 ? (
+            <p className="emptyState compactEmptyState centeredEmptyState">
+              등록된 커스텀 툴이 없습니다.
+            </p>
+          ) : null}
+        </div>
+      </section>
+
+      {pendingWarningTool ? (
+        <div className="flowConfirmBackdrop" role="presentation" onMouseDown={() => setPendingWarningTool(null)}>
+          <div
+            className="flowConfirmDialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="toolRunWarningTitle"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <strong id="toolRunWarningTitle">주의가 필요한 툴입니다.</strong>
+            <p>{pendingWarningTool.name} 실행 전에 아래 내용을 확인하세요.</p>
+            <div className="toolRiskReasons">
+              {warningMessages.map((message) => (
+                <span key={message}>{message}</span>
+              ))}
+            </div>
+            <p>그래도 열까요?</p>
+            <div className="flowConfirmActions">
+              <button type="button" onClick={() => setPendingWarningTool(null)}>
+                취소
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={() => {
+                  const toolId = pendingWarningTool.id;
+                  setPendingWarningTool(null);
+                  onOpenTool(toolId);
+                }}
+              >
+                열기
+              </button>
+            </div>
+          </div>
+        </div>
         ) : null}
-      </div>
-    </section>
+    </>
   );
 }
 
@@ -6874,6 +7603,46 @@ function valueAsText(value: ToolSettingValue | undefined) {
   return String(value);
 }
 
+function stableSettingValueKey(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableSettingValueKey(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableSettingValueKey(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
+}
+
+function areSettingValuesEqual(
+  left: Record<string, ToolSettingValue> | undefined,
+  right: Record<string, ToolSettingValue> | undefined
+) {
+  return stableSettingValueKey(left ?? {}) === stableSettingValueKey(right ?? {});
+}
+
+function presetToolIdsForFlowNode(node: FlowNode) {
+  const ids = [node.id];
+  const menuMatch = node.id.match(/^menu-(servers|cad|revit|excel|tekla|workflow)-(.+)$/);
+  if (menuMatch?.[2]) {
+    ids.push(menuMatch[2]);
+  }
+  return Array.from(new Set(ids.filter(Boolean)));
+}
+
+function primaryPresetToolIdForFlowNode(node: FlowNode) {
+  return presetToolIdsForFlowNode(node).at(-1) ?? node.id;
+}
+
+function listSettingPresetsForFlowNode(presets: SettingPreset[], node: FlowNode) {
+  const ids = new Set(presetToolIdsForFlowNode(node));
+  return presets
+    .filter((preset) => ids.has(preset.toolId))
+    .sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
 function rowValueAsText(row: Record<string, string | number | boolean>, field: ToolSettingField) {
   const valueKey = field.valueKey || "value";
   return String(row[valueKey] ?? row.value ?? row.file_path ?? "");
@@ -6912,6 +7681,130 @@ const toolRiskLabels: Record<ToolRuntimeSchema["risk"], string> = {
   caution: "주의 필요"
 };
 
+type SettingPresetSaveOptions = {
+  presetId?: string;
+  name?: string;
+};
+
+const titleBlockCandidateValueKey = "title_block_candidate_id";
+
+function toolActionLabel(action: { label: string; runtimeAction: string }) {
+  if (action.runtimeAction === "preview") {
+    return "미리보기";
+  }
+  if (action.runtimeAction === "apply") {
+    return "실행";
+  }
+  return action.label;
+}
+
+function schemaRequiredServerLabel(schema: ToolRuntimeSchema) {
+  return schema.requiredServers.length > 0
+    ? `필요 MCP: ${schema.requiredServers.join(", ")}`
+    : "필요 MCP 서버 없음";
+}
+
+function ToolRiskSummary({ schema }: { schema?: ToolRuntimeSchema }) {
+  if (!schema) {
+    return null;
+  }
+  const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
+
+  return (
+    <div className={`schemaRiskBar toolPrincipleRiskSummary risk-${safeSchema.risk}`}>
+      <span>{toolRiskLabels[safeSchema.risk]}</span>
+      <small>{schemaRequiredServerLabel(safeSchema)}</small>
+    </div>
+  );
+}
+
+function isTitleBlockCandidateSchema(schema: ToolRuntimeSchema) {
+  const text = [
+    ...schema.settings.flatMap((field) => [field.id, field.label, field.description]),
+    ...schema.mcpCommands.flatMap((command) => [command.server, command.command]),
+    schema.resultSchema.type
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    text.includes("도곽") ||
+    (text.includes("title") && text.includes("block")) ||
+    text.includes("title_block")
+  );
+}
+
+function operationPrincipleStepsForTool(
+  menuLabel: string,
+  toolLabel: string,
+  schemaInput?: ToolRuntimeSchema,
+  fallbackDescription?: string
+) {
+  const schema = schemaInput
+    ? normalizeToolRuntimeSchemaForRender(schemaInput)
+    : undefined;
+
+  if (schema && isTitleBlockCandidateSchema(schema)) {
+    return [
+      {
+        title: "도면 입력",
+        description: "DWG 도면을 넣고 처리할 파일 순서를 확정합니다."
+      },
+      {
+        title: "도곽 후보 선택",
+        description: "첫 도면에서 도곽 후보를 뽑아 사용자가 기준 도곽을 선택합니다."
+      },
+      {
+        title: "번호 규칙 적용",
+        description: "도곽 순서와 번호 규칙을 기준으로 미리보기 후 실행합니다."
+      }
+    ];
+  }
+
+  if (schema) {
+    return [
+      {
+        title: "입력 기준 정리",
+        description: `${toolLabel} 실행에 필요한 파일, 선택 범위, 옵션을 먼저 정리합니다.`
+      },
+      {
+        title: "MCP 연결",
+        description: schema.requiredServers.length > 0
+          ? `${schema.requiredServers.join(", ")} MCP에 설정값을 전달합니다.`
+          : `${menuLabel} 작업에 맞는 실행 기준을 준비합니다.`
+      },
+      {
+        title: "결과 확인",
+        description: "미리보기나 실행 결과를 확인하고 필요한 후속 작업으로 이어갑니다."
+      }
+    ];
+  }
+
+  return [
+    {
+      title: "입력 수집",
+      description: fallbackDescription || "파일, 객체, 선택 범위처럼 실행에 필요한 기준을 먼저 모읍니다."
+    },
+    {
+      title: "MCP 명령 연결",
+      description: "정리된 입력값을 연결된 MCP 서버의 실제 명령으로 넘깁니다."
+    },
+    {
+      title: "결과 확인",
+      description: "실행 결과와 후속 확인 항목을 기록해 다음 작업으로 이어갑니다."
+    }
+  ];
+}
+
+function operationPrincipleSteps(menuLabel: string, submenu: SubmenuItem) {
+  return operationPrincipleStepsForTool(
+    menuLabel,
+    submenu.label,
+    submenu.settingsSchema,
+    submenu.description
+  );
+}
+
 const issueToneLabels: Record<ToolRuntimeIssue["severity"], string> = {
   error: "오류",
   warning: "경고",
@@ -6919,7 +7812,8 @@ const issueToneLabels: Record<ToolRuntimeIssue["severity"], string> = {
 };
 
 function defaultSettingValuesForSchema(schema: ToolRuntimeSchema) {
-  return schema.settings.reduce<Record<string, ToolSettingValue>>((values, field) => {
+  const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
+  return safeSchema.settings.reduce<Record<string, ToolSettingValue>>((values, field) => {
     values[field.id] = settingDefaultValue(field);
     return values;
   }, {});
@@ -6973,13 +7867,14 @@ function ToolExecutionPlanPanel({
   values?: Record<string, ToolSettingValue>;
   compact?: boolean;
 }) {
-  const plan = buildToolExecutionPlan(schema, values);
+  const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
+  const plan = buildToolExecutionPlan(safeSchema, values);
 
   return (
     <section className={["schemaExecutionPlan", compact ? "compact" : ""].filter(Boolean).join(" ")}>
       <header>
         <span>테스트 실행 요약</span>
-        <small>{schema.executionMode}</small>
+        <small>{safeSchema.executionMode}</small>
       </header>
       <div className="schemaExecutionSummary">
         {plan.summary.length > 0 ? (
@@ -6999,6 +7894,7 @@ function ToolExecutionPlanPanel({
               {Object.keys(command.params).length > 0 ? (
                 <code>{JSON.stringify(command.params)}</code>
               ) : null}
+              {command.condition ? <small>조건: {command.condition}</small> : null}
             </div>
           ))}
         </div>
@@ -7010,16 +7906,204 @@ function ToolExecutionPlanPanel({
   );
 }
 
+function ToolExecutionActions({
+  schema,
+  values,
+  onRuntimeValueChange,
+  toolName = "MCP 툴",
+  menuName = "MCP"
+}: {
+  schema: ToolRuntimeSchema;
+  values?: Record<string, ToolSettingValue>;
+  onRuntimeValueChange?: (key: string, value: ToolSettingValue) => void;
+  toolName?: string;
+  menuName?: string;
+}) {
+  const [previewGenerated, setPreviewGenerated] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [isRunningAction, setIsRunningAction] = useState(false);
+  const [titleBlockCandidates, setTitleBlockCandidates] = useState<TitleBlockCandidate[]>([]);
+  const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
+  const actions = safeSchema.actions;
+  const previewRows = previewGenerated ? buildToolPreviewSummary(safeSchema, values) : [];
+  const visibleSettingCount = safeSchema.settings.filter((field) => !field.hidden).length;
+  const fileListField = safeSchema.settings.find(
+    (field) => field.type === "repeatable-list" && field.itemType === "file"
+  );
+  const fileListValue = fileListField && values ? values[fileListField.id] : undefined;
+  const fileCount = Array.isArray(fileListValue) ? fileListValue.length : 0;
+  const usesTitleBlockCandidates = isTitleBlockCandidateSchema(safeSchema);
+  const candidateOptions = usesTitleBlockCandidates ? titleBlockCandidates : [];
+  const selectedCandidateId = valueAsText(values?.[titleBlockCandidateValueKey]);
+  const runToolAction = async (action: ToolRuntimeSchema["actions"][number]) => {
+    const request = buildToolExecutionRequest({
+      toolName,
+      menuName,
+      runtimeAction: action.runtimeAction,
+      schema: safeSchema,
+      values
+    });
+
+    if (!window.toolExecution?.run) {
+      if (action.runtimeAction === "preview") {
+        setPreviewGenerated(true);
+        setTitleBlockCandidates([]);
+      }
+      setActionMessage("AI/MCP 실행 통로가 아직 연결되지 않았습니다. 실행 요청은 만들 수 있지만 실제 프로그램 호출은 비활성 상태입니다.");
+      return;
+    }
+
+    setIsRunningAction(true);
+    try {
+      const result = await window.toolExecution.run(request);
+      if (action.runtimeAction === "preview") {
+        setPreviewGenerated(result.status === "preview" || result.status === "completed");
+        setTitleBlockCandidates(result.titleBlockCandidates ?? []);
+      }
+      setActionMessage(result.message);
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "툴 실행 요청 중 오류가 발생했습니다.");
+    } finally {
+      setIsRunningAction(false);
+    }
+  };
+
+  if (actions.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="schemaSettingsSection schemaActionSection">
+      <header>
+        <span>실행</span>
+        <small>입력값을 확인하고 미리보기 후 실행합니다.</small>
+      </header>
+      <div className="schemaWorkflowSteps" aria-label="실행 단계">
+        <div className="schemaWorkflowStep complete">
+          <strong>1</strong>
+          <span>입력</span>
+          <small>{fileListField ? `${fileCount}개 파일` : `${visibleSettingCount}개 항목`}</small>
+        </div>
+        <div className={previewGenerated ? "schemaWorkflowStep complete" : "schemaWorkflowStep active"}>
+          <strong>2</strong>
+          <span>미리보기</span>
+          <small>{previewGenerated ? "미리보기 완료" : "대기"}</small>
+        </div>
+        <div className={previewGenerated ? "schemaWorkflowStep active" : "schemaWorkflowStep"}>
+          <strong>3</strong>
+          <span>실행</span>
+          <small>{previewGenerated ? "확인 가능" : "미리보기 필요"}</small>
+        </div>
+      </div>
+      <div className="schemaActionButtons">
+        {actions.map((action) => {
+          const blockedByPreview = action.requiresPreview && !previewGenerated;
+          const blockedByCandidate =
+            action.runtimeAction === "apply" &&
+            previewGenerated &&
+            usesTitleBlockCandidates &&
+            !selectedCandidateId;
+          const isPrimary =
+            action.runtimeAction === "apply" ? previewGenerated : action.primary;
+
+          return (
+            <button
+              className={[
+                "schemaActionButton",
+                isPrimary ? "primaryAction" : "secondaryAction"
+              ].join(" ")}
+              disabled={isRunningAction || blockedByPreview || blockedByCandidate}
+              key={action.id}
+              onClick={() => {
+                if (action.runtimeAction === "preview") {
+                  void runToolAction(action);
+                  return;
+                }
+                if (action.runtimeAction === "apply") {
+                  void runToolAction(action);
+                  return;
+                }
+                setActionMessage(action.description || `${action.label} 작업을 선택했습니다.`);
+              }}
+              title={
+                blockedByCandidate
+                  ? "도곽 후보를 먼저 선택하세요."
+                  : action.description || action.label
+              }
+              type="button"
+            >
+              {toolActionLabel(action)}
+            </button>
+          );
+        })}
+      </div>
+      <div className="schemaActionResult">
+        {previewGenerated ? (
+          previewRows.length > 0 ? (
+            <div className="schemaPreviewResultRows">
+              {previewRows.map((row) => (
+                <div className="schemaPreviewResultRow" key={row.id}>
+                  <span>{row.fileName}</span>
+                  <small>{row.countLabel}</small>
+                  <strong>{row.rangeLabel}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>파일을 추가하면 분석 미리보기 결과가 여기에 표시됩니다.</p>
+          )
+        ) : (
+          <p>미리보기를 누르면 파일별 도곽 수와 배정 번호 범위를 먼저 확인합니다.</p>
+        )}
+      </div>
+      {previewGenerated && candidateOptions.length > 0 ? (
+        <div className="schemaCandidatePanel">
+          <header>
+            <span>도곽 후보 선택</span>
+            <small>첫 도면에서 감지한 후보 중 기준 도곽을 고릅니다.</small>
+          </header>
+          <div className="schemaCandidateList">
+            {candidateOptions.map((candidate) => (
+              <button
+                className={selectedCandidateId === candidate.id ? "selected" : ""}
+                key={candidate.id}
+                onClick={() => onRuntimeValueChange?.(titleBlockCandidateValueKey, candidate.id)}
+                type="button"
+              >
+                <strong>{candidate.label}</strong>
+                <span>{candidate.detail}</span>
+              </button>
+            ))}
+          </div>
+          {!selectedCandidateId ? (
+            <p className="schemaActionHint">실행 전에 기준 도곽 후보를 선택해야 합니다.</p>
+          ) : null}
+        </div>
+      ) : null}
+      {previewGenerated && usesTitleBlockCandidates && candidateOptions.length === 0 ? (
+        <p className="schemaActionHint">
+          CAD MCP에서 도곽 블록 후보가 아직 반환되지 않았습니다. 실제 블록명/배치명을 받으면 여기에 표시됩니다.
+        </p>
+      ) : null}
+      {actionMessage ? <p className="schemaActionHint">{actionMessage}</p> : null}
+      {actions.some((action) => action.requiresPreview) && !previewGenerated ? (
+        <p className="schemaActionHint">미리보기 결과가 생성되면 실행 버튼이 활성화됩니다.</p>
+      ) : null}
+    </section>
+  );
+}
+
 function ToolSchemaPreviewPanel({ schema }: { schema: ToolRuntimeSchema }) {
-  const values = defaultSettingValuesForSchema(schema);
-  const definitionIssues = validateToolRuntimeSchema(schema);
-  const valueIssues = validateToolSettingsValues(schema, values);
-  const sections = schema.settingsLayout.sections.length
-    ? schema.settingsLayout.sections
+  const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
+  const values = defaultSettingValuesForSchema(safeSchema);
+  const definitionIssues = validateToolRuntimeSchema(safeSchema);
+  const valueIssues = validateToolSettingsValues(safeSchema, values);
+  const sections = safeSchema.settingsLayout.sections.length
+    ? safeSchema.settingsLayout.sections
     : [{ id: "basic", label: "기본 설정", defaultOpen: true }];
   const fieldsBySection = new Map<string, ToolSettingField[]>();
 
-  schema.settings.forEach((field) => {
+  safeSchema.settings.filter((field) => !field.hidden).forEach((field) => {
     const sectionId = field.section ?? (field.advanced ? "advanced" : sections[0].id);
     fieldsBySection.set(sectionId, [...(fieldsBySection.get(sectionId) ?? []), field]);
   });
@@ -7030,11 +8114,11 @@ function ToolSchemaPreviewPanel({ schema }: { schema: ToolRuntimeSchema }) {
         <h2>설정창 미리보기</h2>
         <span className="panelHeaderNote">MD 파일이 앱에서 어떤 설정창으로 보일지 확인합니다.</span>
       </div>
-      <div className={`schemaRiskBar risk-${schema.risk}`}>
-        <span>{toolRiskLabels[schema.risk]}</span>
+      <div className={`schemaRiskBar risk-${safeSchema.risk}`}>
+        <span>{toolRiskLabels[safeSchema.risk]}</span>
         <small>
-          {schema.requiredServers.length > 0
-            ? `필요 MCP: ${schema.requiredServers.join(", ")}`
+          {safeSchema.requiredServers.length > 0
+            ? `필요 MCP: ${safeSchema.requiredServers.join(", ")}`
             : "필요 MCP 서버 없음"}
         </small>
       </div>
@@ -7063,27 +8147,311 @@ function ToolSchemaPreviewPanel({ schema }: { schema: ToolRuntimeSchema }) {
           );
         })}
       </div>
+      <ToolExecutionActions schema={safeSchema} values={values} />
       <div className="toolSchemaPortPreview">
         <div>
           <strong>입력</strong>
           <span>
-            {schema.inputs.length > 0
-              ? schema.inputs.map((port) => `${port.label}(${port.type})`).join(", ")
+            {safeSchema.inputs.length > 0
+              ? safeSchema.inputs.map((port) => `${port.label}(${port.type})`).join(", ")
               : "입력 포트 없음"}
           </span>
         </div>
         <div>
           <strong>출력</strong>
           <span>
-            {schema.outputs.length > 0
-              ? schema.outputs.map((port) => `${port.label}(${port.type})`).join(", ")
-              : schema.resultSchema.type}
+            {safeSchema.outputs.length > 0
+              ? safeSchema.outputs.map((port) => `${port.label}(${port.type})`).join(", ")
+              : safeSchema.resultSchema.type}
           </span>
         </div>
       </div>
       <ToolRuntimeIssueList issues={[...definitionIssues, ...valueIssues]} />
-      <ToolExecutionPlanPanel schema={schema} values={values} />
+      <ToolExecutionPlanPanel schema={safeSchema} values={values} />
     </section>
+  );
+}
+
+function SettingPresetLoadDialog({
+  presets,
+  values,
+  activePresetId,
+  onClose,
+  onLoadPreset,
+  onDeletePreset,
+  onRenamePreset
+}: {
+  presets: SettingPreset[];
+  values?: Record<string, ToolSettingValue>;
+  activePresetId: string;
+  onClose: () => void;
+  onLoadPreset?: (preset: SettingPreset) => void;
+  onDeletePreset?: (presetId: string) => void;
+  onRenamePreset?: (presetId: string, name: string) => void;
+}) {
+  const [editingPresetId, setEditingPresetId] = useState("");
+  const [editingPresetName, setEditingPresetName] = useState("");
+  const selectedPresetId =
+    activePresetId ||
+    presets.find((preset) => areSettingValuesEqual(values, preset.values))?.id ||
+    "";
+
+  return (
+    <div className="dialogBackdrop nestedDialogBackdrop" role="presentation" onClick={onClose}>
+      <div
+        className="dialogWindow schemaPresetDialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="schema-preset-dialog-title"
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <div className="dialogHeader">
+          <div>
+            <h2 id="schema-preset-dialog-title">저장한 설정 불러오기</h2>
+            <span>저장해 둔 설정을 선택하면 현재 설정창에 그대로 입력됩니다.</span>
+          </div>
+          <div className="dialogHeaderActions">
+            <button className="dialogWindowButton" type="button" onClick={onClose} aria-label="닫기">
+              ×
+            </button>
+          </div>
+        </div>
+        <div className="schemaPresetDialogBody">
+          {presets.length > 0 ? (
+            <div className="schemaPresetList">
+              {presets.map((preset) => {
+                const isSelectedPreset = selectedPresetId === preset.id;
+                return (
+                  <div
+                    className={["schemaPresetItem", isSelectedPreset ? "selected" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
+                    key={preset.id}
+                  >
+                    {editingPresetId === preset.id ? (
+                      <div className="schemaPresetEdit">
+                        <input
+                          autoFocus
+                          value={editingPresetName}
+                          onChange={(event) => setEditingPresetName(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              onRenamePreset?.(preset.id, editingPresetName);
+                              setEditingPresetId("");
+                            }
+                            if (event.key === "Escape") {
+                              setEditingPresetId("");
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onRenamePreset?.(preset.id, editingPresetName);
+                            setEditingPresetId("");
+                          }}
+                        >
+                          저장
+                        </button>
+                        <button type="button" onClick={() => setEditingPresetId("")}>
+                          취소
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="schemaPresetLoad"
+                          aria-pressed={isSelectedPreset}
+                          onClick={() => {
+                            onLoadPreset?.(preset);
+                            onClose();
+                          }}
+                        >
+                          <strong>{preset.name}</strong>
+                          <small>{new Date(preset.updatedAt).toLocaleString()}</small>
+                        </button>
+                        <button
+                          type="button"
+                          className="schemaPresetRename"
+                          onClick={() => {
+                            setEditingPresetId(preset.id);
+                            setEditingPresetName(preset.name);
+                          }}
+                          aria-label={`${preset.name} 설정 이름 변경`}
+                          title="이름 변경"
+                        >
+                          <AppIcon name="edit" />
+                        </button>
+                        <button
+                          type="button"
+                          className="schemaPresetDelete"
+                          onClick={() => onDeletePreset?.(preset.id)}
+                          aria-label={`${preset.name} 설정 삭제`}
+                        >
+                          ×
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="schemaPresetEmpty">저장한 설정이 없습니다.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingPresetControls({
+  presets,
+  values,
+  onSavePreset,
+  onLoadPreset,
+  onDeletePreset,
+  onRenamePreset,
+  showCurrentNote = true,
+  inline = false
+}: {
+  presets: SettingPreset[];
+  values?: Record<string, ToolSettingValue>;
+  onSavePreset?: (options?: SettingPresetSaveOptions) => void;
+  onLoadPreset?: (preset: SettingPreset) => void;
+  onDeletePreset?: (presetId: string) => void;
+  onRenamePreset?: (presetId: string, name: string) => void;
+  showCurrentNote?: boolean;
+  inline?: boolean;
+}) {
+  const [activePresetId, setActivePresetId] = useState("");
+  const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
+  const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false);
+  const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
+  const [saveAsName, setSaveAsName] = useState("");
+  const selectedPreset =
+    presets.find((preset) => preset.id === activePresetId) ??
+    presets.find((preset) => areSettingValuesEqual(values, preset.values));
+  const saveCurrentPreset = () => {
+    onSavePreset?.(selectedPreset ? { presetId: selectedPreset.id } : undefined);
+    if (selectedPreset) {
+      setActivePresetId(selectedPreset.id);
+    }
+  };
+  const saveAsPreset = () => {
+    onSavePreset?.({
+      name: saveAsName.trim() || `${new Date().toLocaleString("ko-KR")} 설정`
+    });
+    setSaveAsName("");
+    setIsSaveAsOpen(false);
+    setIsSaveMenuOpen(false);
+  };
+  const loadPreset = (preset: SettingPreset) => {
+    setActivePresetId(preset.id);
+    onLoadPreset?.(preset);
+  };
+
+  return (
+    <div className={["schemaPresetControls", inline ? "inline" : ""].filter(Boolean).join(" ")}>
+      <div className="schemaPresetToolbar">
+        <div className="schemaSplitSave">
+          <button
+            className="primaryAction schemaPresetSaveButton"
+            type="button"
+            onClick={saveCurrentPreset}
+            disabled={!onSavePreset}
+            title={selectedPreset ? `${selectedPreset.name}에 덮어쓰기` : "현재 설정을 새 저장본으로 저장"}
+          >
+            저장
+          </button>
+          <button
+            className="primaryAction schemaPresetArrowButton"
+            type="button"
+            onClick={() => setIsSaveMenuOpen((current) => !current)}
+            disabled={!onSavePreset}
+            aria-label="저장 옵션"
+          >
+            ▾
+          </button>
+          {isSaveMenuOpen ? (
+            <div className="schemaPresetDropdown">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSaveAsOpen(true);
+                  setSaveAsName(`${new Date().toLocaleString("ko-KR")} 설정`);
+                  setIsSaveMenuOpen(false);
+                }}
+              >
+                다른 이름으로 저장
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <button
+          className="secondaryAction schemaPresetLoadButton"
+          type="button"
+          onClick={() => setIsPresetDialogOpen(true)}
+          disabled={!onLoadPreset}
+        >
+          불러오기
+        </button>
+      </div>
+      {showCurrentNote ? (
+        selectedPreset ? (
+          <p className="schemaPresetCurrent">
+            선택됨: <strong>{selectedPreset.name}</strong>
+          </p>
+        ) : (
+          <p className="schemaPresetEmpty">저장 후 불러오기에서 저장본을 관리할 수 있습니다.</p>
+        )
+      ) : null}
+      {isSaveAsOpen ? (
+        <div className="schemaPresetSaveAs">
+          <input
+            autoFocus
+            value={saveAsName}
+            onChange={(event) => setSaveAsName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                saveAsPreset();
+              }
+              if (event.key === "Escape") {
+                setIsSaveAsOpen(false);
+                setSaveAsName("");
+              }
+            }}
+            placeholder="저장 이름"
+          />
+          <button className="primaryAction" type="button" onClick={saveAsPreset}>
+            저장
+          </button>
+          <button
+            className="secondaryAction"
+            type="button"
+            onClick={() => {
+              setIsSaveAsOpen(false);
+              setSaveAsName("");
+            }}
+          >
+            취소
+          </button>
+        </div>
+      ) : null}
+      {isPresetDialogOpen ? (
+        <SettingPresetLoadDialog
+          presets={presets}
+          values={values}
+          activePresetId={activePresetId}
+          onClose={() => setIsPresetDialogOpen(false)}
+          onLoadPreset={loadPreset}
+          onDeletePreset={onDeletePreset}
+          onRenamePreset={onRenamePreset}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -7094,21 +8462,30 @@ function FlowNodeSchemaSettings({
   presets = [],
   onSavePreset,
   onLoadPreset,
-  onDeletePreset
+  onDeletePreset,
+  onRenamePreset,
+  onRuntimeValueChange,
+  showRiskBar = false,
+  showPresetControls = true
 }: {
   schema: ToolRuntimeSchema;
   values?: Record<string, ToolSettingValue>;
   onChange: (field: ToolSettingField, value: ToolSettingValue) => void;
   presets?: SettingPreset[];
-  onSavePreset?: () => void;
+  onSavePreset?: (options?: SettingPresetSaveOptions) => void;
   onLoadPreset?: (preset: SettingPreset) => void;
   onDeletePreset?: (presetId: string) => void;
+  onRenamePreset?: (presetId: string, name: string) => void;
+  onRuntimeValueChange?: (key: string, value: ToolSettingValue) => void;
+  showRiskBar?: boolean;
+  showPresetControls?: boolean;
 }) {
-  const visibleFields = schema.settings.filter((field) =>
-    isSettingVisible(field, schema.settings, values)
+  const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
+  const visibleFields = safeSchema.settings.filter((field) =>
+    !field.hidden && isSettingVisible(field, safeSchema.settings, values)
   );
-  const sections = schema.settingsLayout.sections.length
-    ? schema.settingsLayout.sections
+  const sections = safeSchema.settingsLayout.sections.length
+    ? safeSchema.settingsLayout.sections
     : [{ id: "basic", label: "기본 설정", defaultOpen: true }];
   const [openSectionIds, setOpenSectionIds] = useState<string[]>(() =>
     sections.filter((section) => section.defaultOpen !== false).map((section) => section.id)
@@ -7121,58 +8498,44 @@ function FlowNodeSchemaSettings({
   });
 
   const previewFields = visibleFields.filter((field) => field.preview || field.required);
-  const executionPlan = buildToolExecutionPlan(schema, values);
+  const executionPlan = buildToolExecutionPlan(safeSchema, values);
   const [openReviewPanel, setOpenReviewPanel] = useState<
     "summary" | "checks" | "validation" | "tests" | null
   >(null);
   const reviewTabs = [
     { id: "summary" as const, label: "실행 전 요약", icon: "preview" as AppIconName, count: previewFields.length },
-    { id: "checks" as const, label: "점검", icon: "monitor" as AppIconName, count: schema.preflightChecks.length },
+    { id: "checks" as const, label: "점검", icon: "monitor" as AppIconName, count: safeSchema.preflightChecks.length },
     { id: "validation" as const, label: "검증", icon: "settings" as AppIconName, count: executionPlan.issues.length },
-    { id: "tests" as const, label: "테스트 요약", icon: "customTools" as AppIconName, count: schema.testCases.length }
+    { id: "tests" as const, label: "테스트 요약", icon: "customTools" as AppIconName, count: safeSchema.testCases.length }
   ];
 
   return (
+    <>
     <div className="flowSchemaSettings" onPointerDown={(event) => event.stopPropagation()}>
-      <div className={`schemaRiskBar risk-${schema.risk}`}>
-        <span>{toolRiskLabels[schema.risk]}</span>
-        <small>
-          {schema.requiredServers.length > 0
-            ? `필요 MCP: ${schema.requiredServers.join(", ")}`
-            : "필요 MCP 서버가 명시되지 않았습니다."}
-        </small>
-      </div>
+      {showRiskBar ? <ToolRiskSummary schema={safeSchema} /> : null}
 
+      <ToolExecutionActions
+        schema={safeSchema}
+        values={values}
+        onRuntimeValueChange={onRuntimeValueChange}
+      />
+
+      {showPresetControls ? (
       <section className="schemaSettingsSection schemaPresetSection">
         <header>
           <span>저장한 설정</span>
-          <button type="button" onClick={onSavePreset}>
-            현재 설정 저장
-          </button>
+          <SettingPresetControls
+            presets={presets}
+            values={values}
+            onSavePreset={onSavePreset}
+            onLoadPreset={onLoadPreset}
+            onDeletePreset={onDeletePreset}
+            onRenamePreset={onRenamePreset}
+            showCurrentNote={false}
+          />
         </header>
-        {presets.length > 0 ? (
-          <div className="schemaPresetList">
-            {presets.map((preset) => (
-              <div className="schemaPresetItem" key={preset.id}>
-                <button type="button" onClick={() => onLoadPreset?.(preset)}>
-                  <strong>{preset.name}</strong>
-                  <small>{new Date(preset.updatedAt).toLocaleString()}</small>
-                </button>
-                <button
-                  type="button"
-                  className="schemaPresetDelete"
-                  onClick={() => onDeletePreset?.(preset.id)}
-                  aria-label={`${preset.name} 설정 삭제`}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="schemaPresetEmpty">저장한 설정이 없습니다.</p>
-        )}
       </section>
+      ) : null}
 
       {sections.map((section, sectionIndex) => {
         const fields = fieldsBySection.get(section.id) ?? [];
@@ -7196,7 +8559,7 @@ function FlowNodeSchemaSettings({
             >
               <span>
                 {isOpen ? "▴" : "▾"}
-                {schema.settingsLayout.mode === "steps" ? `${sectionIndex + 1}. ` : ""}
+                {safeSchema.settingsLayout.mode === "steps" ? `${sectionIndex + 1}. ` : ""}
                 {section.label}
               </span>
               {section.defaultOpen === false ? <small>고급</small> : null}
@@ -7254,9 +8617,9 @@ function FlowNodeSchemaSettings({
               )
             ) : null}
             {openReviewPanel === "checks" ? (
-              schema.preflightChecks.length > 0 ? (
+              safeSchema.preflightChecks.length > 0 ? (
                 <div className="schemaCheckList">
-                  {schema.preflightChecks.map((check) => (
+                  {safeSchema.preflightChecks.map((check) => (
                     <div className={`schemaCheckItem ${check.severity}`} key={check.id}>
                       <strong>{check.label}</strong>
                       <span>{check.message}</span>
@@ -7271,10 +8634,10 @@ function FlowNodeSchemaSettings({
             {openReviewPanel === "validation" ? <ToolRuntimeIssueList issues={executionPlan.issues} /> : null}
             {openReviewPanel === "tests" ? (
               <>
-                <ToolExecutionPlanPanel schema={schema} values={values} compact />
-                {schema.testCases.length > 0 ? (
+                <ToolExecutionPlanPanel schema={safeSchema} values={values} compact />
+                {safeSchema.testCases.length > 0 ? (
                   <div className="schemaTestCaseList">
-                    {schema.testCases.map((testCase) => (
+                    {safeSchema.testCases.map((testCase) => (
                       <div className="schemaTestCaseItem" key={testCase.name}>
                         <strong>{testCase.name}</strong>
                         <span>{testCase.expect}</span>
@@ -7288,6 +8651,7 @@ function FlowNodeSchemaSettings({
         ) : null}
       </section>
     </div>
+    </>
   );
 }
 
@@ -7744,58 +9108,165 @@ function FlowNodeResultPreview({ record }: { record?: FlowRunRecord }) {
   );
 }
 
+function startSavedFlowDrag(event: DragEvent<HTMLElement>, flow: SavedCustomFlow) {
+  event.dataTransfer.effectAllowed = "copy";
+  event.dataTransfer.setData("application/x-custom-flow", serializeSavedFlowForDrag(flow));
+}
+
+function flowCardMeta(flow: SavedCustomFlow) {
+  return `노드 ${flow.graph.nodes.length} / 연결 ${flow.graph.connections.length}`;
+}
+
+function MarketFlowPanel({
+  sharedFlows,
+  savedFlows,
+  onRegisterSharedFlow
+}: {
+  sharedFlows: SavedCustomFlow[];
+  savedFlows: SavedCustomFlow[];
+  onRegisterSharedFlow: (flow: SavedCustomFlow) => void;
+}) {
+  const sharedFlowIds = new Set(sharedFlows.map((flow) => flow.id));
+
+  return (
+    <div className="marketFlowPanel">
+      <section className="marketFlowSection">
+        <header>
+          <strong>Shared Flows</strong>
+          <span>공유하도록 등록된 Flow입니다. 캔버스로 드래그하면 그룹으로 추가됩니다.</span>
+        </header>
+        <div className="marketFlowList">
+          {sharedFlows.length > 0 ? (
+            sharedFlows.map((flow) => (
+              <article
+                className="marketFlowCard"
+                draggable
+                key={flow.id}
+                onDragStart={(event) => startSavedFlowDrag(event, flow)}
+              >
+                <div>
+                  <strong>{flow.name}</strong>
+                  <span>{flow.description}</span>
+                  <small>{flowCardMeta(flow)}</small>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="emptyState compactEmptyState centeredEmptyState">
+              공유된 Flow가 없습니다. 아래 My Flow에서 공유할 항목을 등록하세요.
+            </p>
+          )}
+        </div>
+      </section>
+      <section className="marketFlowSection">
+        <header>
+          <strong>My Flow</strong>
+          <span>이 컴퓨터에 저장된 Flow 중 공유할 항목을 등록합니다.</span>
+        </header>
+        <div className="marketFlowList">
+          {savedFlows.length > 0 ? (
+            savedFlows.map((flow) => {
+              const registered = sharedFlowIds.has(flow.id);
+              return (
+                <article
+                  className={registered ? "marketFlowCard registered" : "marketFlowCard"}
+                  draggable
+                  key={flow.id}
+                  onDragStart={(event) => startSavedFlowDrag(event, flow)}
+                >
+                  <div>
+                    <strong>{flow.name}</strong>
+                    <span>{flow.description}</span>
+                    <small>{flowCardMeta(flow)}</small>
+                  </div>
+                  <button
+                    className={
+                      registered ? "tableActionButton" : "tableActionButton registerAction"
+                    }
+                    type="button"
+                    disabled={registered}
+                    onClick={() => onRegisterSharedFlow(flow)}
+                  >
+                    {registered ? "등록됨" : "등록"}
+                  </button>
+                </article>
+              );
+            })
+          ) : (
+            <p className="emptyState compactEmptyState centeredEmptyState">
+              저장된 My Flow가 없습니다. Custom Flow에서 먼저 저장하세요.
+            </p>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function WorkflowHomeView({
   savedFlows,
   sharedFlows,
   onCreateNew,
-  onImportShared,
+  onOpenFlowMarket,
+  onOpenShared,
   onOpenSaved,
   onUpdateSavedDetails,
-  onRenameSaved,
   onDuplicateSaved,
   onDeleteSaved
 }: {
   savedFlows: SavedCustomFlow[];
   sharedFlows: SavedCustomFlow[];
   onCreateNew: () => void;
-  onImportShared: (flow: SavedCustomFlow) => void;
+  onOpenFlowMarket: () => void;
+  onOpenShared: (flow: SavedCustomFlow) => void;
   onOpenSaved: (flow: SavedCustomFlow) => void;
   onUpdateSavedDetails: (
     flowId: string,
     patch: { name?: string; description?: string }
   ) => void;
-  onRenameSaved: (flowId: string) => void;
   onDuplicateSaved: (flowId: string) => void;
   onDeleteSaved: (flowId: string) => void;
 }) {
-  const flowMeta = (flow: SavedCustomFlow) =>
-    `노드 ${flow.graph.nodes.length} / 연결 ${flow.graph.connections.length}`;
+  const [flowCardMenu, setFlowCardMenu] = useState<{
+    flowId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [editingFlowId, setEditingFlowId] = useState("");
 
   return (
-    <section className="sectionView customFlowHomeView">
-      <div className="customFlowHomeHeader">
-        <div>
-          <h2>Custom Flow</h2>
-          <span>공유 플로우를 가져오거나 내가 저장한 플로우를 열어 작업합니다.</span>
-        </div>
-      </div>
+    <section className="sectionView customFlowHomeView" onClick={() => setFlowCardMenu(null)}>
       <div className="customFlowHomeGrid">
         <section className="customFlowLibraryPanel">
           <header>
-            <strong>공유 플로우</strong>
-            <span>나중에 GitHub/서버와 연결됩니다.</span>
+            <div>
+              <strong>Share Flow</strong>
+              <span>공유 등록된 Flow를 선택하거나 캔버스에 드래그해 사용합니다.</span>
+            </div>
+            <button
+              className="secondaryAction squareAction"
+              type="button"
+              onClick={onOpenFlowMarket}
+              aria-label="Market에서 공유 Flow 보기"
+              title="Market에서 공유 Flow 보기"
+            >
+              +
+            </button>
           </header>
           <div className="customFlowCardList">
             {sharedFlows.map((flow) => (
-              <article className="customFlowCard" key={flow.id}>
+              <article
+                className="customFlowCard clickableFlowCard"
+                draggable
+                key={flow.id}
+                onDragStart={(event) => startSavedFlowDrag(event, flow)}
+                onClick={() => onOpenShared(flow)}
+              >
                 <div>
                   <strong>{flow.name}</strong>
                   <span>{flow.description}</span>
-                  <small>{flowMeta(flow)} · 필요 MCP CAD/Revit/Excel</small>
+                  <small>{flowCardMeta(flow)} · 필요 MCP CAD/Revit/Excel</small>
                 </div>
-                <button type="button" onClick={() => onImportShared(flow)}>
-                  내 플로우로 가져오기
-                </button>
               </article>
             ))}
           </div>
@@ -7803,7 +9274,7 @@ function WorkflowHomeView({
         <section className="customFlowLibraryPanel">
           <header>
             <div>
-              <strong>내 플로우</strong>
+              <strong>My Flow</strong>
               <span>이 컴퓨터에 저장된 Custom Flow입니다.</span>
             </div>
             <button
@@ -7819,40 +9290,80 @@ function WorkflowHomeView({
           <div className="customFlowCardList">
             {savedFlows.length > 0 ? (
               savedFlows.map((flow) => (
-                <article className="customFlowCard" key={flow.id}>
-                  <div className="customFlowEditableMeta">
-                    <input
-                      value={flow.name}
-                      onChange={(event) =>
-                        onUpdateSavedDetails(flow.id, { name: event.target.value })
-                      }
-                      aria-label="플로우 이름"
-                    />
-                    <textarea
-                      value={flow.description}
-                      onChange={(event) =>
-                        onUpdateSavedDetails(flow.id, { description: event.target.value })
-                      }
-                      aria-label="플로우 설명"
-                    />
-                    <small>
-                      {flowMeta(flow)} · {new Date(flow.updatedAt).toLocaleString()}
-                    </small>
-                  </div>
-                  <div className="customFlowCardActions">
-                    <button type="button" onClick={() => onOpenSaved(flow)}>
-                      열기
-                    </button>
-                    <button type="button" onClick={() => onRenameSaved(flow.id)}>
-                      이름 변경
-                    </button>
-                    <button type="button" onClick={() => onDuplicateSaved(flow.id)}>
-                      복제
-                    </button>
-                    <button type="button" onClick={() => onDeleteSaved(flow.id)}>
-                      삭제
-                    </button>
-                  </div>
+                <article
+                  className="customFlowCard clickableFlowCard"
+                  draggable
+                  key={flow.id}
+                  onDragStart={(event) => startSavedFlowDrag(event, flow)}
+                  onClick={() => onOpenSaved(flow)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setFlowCardMenu({ flowId: flow.id, x: event.clientX, y: event.clientY });
+                  }}
+                >
+                  {editingFlowId === flow.id ? (
+                    <div className="customFlowEditableMeta">
+                      <input
+                        value={flow.name}
+                        onClick={(event) => event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onChange={(event) =>
+                          onUpdateSavedDetails(flow.id, { name: event.target.value })
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape" || event.key === "Enter") {
+                            setEditingFlowId("");
+                          }
+                        }}
+                        aria-label="플로우 이름"
+                      />
+                      <textarea
+                        value={flow.description}
+                        onClick={(event) => event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onChange={(event) =>
+                          onUpdateSavedDetails(flow.id, { description: event.target.value })
+                        }
+                        aria-label="플로우 설명"
+                      />
+                      <div className="customFlowEditableActions">
+                        <small>
+                          {flowCardMeta(flow)} · {new Date(flow.updatedAt).toLocaleString()}
+                        </small>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditingFlowId("");
+                          }}
+                        >
+                          완료
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="customFlowDisplayMeta">
+                      <div>
+                        <strong>{flow.name}</strong>
+                        <span>{flow.description}</span>
+                        <small>
+                          {flowCardMeta(flow)} · {new Date(flow.updatedAt).toLocaleString()}
+                        </small>
+                      </div>
+                      <button
+                        className="customFlowCardEditButton"
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditingFlowId(flow.id);
+                        }}
+                        aria-label={`${flow.name} 이름과 설명 수정`}
+                        title="이름과 설명 수정"
+                      >
+                        <AppIcon name="edit" />
+                      </button>
+                    </div>
+                  )}
                 </article>
               ))
             ) : (
@@ -7863,6 +9374,34 @@ function WorkflowHomeView({
           </div>
         </section>
       </div>
+      {flowCardMenu ? (
+        <div
+          className="contextMenu flowCardContextMenu"
+          style={{ left: flowCardMenu.x, top: flowCardMenu.y } as CSSProperties}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onDuplicateSaved(flowCardMenu.flowId);
+              setFlowCardMenu(null);
+            }}
+          >
+            복제
+          </button>
+          <button
+            className="danger"
+            type="button"
+            onClick={() => {
+              onDeleteSaved(flowCardMenu.flowId);
+              setFlowCardMenu(null);
+            }}
+          >
+            삭제
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -7872,7 +9411,9 @@ function WorkflowView({
   homeRequestId,
   openRequest,
   detailsUpdateRequest,
+  sharedFlows,
   onCreateRequestConsumed,
+  onOpenFlowMarket,
   onNotify,
   onSavedFlowsChange,
   onSavedFlowOpened,
@@ -7882,7 +9423,9 @@ function WorkflowView({
   homeRequestId?: number;
   openRequest?: WorkflowOpenRequest | null;
   detailsUpdateRequest?: WorkflowDetailsUpdateRequest | null;
+  sharedFlows: SavedCustomFlow[];
   onCreateRequestConsumed?: () => void;
+  onOpenFlowMarket: () => void;
   onNotify?: (notification: AppNotificationInput) => void;
   onSavedFlowsChange?: (flows: SavedCustomFlow[]) => void;
   onSavedFlowOpened?: (flow: SavedCustomFlow, source: "menu" | "favorite" | "recent") => void;
@@ -7962,6 +9505,8 @@ function WorkflowView({
   const [isFlowSearchOpen, setIsFlowSearchOpen] = useState(false);
   const [flowSearchQuery, setFlowSearchQuery] = useState("");
   const [basicToolsTab, setBasicToolsTab] = useState<"tools" | "ports">("tools");
+  const [basicPortFilter, setBasicPortFilter] = useState<FlowBasicPortFilter>("all");
+  const [isBasicPortFilterOpen, setIsBasicPortFilterOpen] = useState(false);
   const [activeFileOptions, setActiveFileOptions] =
     useState<FlowActiveFileSelection[]>(detectedActiveFileOptions);
   const [isRefreshingActiveFiles, setIsRefreshingActiveFiles] = useState(false);
@@ -7974,6 +9519,12 @@ function WorkflowView({
   const [editingSavedFlowId, setEditingSavedFlowId] = useState("");
   const [editingSavedFlowBaseline, setEditingSavedFlowBaseline] = useState<StoredFlowGraph | null>(null);
   const [deleteFlowRequest, setDeleteFlowRequest] = useState<SavedCustomFlow | null>(null);
+  const [isLeaveFlowConfirmOpen, setIsLeaveFlowConfirmOpen] = useState(false);
+  const [pendingFlowSettingChange, setPendingFlowSettingChange] = useState<{
+    nodeId: string;
+    field: ToolSettingField;
+    value: ToolSettingValue;
+  } | null>(null);
   const [isHistoryMenuOpen, setIsHistoryMenuOpen] = useState(false);
   const [runningNodeIds, setRunningNodeIds] = useState<string[]>([]);
   const runTimersRef = useRef<number[]>([]);
@@ -8125,6 +9676,24 @@ function WorkflowView({
       isStoredFlowGraphDirty(editingSavedFlowBaseline, currentStoredFlowGraph())
     );
 
+  const hasUnsavedNewFlowContent = () => {
+    if (editingSavedFlowId) {
+      return false;
+    }
+    if (editingSavedFlowBaseline) {
+      return isStoredFlowGraphDirty(editingSavedFlowBaseline, currentStoredFlowGraph());
+    }
+    return (
+      flowNodes.length > 0 ||
+      flowConnections.length > 0 ||
+      flowGroups.length > 0 ||
+      flowNotes.length > 0
+    );
+  };
+
+  const hasUnsavedFlowChanges = () =>
+    hasUnsavedSavedFlowChanges() || hasUnsavedNewFlowContent();
+
   const saveEditingSavedFlow = () => {
     if (!editingSavedFlowId) {
       return;
@@ -8134,35 +9703,34 @@ function WorkflowView({
     setEditingSavedFlowBaseline(cloneStoredFlowGraph(nextGraph));
   };
 
-  const requestWorkflowHome = () => {
-    if (hasUnsavedSavedFlowChanges()) {
-      const leave = window.confirm(
-        "저장되지 않은 변경이 있습니다. 저장하지 않고 메인페이지로 이동할까요?"
-      );
-      if (!leave) {
-        return;
-      }
-    }
+  const leaveWorkflowEditor = () => {
     setWorkflowMode("home");
     setEditingSavedFlowId("");
     setEditingSavedFlowBaseline(null);
+    setIsLeaveFlowConfirmOpen(false);
+  };
+
+  const requestWorkflowHome = () => {
+    if (hasUnsavedFlowChanges()) {
+      setIsLeaveFlowConfirmOpen(true);
+      return;
+    }
+    leaveWorkflowEditor();
   };
 
   const createNewFlow = () => {
     const graph = {
-      nodes: defaultFlowNodes(),
-      connections: defaultFlowConnections(),
+      nodes: [],
+      connections: [],
       groups: [],
       notes: [],
       scale: 1,
       pan: { x: 0, y: 0 }
     };
-    const flow = createSavedFlow("새 페이지", graph, Date.now(), "새 Custom Flow 작업 흐름");
-    setSavedFlows((flows) => [flow, ...flows]);
-    loadFlowGraphIntoEditor(flow.graph);
-    setEditingSavedFlowId(flow.id);
-    setEditingSavedFlowBaseline(cloneStoredFlowGraph(flow.graph));
-    onSavedFlowOpened?.(flow, "menu");
+    loadFlowGraphIntoEditor(graph);
+    setEditingSavedFlowId("");
+    setEditingSavedFlowBaseline(null);
+    window.localStorage.removeItem(customFlowGraphStorageKey);
   };
 
   useEffect(() => {
@@ -8237,12 +9805,11 @@ function WorkflowView({
     });
   };
 
-  const importSharedFlow = (flow: SavedCustomFlow) => {
-    const imported = createSavedFlow(flow.name, flow.graph, Date.now(), flow.description);
-    setSavedFlows((flows) => [imported, ...flows]);
-    loadFlowGraphIntoEditor(imported.graph);
-    setEditingSavedFlowId(imported.id);
-    setEditingSavedFlowBaseline(cloneStoredFlowGraph(imported.graph));
+  const openSharedFlow = (flow: SavedCustomFlow) => {
+    const nextGraph = cloneStoredFlowGraph(flow.graph);
+    loadFlowGraphIntoEditor(nextGraph);
+    setEditingSavedFlowId("");
+    setEditingSavedFlowBaseline(cloneStoredFlowGraph(nextGraph));
   };
 
   const openSavedFlow = (flow: SavedCustomFlow) => {
@@ -8257,15 +9824,6 @@ function WorkflowView({
     patch: { name?: string; description?: string }
   ) => {
     setSavedFlows((flows) => updateSavedFlowDetails(flows, flowId, patch));
-  };
-
-  const renameFlow = (flowId: string) => {
-    const current = savedFlows.find((flow) => flow.id === flowId);
-    const name = window.prompt("플로우 이름을 입력하세요.", current?.name ?? "Custom Flow");
-    if (name === null) {
-      return;
-    }
-    setSavedFlows((flows) => renameSavedFlow(flows, flowId, name));
   };
 
   const duplicateFlow = (flowId: string) => {
@@ -8911,20 +10469,11 @@ function WorkflowView({
     );
   };
 
-  const updateFlowNodeSettingValue = (
+  const commitFlowNodeSettingValue = (
     nodeId: string,
     field: ToolSettingField,
     value: ToolSettingValue
   ) => {
-    if (field.confirmOnChange) {
-      const confirmed = window.confirm(
-        `${field.label} 설정은 실행 결과나 원본 데이터에 영향을 줄 수 있습니다. 변경할까요?`
-      );
-      if (!confirmed) {
-        return;
-      }
-    }
-
     rememberFlowState();
     setFlowNodes((nodes) =>
       nodes.map((node) =>
@@ -8941,13 +10490,64 @@ function WorkflowView({
     );
   };
 
-  const saveFlowNodePreset = (node: FlowNode) => {
-    const name = window.prompt("저장할 설정 이름을 입력하세요.", `${node.name} 기본값`);
-    if (name === null) {
+  const updateFlowNodeSettingValue = (
+    nodeId: string,
+    field: ToolSettingField,
+    value: ToolSettingValue
+  ) => {
+    if (field.confirmOnChange) {
+      setPendingFlowSettingChange({ nodeId, field, value });
       return;
     }
-    const preset = createSettingPreset(node.id, name, node.settingsValues ?? {});
-    setSettingPresets((presets) => upsertSettingPreset(presets, preset));
+
+    commitFlowNodeSettingValue(nodeId, field, value);
+  };
+
+  const updateFlowNodeRuntimeSettingValue = (
+    nodeId: string,
+    key: string,
+    value: ToolSettingValue
+  ) => {
+    rememberFlowState();
+    setFlowNodes((nodes) =>
+      nodes.map((node) =>
+        node.nodeId === nodeId
+          ? {
+              ...node,
+              settingsValues: {
+                ...(node.settingsValues ?? {}),
+                [key]: value
+              }
+            }
+          : node
+      )
+    );
+  };
+
+  const saveFlowNodePreset = (
+    node: FlowNode,
+    options?: { presetId?: string; name?: string }
+  ) => {
+    const toolId = primaryPresetToolIdForFlowNode(node);
+    setSettingPresets((presets) => {
+      const existing = options?.presetId
+        ? presets.find((preset) => preset.id === options.presetId)
+        : undefined;
+      const presetName =
+        options?.name ??
+        existing?.name ??
+        `${node.name} 설정 ${new Date().toLocaleString("ko-KR")}`;
+      const preset = existing
+        ? {
+            ...existing,
+            toolId,
+            name: presetName,
+            values: cloneSettingValues(node.settingsValues ?? {})
+          }
+        : createSettingPreset(toolId, presetName, node.settingsValues ?? {});
+
+      return upsertSettingPreset(presets, preset);
+    });
   };
 
   const loadFlowNodePreset = (nodeId: string, preset: SettingPreset) => {
@@ -8957,7 +10557,7 @@ function WorkflowView({
         node.nodeId === nodeId
           ? {
               ...node,
-              settingsValues: { ...preset.values }
+              settingsValues: cloneSettingValues(preset.values)
             }
           : node
       )
@@ -8966,6 +10566,10 @@ function WorkflowView({
 
   const deleteFlowNodePreset = (presetId: string) => {
     setSettingPresets((presets) => removeSettingPreset(presets, presetId));
+  };
+
+  const renameFlowNodePreset = (presetId: string, name: string) => {
+    setSettingPresets((presets) => renameSettingPreset(presets, presetId, name));
   };
 
   const toggleFlowNodeActiveFile = (
@@ -9188,7 +10792,7 @@ function WorkflowView({
   }, []);
 
   useEffect(() => {
-    if (!canAutoPersistCustomFlowGraph(workflowMode)) {
+    if (!canAutoPersistCustomFlowGraph(workflowMode) || !editingSavedFlowId) {
       return undefined;
     }
 
@@ -9207,7 +10811,16 @@ function WorkflowView({
     }, 140);
 
     return () => window.clearTimeout(saveTimerId);
-  }, [flowConnections, flowGroups, flowNodes, flowNotes, flowPan, flowScale, workflowMode]);
+  }, [
+    editingSavedFlowId,
+    flowConnections,
+    flowGroups,
+    flowNodes,
+    flowNotes,
+    flowPan,
+    flowScale,
+    workflowMode
+  ]);
 
   useEffect(() => {
     saveSettingPresets(settingPresets);
@@ -9934,6 +11547,38 @@ function WorkflowView({
       return;
     }
 
+    const draggedFlow = parseDraggedSavedFlow(
+      event.dataTransfer.getData("application/x-custom-flow")
+    );
+    if (draggedFlow) {
+      const dropPoint = canvasPointFromPointer(event.clientX, event.clientY);
+      rememberFlowState();
+      const next = insertStoredFlowGraphAsGroup(
+        {
+          nodes: flowNodes,
+          connections: flowConnections,
+          groups: flowGroups,
+          notes: flowNotes
+        },
+        draggedFlow.graph,
+        {
+          flowName: draggedFlow.name,
+          x: dropPoint.x - 120,
+          y: dropPoint.y - 28
+        }
+      );
+      const importedGroup = next.groups[next.groups.length - 1];
+      setFlowNodes(next.nodes);
+      setFlowConnections(next.connections);
+      setFlowGroups(next.groups);
+      setFlowNotes(next.notes);
+      setSelectedNodeId("");
+      setSelectedNodeIds(importedGroup?.nodeIds ?? []);
+      setSelectedGroupIds(importedGroup ? [importedGroup.id] : []);
+      setSelectedNoteIds([]);
+      return;
+    }
+
     const toolId = event.dataTransfer.getData("application/x-flow-tool");
     const draggedTool = parseDraggedFlowTool(
       event.dataTransfer.getData("application/x-flow-tool-data")
@@ -10459,6 +12104,12 @@ function WorkflowView({
       })
       .slice(0, 12);
   }, [flowNodes, normalizedFlowSearchQuery]);
+  const basicPortFilterLabel =
+    flowBasicPortFilters.find((filter) => filter.id === basicPortFilter)?.label ?? "전체";
+  const filteredBasicPortTools = useMemo(
+    () => flowBasicPortTools.filter((tool) => flowBasicPortToolMatchesFilter(tool, basicPortFilter)),
+    [basicPortFilter]
+  );
 
   const runFlow = () => {
     const nodeIds = resolveFlowRunNodeIds(
@@ -10607,12 +12258,12 @@ function WorkflowView({
       <>
         <WorkflowHomeView
           savedFlows={listSavedFlows(savedFlows)}
-          sharedFlows={sampleSharedFlows}
+          sharedFlows={sharedFlows}
           onCreateNew={createNewFlow}
-          onImportShared={importSharedFlow}
+          onOpenFlowMarket={onOpenFlowMarket}
+          onOpenShared={openSharedFlow}
           onOpenSaved={openSavedFlow}
           onUpdateSavedDetails={updateSavedFlowHomeDetails}
-          onRenameSaved={renameFlow}
           onDuplicateSaved={duplicateFlow}
           onDeleteSaved={deleteFlow}
         />
@@ -11345,10 +12996,14 @@ function WorkflowView({
                                 onChange={(field, value) =>
                                   updateFlowNodeSettingValue(node.nodeId, field, value)
                                 }
-                                presets={listSettingPresetsForTool(settingPresets, node.id)}
-                                onSavePreset={() => saveFlowNodePreset(node)}
+                                onRuntimeValueChange={(key, value) =>
+                                  updateFlowNodeRuntimeSettingValue(node.nodeId, key, value)
+                                }
+                                presets={listSettingPresetsForFlowNode(settingPresets, node)}
+                                onSavePreset={(options) => saveFlowNodePreset(node, options)}
                                 onLoadPreset={(preset) => loadFlowNodePreset(node.nodeId, preset)}
                                 onDeletePreset={deleteFlowNodePreset}
+                                onRenamePreset={renameFlowNodePreset}
                               />
                             ) : (
                               <>
@@ -11474,7 +13129,20 @@ function WorkflowView({
                         ) : (
                           <>
                             <strong>작동 원리</strong>
-                            <p>{node.description}</p>
+                            <ToolRiskSummary schema={node.settingsSchema} />
+                            <div className="flowNodePrincipleList">
+                              {operationPrincipleStepsForTool(
+                                String(node.programIcon).toUpperCase(),
+                                node.name,
+                                node.settingsSchema,
+                                node.description
+                              ).map((step) => (
+                                <div key={step.title}>
+                                  <span>{step.title}</span>
+                                  <small>{step.description}</small>
+                                </div>
+                              ))}
+                            </div>
                           </>
                         )}
                       </div>
@@ -11603,30 +13271,21 @@ function WorkflowView({
           onPointerDown={(event) => event.stopPropagation()}
         >
           <button
-            className="flowToolbarTextButton"
+            className="flowToolbarIconButton"
             type="button"
-            onPointerDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              requestWorkflowHome();
-            }}
-          >
-            메인
-          </button>
-          <button
-            className="flowToolbarTextButton"
-            type="button"
+            aria-label="저장"
+            title="저장"
             onPointerDown={(event) => {
               event.preventDefault();
               event.stopPropagation();
               saveCurrentFlowToLibrary();
             }}
           >
-            저장
+            <AppIcon name="save" />
           </button>
           <div className="flowToolbarSplit flowSearchSplit">
             <button
-              className="flowSearchButton"
+              className="flowSearchButton flowToolbarIconButton"
               type="button"
               onPointerDown={(event) => {
                 event.preventDefault();
@@ -11639,7 +13298,7 @@ function WorkflowView({
               aria-label="노드 검색"
               title="노드 검색 Ctrl+F"
             >
-              노드 검색
+              <AppIcon name="search" />
             </button>
             {isFlowSearchOpen ? (
               <div className="flowToolbarMenu flowSearchMenu">
@@ -11727,8 +13386,38 @@ function WorkflowView({
                     ))}
                   </div>
                 ) : (
+                  <>
+                  <div
+                    className={`basicPortFilterPanel ${isBasicPortFilterOpen ? "open" : ""}`}
+                    aria-label="연결값 도구 필터"
+                  >
+                    <button
+                      className="basicPortFilterToggle"
+                      type="button"
+                      onClick={() => setIsBasicPortFilterOpen((current) => !current)}
+                      aria-expanded={isBasicPortFilterOpen}
+                    >
+                      <span>필터</span>
+                      <strong>{basicPortFilterLabel}</strong>
+                      <span className="basicPortFilterChevron">⌄</span>
+                    </button>
+                    {isBasicPortFilterOpen ? (
+                      <div className="basicPortFilterBar">
+                        {flowBasicPortFilters.map((filter) => (
+                      <button
+                        className={basicPortFilter === filter.id ? "selected" : ""}
+                        key={filter.id}
+                        type="button"
+                        onClick={() => setBasicPortFilter(filter.id)}
+                      >
+                        {filter.label}
+                      </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="basicToolsList">
-                    {flowBasicPortTools.map((tool) => {
+                    {filteredBasicPortTools.map((tool) => {
                       const palette = flowPaletteForType(tool.type);
                       return (
                         <button
@@ -11747,17 +13436,18 @@ function WorkflowView({
                           } as CSSProperties}
                         >
                           <span className="basicToolTitle">{tool.label}</span>
+                          <span className="basicToolProgramTag">{tool.programScope}</span>
                           <span
                             className={`basicToolScopeTag ${flowPortToolScopeClass(tool.direction)}`}
                           >
                             {flowPortToolScopeLabel(tool.direction)}
                           </span>
-                          <span className="basicToolProgramTag">{tool.programScope}</span>
                           <small>{tool.description}</small>
                         </button>
                       );
                     })}
                   </div>
+                  </>
                 )}
               </div>
             ) : null}
@@ -11981,6 +13671,75 @@ function WorkflowView({
             </div>
           </div>
         </aside>
+        {isLeaveFlowConfirmOpen ? (
+          <div
+            className="flowConfirmBackdrop"
+            role="presentation"
+            onMouseDown={() => setIsLeaveFlowConfirmOpen(false)}
+          >
+            <section
+              className="flowConfirmDialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="leaveFlowDialogTitle"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <strong id="leaveFlowDialogTitle">저장되지 않은 변경</strong>
+              <p>현재 Custom Flow에 저장되지 않은 변경이 있습니다. 저장하지 않고 나갈까요?</p>
+              <div className="flowConfirmActions">
+                <button type="button" onClick={() => setIsLeaveFlowConfirmOpen(false)}>
+                  취소
+                </button>
+                <button type="button" onClick={saveCurrentFlowToLibrary}>
+                  저장
+                </button>
+                <button className="danger" type="button" onClick={leaveWorkflowEditor}>
+                  저장하지 않고 나가기
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+        {pendingFlowSettingChange ? (
+          <div
+            className="flowConfirmBackdrop"
+            role="presentation"
+            onMouseDown={() => setPendingFlowSettingChange(null)}
+          >
+            <section
+              className="flowConfirmDialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="flowSettingConfirmTitle"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <strong id="flowSettingConfirmTitle">설정 변경 확인</strong>
+              <p>
+                {pendingFlowSettingChange.field.label} 설정은 실행 결과나 원본 데이터에 영향을 줄 수 있습니다.
+                변경할까요?
+              </p>
+              <div className="flowConfirmActions">
+                <button type="button" onClick={() => setPendingFlowSettingChange(null)}>
+                  취소
+                </button>
+                <button
+                  className="danger"
+                  type="button"
+                  onClick={() => {
+                    commitFlowNodeSettingValue(
+                      pendingFlowSettingChange.nodeId,
+                      pendingFlowSettingChange.field,
+                      pendingFlowSettingChange.value
+                    );
+                    setPendingFlowSettingChange(null);
+                  }}
+                >
+                  변경
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -12100,6 +13859,8 @@ function targetLabel(target: McpServerRecord["target"]) {
   const labels: Record<McpServerRecord["target"], string> = {
     cad: "CAD",
     revit: "Revit",
+    excel: "Excel",
+    tekla: "Tekla",
     other: "Other"
   };
   return labels[target];

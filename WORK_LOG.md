@@ -1594,3 +1594,256 @@
 - 현재 registry target 타입은 `cad | revit | other`만 지원하므로 Excel MCP는 임시로 `other` target에 등록했다.
 - 실제 실행 앱이 쓰는 `C:\Users\Donggeon\AppData\Roaming\ai-program\registry.json`에도 AutoCAD/Revit/Excel MCP 3개를 병합 등록했다. 기존 자동 감지 서버는 유지했고, 수정 전 백업은 같은 폴더의 `registry.backup-before-program-mcp-20260707.json`에 저장했다.
 - `Test-NetConnection` 확인 결과 AutoCAD/Revit/Excel MCP 포트는 모두 현재 응답하지 않았다. 실제 실행 확인은 각 프로그램과 MCP 브리지 실행 후 다시 해야 한다.
+
+## 2026-07-07 추가 189
+
+- 앱에 포함되는 `/등록` 스킬(`program-mcp-registrar`)을 등록값 안내 중심에서 MCP 브리지 생성/등록/연결/검증 중심으로 개편했다.
+- 새 스킬은 AutoCAD/Revit/Excel/Tekla/Dynamo MCP를 대상으로, 브리지가 없을 때 스캐폴드 생성까지 진행하고 AI Program 등록, URL/포트 확인, 명령 목록 확인, 안전한 읽기 테스트까지 단계별로 확인하도록 정리했다.
+- 등록 완료, 브리지 생성 완료, 프로그램 로드 확인 전, 연결 확인 완료, 명령 확인 완료, 실행 확인 완료 상태를 분리해 실제 검증 없이 연결됐다고 표시하지 않도록 했다.
+- `agents/openai.yaml` 표시명과 기본 프롬프트도 새 흐름에 맞게 갱신했다.
+- Home의 Other Tools 카드와 설치 완료 알림 문구도 새 `/등록` 스킬 흐름에 맞춰 `브리지 생성, 등록, 연결, 검증`으로 수정했다.
+- 앱 시작 시 사용자 registry에 AutoCAD/Revit/Excel 로컬 MCP 브리지 항목이 없거나 예전 placeholder 실행 명령이면 자동으로 병합/갱신하도록 했다.
+- Windows 기본 PowerShell로 실행되는 `tools/mcp-bridges/program-bridge/program-mcp-bridge.ps1` 로컬 브리지 스캐폴드를 추가했다. `/mcp`, `/status`, `/active-file`, `/commands`에 응답해 AI Program 연결 상태 점검에서 감지될 수 있다.
+- 이 브리지는 현재 AI Program 연결 확인용 스캐폴드이며 실제 AutoCAD/Revit/Excel SDK 또는 애드인 제어 명령은 다음 통합 단계로 남겨뒀다.
+- Settings의 `MCP 서버` 영역은 기본 접힘 상태로 바꾸고, 헤더 클릭으로 서버 목록/상세 설정을 펼치거나 다시 접을 수 있게 했다.
+- Custom Flow 메인 화면의 공유 플로우/내 플로우 카드, 헤더, 편집 입력칸, 버튼에 다크모드 스타일을 추가했다.
+- 패키징 후 AI Program을 숨김 창으로 실행하면 사용자에게 안 열린 것처럼 보일 수 있으므로, 확인용 실행은 보이는 창으로 띄우도록 정리했다.
+- Custom Flow 메인 화면 상단의 중복 설명 박스를 제거했다.
+- Player view에서 Custom Flow 메인 화면은 공유 플로우 아래에 내 플로우가 오는 1열 레이아웃으로 바꿨다.
+- Excel MCP가 `other` target으로 임시 등록되어 Excel 페이지의 연결 상태 필터에서 명확히 잡히지 않던 문제를 수정했다. `McpTarget`에 `excel`/`tekla`를 추가하고, Excel 페이지/Custom Flow 연결 범위/설정 서버 필터/기본 registry/자동 병합 값을 Excel 전용 target으로 갱신했다.
+
+## 2026-07-07 추가 190
+
+- Custom Flow 메인 화면의 `내 플로우` 카드에서 별도 `이름 변경` 버튼을 제거했다. 이름과 설명은 카드 입력칸에서 바로 수정하는 흐름만 유지한다.
+- Custom Flow의 새 플로우 생성은 더 이상 기본 CAD/Excel 노드를 만들거나 저장 목록에 즉시 추가하지 않는다. 빈 캔버스로 열고, 사용자가 `저장`을 누르기 전에는 내 플로우 목록과 localStorage 자동 보관에 남기지 않는다.
+- Custom Flow 캔버스 툴바에서 `메인` 버튼을 제거하고, `저장`은 디스크 아이콘, `노드 검색`은 돋보기 아이콘 버튼으로 교체했다.
+- Custom Flow 노드 상세 탭(`작동 원리`/`설정`/`결과`)은 항상 한 줄 3열로 표시되도록 정리했다.
+- More Tools/Custom Tools 삭제 실패 원인을 확인했다. 앱의 `tools` 폴더 파일이 승인된 커스텀 툴 루트에 포함되지 않아 목록 제거 후 원본 파일 삭제가 실패했다. 앱/프로젝트 `tools` 폴더를 안전 삭제 허용 루트에 포함해 재발을 막았다.
+- 실패했던 `tools/cad-drawing-number-batch-renumber_1.0.0.md` 원본 파일을 삭제했다.
+- GitHub 툴 등록 PR 생성 시 `git/refs` 404가 나던 경로를 보강했다. fork 저장소 준비와 fork 기본 브랜치 ref를 확인한 뒤 PR 브랜치를 만들고, 저장소 접근 권한 문제가 있으면 더 명확한 오류를 표시한다.
+- 툴 버전 업데이트는 현재 로그인한 닉네임 또는 GitHub ID가 기존 툴 제작자와 일치할 때만 허용하도록 했다.
+- Settings의 MCP 서버 화면은 전체 접힘 UI를 제거하고, 서버 목록은 항상 보이되 선택한 서버 상세만 아래에 읽기 전용으로 표시하도록 바꿨다. MCP 서버 등록/수정은 `/등록` 스킬과 registry 자동 병합 흐름이 담당한다.
+- `%APPDATA%\ai-program\registry.json` 같은 registry 파일이 UTF-8 BOM으로 저장되어도 `mcp-processes:get-snapshot` JSON 파싱이 실패하지 않도록 `loadRegistry`에서 BOM을 제거한다.
+- BOM registry 로딩 회귀 테스트를 추가했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과.
+- 패키징 중 기존 `AI_PROGRAM.exe`가 release 폴더를 잡고 있으면 `EBUSY: resource busy or locked`가 발생한다. 이 경우 실행 중인 AI_PROGRAM 프로세스를 종료한 뒤 다시 패키징해야 한다.
+
+## 2026-07-07 추가 191
+
+- Monitor의 연결 상태 카드에서 개별 CAD/Revit bridge 항목을 제거하고 전체 연결 상태/등록 서버 중심으로 단순화했다.
+- More Tools/Custom Tools 필터를 큰 필터 줄 대신 검색줄 옆 작은 아이콘 필터로 바꿨다.
+- Custom Flow 메인 화면의 공유 플로우/내 플로우 헤더 구조, 텍스트 크기, 카드 hover, 다크모드 스타일을 다른 메인 페이지 기준에 맞췄다.
+- 공유 플로우와 내 플로우 카드를 클릭하면 바로 해당 캔버스로 들어가고, 내 플로우의 복제/삭제는 우클릭 메뉴로 이동했다.
+- 저장하지 않은 Custom Flow에서 나갈 때 브라우저 기본 확인창 대신 앱 디자인에 맞춘 확인 모달을 띄우도록 했다.
+- 툴 삭제 시 원본 MD 파일이 이미 사라진 경우를 성공 처리해 `목록에서 제거됐지만 원본 파일 삭제 실패`가 반복되지 않도록 했다.
+- Custom Flow 기본 도구 창의 툴/연결값 도구 탭은 스크롤 중 상단에 고정되고, 연결값 도구는 프로그램/공용/입출력 필터로 좁혀 볼 수 있다.
+- 기본 전체 창 크기를 1440x900으로 키웠다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과.
+
+## 2026-07-07 추가 192
+
+- Player view에서 Share/Custom Tool을 선택하면 같은 화면 아래에 선택 툴 실행 패널이 펼쳐지도록 했다.
+- Player view 실행 패널은 툴 이름/버전/제작자/설명, 한 줄 버튼(`실행`, `값 저장`, `초기화`), 설정값 입력 영역 순서로 표시한다.
+- Custom Tool에 MD schema가 있으면 Player view에서도 동일한 schema 설정창을 렌더링하고, schema가 없으면 기본 작업 대상/실행 옵션/메모 입력칸을 표시한다.
+- 툴 삭제 시 이미 삭제된 로컬 원본 파일은 허용 루트 검사보다 먼저 존재 여부를 확인해 삭제 성공으로 처리한다. 오래된 source/installedPath 때문에 `원본 파일 삭제 실패`가 반복되는 문제를 줄였다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 193
+
+- Player view의 툴 실행 패널 위치를 다시 조정했다. 이제 선택한 툴 목록 섹션 아래에 따로 뜨지 않고, 클릭한 툴 카드 바로 다음 위치에서 그 자리 확장 방식으로 펼쳐진다.
+- Share Tools와 Custom Tools 모두 같은 확장 기준을 사용한다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 194
+
+- `cad-drawing-number-batch-renumber` 삭제 실패를 재확인했다. 로컬 `tools/cad-drawing-number-batch-renumber_1.0.0.md`는 이미 삭제되어 있었고, 남은 실패 원인은 GitHub 원본 경로가 404일 때도 실패로 집계되는 흐름이었다.
+- GitHub 툴 삭제에서 contents API 404는 `이미 삭제된 GitHub 원본 파일`로 보고 삭제 성공 처리하도록 수정했다.
+- 삭제 일부 실패가 다시 생기면 알림에 실패 경로를 함께 표시하도록 바꿔 다음 원인을 바로 추적할 수 있게 했다.
+- More Tools/Custom Tools 필터를 검색줄 옆 아이콘 버튼에서 `툴 이름` 테이블 헤더 옆 필터 버튼으로 옮겼다. 버튼을 누르면 필터 목록 드롭다운이 열리고 선택한 필터가 적용된다.
+- `툴 등록` 옆에 `내 툴 관리` 버튼을 추가했다. 이 모드에서는 현재 로그인한 닉네임/GitHub ID가 제작자인 툴만 보이고, 마지막 열에서 바로 삭제할 수 있다.
+- 툴 삭제 권한은 관리자뿐 아니라 제작자 본인에게도 허용했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 195
+
+- GitHub 원본 삭제가 권한/원격 상태 문제로 실패해도 사용자가 삭제한 툴이 새로고침 후 다시 목록에 나타나지 않도록, 삭제한 `github:` 툴 경로를 localStorage tombstone(`mcp-registry:deleted-github-tool-paths`)에 저장한다.
+- GitHub 툴 동기화 시 tombstone에 있는 경로는 목록에서 제외한다.
+- GitHub 동기화 성공 메시지(`GitHub에서 N개의 MD 툴을 가져왔습니다.`)는 더 이상 툴 리스트에 표시하지 않는다. 오류 메시지만 상태 영역에 남긴다.
+- `내 툴 관리`는 More Tools 내부 모드가 아니라 `툴 등록`처럼 별도 창으로 열리도록 변경했다. 내 닉네임으로 등록한 툴만 표시하고, 승인/관리자 거절/GitHub 승인 대기 상태와 삭제 버튼을 보여준다.
+- 툴 이름 헤더 옆 필터는 `전체`, `주의`, `앱 승인 대기`만 남기고 `등록됨`, `미등록` 필터를 제거했다.
+- 필터 아이콘이 테이블 밖으로 튀어나오지 않도록 헤더 안쪽 그리드 배치와 드롭다운 오른쪽 정렬로 수정했다.
+- 계정 정보에서 저장한 닉네임이 GitHub 이름으로 덮이지 않도록, 계정 목록에 저장된 닉네임을 우선 표시하고 툴 제작자 기본값에도 같은 닉네임을 사용한다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 196
+
+- 전체 점검 중 App/Electron main의 깨진 한글 문자열을 다시 검색했다. GitHub 로그인/토큰/브랜치 생성/툴 삭제/프로세스 로그/로딩 화면/IPC 경로 라벨의 깨진 메시지를 정상 한글로 복구했다.
+- `filePathSecurity.ts`의 깨진 경로 검증 오류 메시지를 복구하고, 라벨 뒤 조사(`은`/`는`)를 자동 선택하도록 정리했다.
+- More Tools/Custom Tools에서 제거한 `등록됨`/`미등록` 필터 값이 타입과 필터 로직에 남아 있던 것을 제거했다. 현재 필터는 `전체`, `주의`, `앱 승인 대기`만 유지한다.
+- 툴 이름 헤더 필터 레이아웃을 `inline-flex`로 바꿔 좁은 표 컬럼에서도 필터 아이콘이 셀 밖으로 튀어나오지 않게 보완했다.
+- 커스텀 툴 설명 fallback의 깨진 구분자(`쨌`)를 `·`로 교체했다.
+- 툴 등록/업데이트 제작자 기본값과 제작자 확인 기준을 GitHub 표시 이름이 아니라 앱 계정의 저장 닉네임 우선으로 맞췄다.
+- 검증 완료: `pnpm test` 30개 파일/118개 테스트 통과, `pnpm typecheck`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과.
+
+## 2026-07-07 추가 197
+
+- More Tools/Custom Tools의 툴 이름 필터 드롭다운이 버튼 기준 왼쪽으로 펼쳐져 테이블 밖으로 튀어나오던 원인을 수정했다. `.tableFilterMenu`를 `left: 0` 기준으로 열고 폭을 줄여 버튼 아래쪽에서 시작하도록 변경했다.
+- 툴 등록 저장 버튼이 일반 `primary` 클래스라 다른 주요 버튼보다 hover/active 피드백이 약했던 문제를 수정했다. `primaryAction`으로 통일하고, 저장 중에는 `저장 중...` 문구와 disabled 상태를 표시한다.
+- GitHub OAuth Device Flow 요청 scope를 `read:user repo`로 변경했다. 기존 `public_repo` 토큰으로는 private repo 또는 브랜치 생성 권한이 부족해 `git/refs` 404가 발생할 수 있으므로, 기존 로그인 사용자는 로그아웃 후 다시 로그인해야 한다.
+- GitHub 툴 등록 중 브랜치 생성 404/권한 오류가 나면 긴 API 오류 대신 `GitHub 권한이 부족합니다. 로그아웃 후 다시 로그인해서 저장소 권한을 승인해주세요.`로 안내하도록 정리했다.
+- GitHub 원격 툴 삭제는 직접 삭제가 막히면 작성자 fork에서 삭제 브랜치와 PR을 만들 수 있도록 보강했다. 앱 목록에서는 tombstone으로 즉시 숨기고, 원격 반영은 PR 승인 후 완료된다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 198
+
+- 툴 이름 필터가 계속 튀어나오던 실제 원인을 재확인했다. 문제는 좌우 정렬이 아니라 `th` 안의 absolute 커스텀 드롭다운이 테이블 첫 행 위에 떠서 내용을 덮는 구조였다.
+- 커스텀 드롭다운(`.tableFilterMenu`)을 제거하고, 테이블 헤더 안에서만 공간을 차지하는 작은 네이티브 select(`.tableFilterSelect`)로 바꿨다. 필터 값은 `전체`, `주의`, `대기`로 줄여 헤더 안에서 끝나게 했다.
+- 사용자가 제공한 `cad-drawing-number-batch-renumber.md`를 앱의 `parseToolRuntimeSchema`로 직접 검사했다. 현재 코드 기준 `settings 15개`, `sections 4개`, `inputs 1개`, `outputs 3개`, `mcpCommands 7개`가 정상 파싱된다.
+- 따라서 해당 MD의 설정창이 비어 보이는 경우는 MD schema 부재가 아니라, GitHub 권한 문제로 툴 등록이 실패해 실제 등록 목록/툴 페이지에 반영되지 않았거나 예전 등록본을 보고 있는 상황으로 판단했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 199
+
+- Settings 관리 탭의 `승인 대기 툴` 목록이 앱 승인 상태와 GitHub PR 상태를 함께 조건으로 사용하던 문제를 수정했다.
+- 기존에는 `approvalStatus`가 `approved`여도 `reviewState`가 `open`이면 계속 승인 대기 목록에 남았다. 이제 이 목록은 `approvalStatus === "pending"`인 앱 승인 대기 툴만 표시한다.
+- GitHub PR이 아직 열려 있는 상태는 툴 리스트/내 툴 관리의 PR 상태로만 확인하도록 분리했다.
+
+## 2026-07-07 추가 200
+
+- More Tools/Custom Tools에서 같은 프로그램/툴 이름의 여러 버전이 내려와도 리스트에는 최신 버전 하나만 표시하도록 GitHub/로컬 동기화 그룹핑을 정리했다.
+- 툴 업데이트 직후 앱 상태도 최신 버전만 유지해 이전 버전 선택 UI가 다시 나타나지 않게 했다.
+- GitHub 툴 등록/업데이트 시 같은 툴의 오래된 MD는 최신 버전과 직전 백업 1개만 남기고 정리하도록 했다. 직접 등록은 바로 삭제하고, PR 등록은 삭제 변경을 PR 브랜치에 함께 포함한다.
+- 툴 이름 헤더 필터 select 폭이 작아 `전체` 텍스트와 화살표가 잘리던 문제를 수정했다.
+- 내 툴 관리 상태 배지를 승인/승인 대기/GitHub 승인 대기/거절 상태별 배경색으로 구분했다.
+- Settings의 MCP 서버 목록에서 선택된 서버를 다시 클릭하면 상세가 닫히도록 자동 재선택 effect를 수정했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 200
+
+- OneDrive Desktop MCP의 `cad-drawing-number-batch-renumber.md` 툴 초안을 수정했다.
+- 파일 처리 순서 선택, 검색 대상 문자 타입 선택, 상대 위치 허용 오차 입력, 증가값 입력을 사용자 설정에서 제거했다.
+- 파일 처리 순서는 목록 순서 그대로, 검색 대상은 Text/MText, 상대 위치 허용 오차는 5 DWG 단위, 증가값은 1로 고정했다.
+- `미분석`/`미리보기 필요`는 DWG 파일 목록 행의 분석 전 배지로 표시되고, 미리보기 생성 후 도곽 수/번호 범위로 대체되도록 문서 설명을 보강했다.
+
+## 2026-07-07 추가 201
+
+- `cad-drawing-number-batch-renumber.md`에서 `preview_only` 설정 필드를 제거하고, `분석 미리보기`/`원본에 적용` 실행 버튼 흐름으로 바꿨다.
+- 미리보기는 `runtime.action == "preview"` 상태로 저장 없이 변경 예정 목록을 계산하고, `cad.save_dwg`는 `runtime.action == "apply"`일 때만 실행하도록 명시했다.
+- `mcp-tool-builder`와 `save-tool` 스킬에 재발 방지 규칙을 추가했다. 사용자가 선택하지 않는 고정값, 분석 후 표시되는 파생 배지, 클릭한 버튼 상태는 `settings`에 넣지 않고 고정값/결과/런타임 액션으로 분리하도록 했다.
+
+## 2026-07-07 추가 202
+
+- 커스텀 툴 메뉴 항목을 ID prefix가 아니라 `customTools` 목록의 실제 ID 매칭으로 판별하도록 바꿨다.
+- GitHub에서 가져온 `github-tool-*` 커스텀 툴도 메뉴/소메뉴에서 툴 이름, 설명, 설정 schema가 정상 표시되며 `새 페이지` fallback으로 빠지지 않는다.
+- 툴 실행 시 위험 동작 또는 툴 문서 형태 경고가 Windows 기본 확인창으로 뜨던 문제를 앱 내부 확인 모달로 변경했다.
+- Custom Flow 설정값 변경의 `confirmOnChange` 경고도 앱 내부 확인 모달을 사용하도록 바꿔 기본 `window.confirm` 사용을 제거했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 203
+
+- GitHub에서 가져온 `github-tool-*` 커스텀 툴이 메뉴에는 표시되지만 클릭하면 본문이 메인페이지로 돌아가던 문제를 수정했다.
+- 원인은 submenuKey 유효성 검사(`isSubmenuId`)가 `github-tool-*` ID를 거부해 탭 적용 시 submenuKey가 버려지는 것이었다.
+- `github-tool-*`도 유효한 소메뉴 ID로 인정해 커스텀툴 페이지 본문과 설정 schema가 정상 렌더링되도록 했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm build` 통과.
+
+## 2026-07-07 추가 204
+
+- 툴 페이지와 Player view의 설정값 저장 버튼이 실제 저장 로직과 연결되지 않아 동작하지 않던 문제를 수정했다.
+- 기존 설정 프리셋 모델을 재사용하는 `useStandaloneToolPresets`를 추가해 툴별 설정값 저장/불러오기/삭제가 localStorage에 유지되도록 했다.
+- Player view의 `값 저장` 버튼과 schema 설정 패널의 `현재 설정 저장` 버튼이 같은 프리셋 저장 흐름을 사용한다.
+- 설정 schema가 없는 툴은 `값 저장` 버튼을 비활성화해 빈 버튼처럼 보이지 않게 했다.
+- `settingPresetModel.ts`의 깨진 기본 한글 문구를 `저장한 설정`으로 정리했다.
+- `ToolRuntimeSchema.actions` 타입 확장에 맞춰 누락된 테스트 fixture를 보강했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+- 같은 스킬 보강 내용을 앱 번들 자산(`packages/desktop/assets/skills/mcp-tool-builder`, `packages/desktop/assets/skills/save-tool`)에도 반영해 재설치나 다른 컴퓨터 설치 시에도 유지되도록 했다.
+
+## 2026-07-07 추가 204
+
+- `save-tool/scripts/create_tool_draft.py`에 `--frontmatter-file` 옵션을 추가했다. 승인된 YAML frontmatter를 넘기면 `settings`, `mcpCommands`, `risk`, `inputs`, `outputs`가 기본 빈 값으로 덮이지 않고 보존된다.
+- 같은 스크립트 보강을 앱 번들 사본(`packages/desktop/assets/skills/save-tool/scripts/create_tool_draft.py`)에도 반영했다.
+- `save-tool` 지침은 실행 가능한/설정이 있는 툴을 저장할 때 승인 frontmatter를 만들어 `--frontmatter-file`로 넘기도록 수정했다.
+- `mcp-tool-builder`와 `save-tool`의 skill description을 `Use when...` 트리거 중심으로 정리했다.
+- `ai-program-md-tool.md` 참조 문서의 risk 안내를 `create/modify/bulk-modify/delete` 중심으로 바꾸고, `settings`에는 사용자 편집값만 넣도록 분류 규칙을 추가했다.
+- `dry-run`은 예외적 체크박스로 낮추고, 분석/미리보기 후 적용하는 흐름은 `runtime.action` 기반 버튼 동작으로 모델링하도록 참조 문서에 예시를 추가했다.
+- 검증 완료: 기존 스크립트가 `--frontmatter-file`을 인식하지 못하는 실패를 먼저 확인했고, 수정 후 로컬/번들 스크립트 모두 승인 frontmatter의 `bulk-modify`, `mcpCommands`, `settings` 보존을 확인했다. `--help`에서도 새 옵션이 표시된다.
+
+## 2026-07-07 추가 205
+
+- 단일 선택지만 있는 select/select-like 값은 설정창에 표시하지 않도록 `mcp-tool-builder`, `save-tool`, `ai-program-md-tool.md` 로컬/번들 스킬 지침을 보강했다.
+- 앱 schema 파서에 `actions`를 추가해 MD 툴이 `분석 미리보기`, `원본에 적용` 같은 실행 버튼을 설정창에 표시할 수 있게 했다.
+- 설정창은 `actions`를 실행 버튼 섹션으로 렌더링하며, `분석 미리보기`를 누른 뒤 `원본에 적용` 버튼이 활성화되는 흐름을 표시한다.
+- 기존 MD 호환을 위해 단일 선택지 설정은 파서에서 완전히 삭제하지 않고 `hidden` 처리해 기본값/명령 매핑은 유지하되 UI 공간은 차지하지 않게 했다.
+- `cad-drawing-number-batch-renumber.md`에서 단일 선택지/고정값 설정(`도곽 순서`, `백업 정책`, `최종 확인`, `도곽 직접 선택 허용`)을 제거하고 고정 MCP 파라미터로 옮겼다.
+- 같은 툴 frontmatter에 `actions`를 추가해 `분석 미리보기`와 `원본에 적용` 버튼이 앱에서 표시되도록 했다.
+- 검증 완료: `pnpm test -- toolSettingsSchema.test.ts` 30개 파일/120개 테스트 통과, `pnpm typecheck` 통과.
+
+## 2026-07-07 추가 206
+
+- 최신 exe 실행 시 프로세스는 뜨지만 화면이 보이지 않던 문제를 조사했다.
+- 원인 1: 로딩 화면 도입 후 `ready-to-show` 이벤트가 오지 않으면 실제 앱 화면 로드가 시작되지 않는 구조였다. 로딩 HTML 로드 완료/실패 시에도 창을 보여주고 본 화면으로 넘어가도록 fallback을 추가했다.
+- 원인 2: 이전에 저장된 MD 툴 schema/localStorage 데이터에는 최신 `actions`, `inputs`, `outputs`, `testCases` 같은 배열 필드가 없을 수 있는데, 렌더러가 `schema.actions.length`를 직접 읽어 화면이 죽었다.
+- `normalizeToolRuntimeSchemaForRender`를 추가해 예전 schema도 렌더링 전에 기본 schema와 병합되도록 했다. 기존에 같이 진행했던 파일 처리 옵션 고정 MD처럼 최신 schema 필드가 일부 없어도 앱이 죽지 않는다.
+- `settingPresetModel.ts`에 남아 있던 깨진 기본 한글 문자열을 `저장한 설정`으로 정리했다.
+- 검증 완료: `pnpm --filter @mcp-registry/desktop typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win` 통과.
+
+## 2026-07-07 추가 207
+
+- 저장한 설정 프리셋 이름을 바꿀 수 있도록 `renameSettingPreset` 모델 함수를 추가했다.
+- 일반 툴 페이지, Player view, Custom Flow 노드 설정창의 `저장한 설정` 목록에서 `이름` 버튼을 누르면 인라인 입력으로 이름을 수정할 수 있다.
+- Player view에서 툴 설정창이 별도 카드처럼 생기고 좁은 폭에서 잘려 보이던 문제를 수정했다. 선택된 툴 카드와 설정 패널을 시각적으로 붙이고, 설정창 내부 요소는 Player view 폭에 맞춰 1열/줄바꿈 기준으로 정리했다.
+- Player view에서는 커스텀 툴을 펼칠 때 위험 경고 확인창을 띄우지 않도록 했다. 경고는 펼치기 흐름을 막지 않고 실행 단계에서 다루는 기준으로 정리한다.
+- 앞으로 기능 추가 시 Full view뿐 아니라 Player view에서 좁은 폭, 확장 느낌, 실행 흐름 방해 여부를 함께 검토하는 것을 작업 기준으로 삼는다.
+- 검증 완료: `pnpm --filter @mcp-registry/desktop typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win` 통과.
+
+## 2026-07-08 추가 208
+
+- `actions` 실행 영역을 단순 버튼 토글에서 `입력` → `분석` → `적용` 3단계 워크플로 패널로 개선했다.
+- `분석 미리보기`를 누르면 파일 목록 설정값을 기반으로 파일명, 도곽 수, 배정 번호 범위를 결과 영역에 표시하도록 `toolActionPreview.ts`를 추가했다.
+- `cad-drawing-number-batch-renumber.md` 문서를 다시 작성해 기준 도곽 학습, 상대 위치 매칭, 고정 규칙, 미리보기/원본 적용 조건을 실제 작동 흐름 중심으로 정리했다.
+- `mcp-tool-builder`, `save-tool`, `ai-program-md-tool.md` 로컬/번들 지침에 AI CAD/Revit 애드인 변환 UI 기준을 추가했다. 읽기/내보내기형은 간단한 폼, 원본 변경형은 분석 미리보기 후 적용 액션 흐름을 사용한다.
+- 검증 완료: `pnpm test -- toolActionPreview.test.ts toolSettingsSchema.test.ts` 31개 파일/122개 테스트 통과, `pnpm typecheck` 통과.
+
+## 2026-07-08 추가 209
+
+- 저장한 설정 프리셋 목록에서 현재 설정값과 동일한 프리셋은 선택된 상태처럼 보이도록 강조했다.
+- Custom Flow 노드 설정 프리셋은 `menu-cad-*` 같은 노드용 ID와 실제 툴 ID를 함께 조회하고, 새 프리셋 저장은 실제 툴 ID 기준으로 저장하도록 바꿔 일반 툴 페이지와 Custom Flow 노드가 같은 저장값을 공유한다.
+- 저장한 설정 이름 변경 버튼을 텍스트 대신 연필 아이콘으로 바꿨다.
+- Custom Flow 노드 경고 배지의 오류 `X`가 한쪽으로 치우쳐 보이던 문제를 CSS pseudo element 기준으로 중앙 정렬했다.
+- `/save` 생성 스크립트와 `save-tool`, `mcp-tool-builder`, `ai-program-md-tool.md` 번들 지침에 `learningLog` 메타데이터 표준을 추가했다. 이 값은 실행에는 영향을 주지 않고, 사용자가 막힌 지점/선택지/선택 결과/추후 개선점을 익명 요약으로 모아 스킬 개선 통계에 쓰기 위한 영역이다.
+- 검증 완료: `pnpm --filter @mcp-registry/desktop typecheck`, `pnpm test`, `pnpm build`, `pnpm package:win` 통과. 실행 중인 `AI_PROGRAM.exe`가 release 폴더를 잠그고 있어 프로세스 종료 후 패키징을 다시 실행했다.
+
+## 2026-07-08 추가 210
+
+- 설정 프리셋 저장을 깊은 복사 스냅샷으로 바꿔 DWG 파일 목록, 매핑표, 정렬 순서 같은 중첩 설정이 저장 뒤 수정되어도 저장본이 같이 변하지 않도록 했다.
+- 툴 페이지, Player view, Custom Flow 노드 설정창에 공통 프리셋 UI를 적용했다. 설정 헤더에는 `저장` split 버튼과 `불러오기` 버튼이 있고, 불러오기 창에서 저장본 선택/이름 변경/삭제를 처리한다.
+- MD action 버튼은 앱 기준 라벨인 `미리보기`, `실행`으로 렌더링하도록 표준화했다. MD의 기존 `분석 미리보기`, `원본에 적용` 문구는 설명/툴팁으로 남긴다.
+- 설정 패널 상단의 `대량 수정`, `필요 MCP` 위험 요약을 작동 원리 영역으로 옮겼다. 도곽 후보가 필요한 툴은 `도면 입력 → 도곽 후보 선택 → 번호 규칙 적용` 흐름으로 보이도록 했다.
+- 미리보기 후 도곽 후보 선택 패널을 추가해 기준 도곽 후보를 고른 뒤 실행할 수 있게 했다. 선택값은 설정값에 같이 저장되어 프리셋/노드에서도 유지된다.
+- Player view 기본 창 폭을 560x780으로 키우고 최소 폭도 520으로 올려 설정 패널이 잘리는 기준을 줄였다.
+- Custom Flow 메인 페이지의 내 플로우 이름/설명은 평소 텍스트로 보이고, 연필 아이콘을 누른 카드만 편집 모드가 되도록 바꿨다.
+- 검증 완료: `pnpm test` 31개 파일/125개 테스트 통과, `pnpm typecheck`, `pnpm build`, `pnpm package:win` 통과. 처음 패키징은 실행 중인 `AI_PROGRAM.exe`가 release 폴더를 잠가 실패했고, 프로세스 종료 후 다시 실행해 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 생성했다.
+
+## 2026-07-08 추가 211
+
+- Custom Flow 캔버스의 `연결값 도구` 필터가 도구 목록 공간을 너무 많이 차지하지 않도록 기본 접힘 상태로 바꿨다.
+- 필터 요약 버튼에는 현재 선택값만 작게 표시하고, 펼쳤을 때만 CAD/Revit/Excel/Tekla 필터 칩이 보이도록 정리했다.
+- 기존 필터 버튼이 작아지지 않던 원인은 뒤쪽 공통 `.flowToolbarMenu button` 규칙이 `min-height: 44px`과 padding을 덮어쓴 것이었다. `.flowToolbarMenu .basicPortFilterBar button`처럼 더 구체적인 선택자로 크기를 고정했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-08 추가 212
+
+- Custom Flow 메인 페이지의 Share Flow 카드에서 `내 플로우로 가져오기` 버튼을 제거했다.
+- Share Flow 카드는 My Flow 카드처럼 클릭하면 바로 캔버스 편집 화면으로 열린다. 이때 내 Flow 목록에 자동 복사하지 않고, 사용자가 저장할 때 새 Flow로 저장하는 기준이다.
+- Share Flow를 단순히 열어보기만 한 상태에서는 나갈 때 저장 경고가 뜨지 않고, 실제 그래프를 수정했을 때만 저장 경고가 뜨도록 baseline 비교를 적용했다.
+- Market 다이얼로그의 Tools/Flows 분기 JSX가 내 툴 관리 창 안쪽으로 잘못 들어가 있던 구조를 바로잡았다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 실행 파일은 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`로 생성했다.
+
+## 2026-07-08 추가 213
+
+- Settings에 `AI 연결` 탭을 추가했다. 사용자는 OpenAI API 키와 모델을 입력할 수 있고, 키 값은 렌더러/localStorage/Git에 저장하지 않는다.
+- Electron main process는 `%APPDATA%` 계열 userData의 `openai-settings.json`에 API 키를 Electron `safeStorage`로 암호화해 저장한다. 실행 시 우선순위는 앱 저장 키, `AI_PROGRAM_OPENAI_API_KEY`/`OPENAI_API_KEY` 환경 변수 순서다.
+- 툴 실행의 OpenAI 직접 호출 경로가 설정창 저장 키를 먼저 사용하도록 바뀌었다. 키가 없으면 `Settings > AI 연결`에서 저장하라는 안내를 반환한다.
+- 앱 preload와 Window 타입에 `openAiSettings.get/save/clear` IPC를 추가했다. 설정창에는 저장 여부, 사용 모델, 암호화 가능 상태만 표시하고 API 키 원문은 다시 보여주지 않는다.
+- 번들 `/등록` 스킬에 `Settings > AI 연결` API 키 설정 절차와 비밀키 취급 금지 규칙을 추가했고, 현재 사용자 로컬 `.codex\skills\program-mcp-registrar`에도 같은 내용을 설치했다.
+- Home 페이지 `Other Tools`의 `/등록` 설명을 최신화해 MCP 브리지 등록뿐 아니라 AI 연결 API 키 설정 확인까지 포함하도록 바꿨다.
+- 검증 완료: `pnpm test packages/desktop/src/openAiSettings.test.ts packages/desktop/src/settingsDialog.test.ts packages/desktop/src/programMcpRegistrarSkill.test.ts packages/desktop/src/openAiToolRunner.test.ts`, `pnpm typecheck`, `pnpm test`, `pnpm build` 통과.

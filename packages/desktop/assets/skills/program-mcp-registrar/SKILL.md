@@ -1,73 +1,126 @@
 ---
 name: program-mcp-registrar
-description: Use when the user types `/등록` or asks to add, register, connect, or verify a program MCP server for AI Program, including AutoCAD, Revit, Excel, Tekla, Dynamo, or another desktop program.
+description: Use when the user types `/등록` or asks Codex to create, add, register, connect, scaffold, or verify a program MCP server for AI Program, including AutoCAD, Revit, Excel, Tekla, Dynamo, or another desktop program.
 ---
 
 # Program MCP Registrar
 
-Use this skill to help a non-technical user register a program-specific MCP server in AI Program and verify whether future MCP tools can actually run.
-
-## Command Trigger
-
-When the user types `/등록`, first show a program selection list. Do not assume the program silently.
-
-Recommended first response:
-
-```text
-어떤 프로그램 MCP를 추가할까요?
-1. AutoCAD MCP (추천: CAD 도면/객체 작업)
-2. Revit MCP (추천: 모델 요소 생성/수정)
-3. Excel MCP (추천: 표 읽기/쓰기)
-4. Tekla MCP (추천: 구조 모델 작업)
-5. Dynamo MCP (추천: Dynamo Player/그래프 실행)
-6. 기타 프로그램
-```
-
-If the user already named a program, continue with that program and still confirm the detected choice briefly.
+Use this skill when the user wants AI Program to work with a desktop program through an MCP bridge. The goal is not only to write registration values, but to move as far as possible through bridge creation, app registration, connection, and verification.
 
 ## Core Rule
 
-Registration is not the same as successful execution. Always separate these two states:
+Do not claim a program MCP is ready just because registry values exist.
 
-- **등록 준비 완료**: AI Program에 넣을 서버 이름, 대상 프로그램, URL, 포트, 실행 명령이 정리됨.
-- **연결 확인 완료**: 해당 URL/포트에 MCP 서버가 응답함.
-- **실행 확인 완료**: 명령 목록 조회와 테스트 명령 1개 실행이 성공함.
+Use these levels separately:
 
-Never tell the user that future MCP tools will run without checking the bridge/server and at least one test command.
+- Registration prepared: server name, target, URL, port, launch command, working folder, and memo are prepared or saved.
+- Bridge scaffolded: a bridge/add-in project exists, but real program control may still be missing.
+- Program load unverified: the target program or add-in has not been confirmed.
+- Connection verified: URL/port responds.
+- Commands verified: MCP command list responds.
+- Execution verified: one safe read-only command succeeds.
 
-## Program Defaults
+If only a scaffold exists, say clearly that real program operation is not connected yet.
 
-Use these as starting candidates, not guaranteed facts:
+## Start Prompt
 
-| Program | Target | Default server name | URL example | Port | Bridge note |
+When the user types `/등록`, ask which program MCP to add:
+
+```text
+어떤 프로그램 MCP를 추가할까요?
+1. AutoCAD MCP - CAD 도면, 객체, 레이어, 블록 작업
+2. Revit MCP - 모델 요소, 패밀리, 파라미터 작업
+3. Excel MCP - 시트, 셀, 범위, 리포트 작업
+4. Tekla MCP - 구조 모델, 어셈블리, 리포트 작업
+5. Dynamo MCP - Dynamo Player/그래프 실행
+6. 기타 프로그램
+```
+
+If the user selects multiple numbers, handle them one by one and summarize shared choices.
+
+## Default Candidates
+
+These values are defaults, not proof that the bridge exists.
+
+| Program | Target | Server name | URL | Port | Typical bridge |
 |---|---|---|---|---:|---|
-| AutoCAD | CAD | AutoCAD MCP Bridge | `http://localhost:5100/mcp` | 5100 | AutoCAD add-in or external bridge must be running |
-| Revit | Revit | Revit MCP Bridge | `http://localhost:5001/mcp` | 5001 | Revit add-in/bridge must be loaded in Revit |
-| Excel | Excel | Excel MCP Bridge | `http://localhost:5200/mcp` | 5200 | Excel bridge must expose workbook commands |
-| Tekla | Tekla | Tekla MCP Bridge | `http://localhost:5300/mcp` | 5300 | Tekla bridge must expose model commands |
-| Dynamo | Revit | Dynamo MCP Bridge | `http://localhost:5400/mcp` | 5400 | Usually depends on Revit/Dynamo environment |
+| AutoCAD | CAD | AutoCAD MCP Bridge | `http://localhost:5100/mcp` | 5100 | AutoCAD add-in, LISP wrapper, .NET/COM bridge |
+| Revit | Revit | Revit MCP Bridge | `http://localhost:5001/mcp` | 5001 | Revit add-in or ExternalEvent bridge |
+| Excel | Excel | Excel MCP Bridge | `http://localhost:5200/mcp` | 5200 | Office add-in, COM bridge, workbook automation bridge |
+| Tekla | Tekla | Tekla MCP Bridge | `http://localhost:5300/mcp` | 5300 | Tekla Open API bridge |
+| Dynamo | Revit | Dynamo MCP Bridge | `http://localhost:5400/mcp` | 5400 | Revit/Dynamo dependent bridge |
 
-For unknown programs, ask for the program name, expected command target, port or URL if known, and how the bridge is started.
+## Required Questions
 
-## Registration Questions
+Ask concise Korean questions before making files or changing registry state:
 
-Ask Korean, choice-based questions whenever possible.
+1. 브리지나 애드인이 이미 있나요?
+   - 이미 있음
+   - 일부만 있음
+   - 아직 없음, 만들어야 함
+2. 이 컴퓨터에서 대상 프로그램을 바로 실행하거나 확인할 수 있나요?
+   - 설치되어 있고 실행 가능
+   - 설치되어 있지만 지금 실행하지 않음
+   - 이 컴퓨터에는 없음
+3. 브리지를 어디에 만들거나 둘까요?
+   - 기존 경로
+   - AI Program repo 안의 `tools/mcp-bridges/<program>`
+   - 나중에 지정
+4. 먼저 등록만 할까요, 아니면 스캐폴드 생성까지 할까요?
 
-Required information:
+## Bridge Creation Rules
 
-- Program: AutoCAD, Revit, Excel, Tekla, Dynamo, or other.
-- Server display name.
-- Target type in AI Program: `CAD`, `Revit`, `Excel`, `Tekla`, `Custom`, or `Other`.
-- URL and port.
-- Start method: already running, executable path, add-in loaded by the program, or unknown.
-- Working folder if an executable bridge is used.
-- Memo: what this bridge will be used for.
+When no bridge exists and the user asks Codex to make one:
 
-If any required value is unknown, propose a default and ask for approval instead of inventing it silently.
+- Inspect the current repo first.
+- Prefer existing project conventions and package scripts.
+- Create scaffold files only inside the workspace unless the user explicitly approves another path.
+- Include health/status and command-list endpoints if possible.
+- Mark commands as `planned` until real SDK/API calls exist.
+- Never fake SDK success.
 
-## Output Contract
+Use the proper future integration layer:
 
-After collecting the values, show a registration block the user can apply in AI Program:
+- AutoCAD: AutoCAD .NET API, COM, LISP wrapper, or loaded add-in bridge.
+- Revit: Revit add-in plus ExternalEvent or another valid Revit API bridge.
+- Excel: Office add-in, COM, Graph, or local workbook bridge.
+- Tekla: Tekla Open API.
+- Dynamo: Dynamo/Revit-hosted command path.
+
+If the SDK or target program is unavailable, create only the scaffold and list the missing real connection work.
+
+## AI Program Registration Rules
+
+Prefer registering through AI Program Settings or the app registry IPC/API when available. If editing files directly:
+
+- Confirm registry path and schema from the current codebase.
+- Do not write to random user-data paths without checking the app code.
+- Keep missing bridges disconnected.
+- Do not mark a server running unless it actually responds.
+
+## OpenAI API Key Setup
+
+When the user wants AI Program to execute tool actions through OpenAI, guide them to configure the key inside the app instead of pasting secrets into chat:
+
+1. Open AI Program.
+2. Go to `Settings > AI 연결`.
+3. Enter the OpenAI API key and model, then click 저장.
+4. Verify the status says 연결 준비됨.
+
+The app stores the key in the local user data folder with Electron safe storage. Environment variables remain valid fallbacks: `AI_PROGRAM_OPENAI_API_KEY`, `OPENAI_API_KEY`, and `AI_PROGRAM_OPENAI_MODEL`.
+
+API 키를 채팅, 로그, GitHub, 툴 MD 파일에 기록하지 않는다. If the user shares a key by mistake, tell them to revoke it and create a new key.
+
+When finishing `/등록`, include the AI connection state separately from MCP bridge state:
+
+```text
+AI 연결
+- API 키: 앱 저장 / 환경 변수 / 미설정
+- 모델:
+- 다음 조치:
+```
+
+Use this registration summary:
 
 ```text
 AI Program MCP 등록값
@@ -77,40 +130,67 @@ AI Program MCP 등록값
 - 포트:
 - 실행 명령:
 - 작업 폴더:
+- 상태:
 - 메모:
 ```
 
-Then show the verification plan:
+## Verification Procedure
+
+After registration, verify in this order:
+
+1. Target program is installed or available.
+2. Target program is running if needed.
+3. Add-in or bridge process is loaded.
+4. URL/port responds.
+5. MCP command list responds.
+6. One safe read-only command succeeds.
+
+Safe test commands:
+
+- AutoCAD: get active document name, list layers, or read selected object count.
+- Revit: get active document name, list categories, or read current selection count.
+- Excel: get active workbook name, list sheets, or read used range summary.
+
+If verification fails, explain likely causes: program closed, add-in not loaded, bridge process failed, port changed, firewall, health endpoint exists but MCP commands do not, or the tool MD command name does not exist in the bridge.
+
+## Output Contract
+
+End every run with:
 
 ```text
-연결 확인 순서
-1. 대상 프로그램 실행 확인
-2. MCP 브리지 실행/로드 확인
-3. URL/포트 응답 확인
-4. MCP 명령 목록 조회
-5. 안전한 테스트 명령 1개 실행
+결과
+- 등록:
+- 브리지 생성:
+- 프로그램 로드:
+- 연결 확인:
+- 명령 확인:
+- 테스트 실행:
+
+다음 작업
+- ...
 ```
 
-## Verification Guidance
+Use conservative labels:
 
-If the user asks whether it will run later, answer conservatively:
+- 완료
+- 준비 완료
+- 확인 전
+- 실패
+- 스캐폴드만 완료
 
-- If only registration values are prepared, say "등록 준비 단계입니다."
-- If URL/port responds, say "연결 확인 단계까지 됐습니다."
-- If command list and test command pass, say "실행 확인 단계까지 됐습니다."
+## AI Program / Custom Flow Notes
 
-When verification fails, explain likely causes in simple Korean:
+When generating values for Custom Flow or MCP Tool Builder:
 
-- Program is closed.
-- MCP bridge/add-in is not loaded.
-- Port is different.
-- Firewall or permission issue.
-- The tool MD command name does not exist in the bridge.
-- The bridge supports connection but not the requested command yet.
+- Mark unverified command names as `planned`.
+- Mark verified commands as `available`.
+- Include required server names in tool schema.
+- Include preflight checks for program running, bridge connected, active document/workbook, and required selection.
 
-## AI Program Integration Notes
+## Do Not
 
-Prefer adding the MCP server through AI Program Settings > MCP 서버. If a future app API exists for direct registry writes, use it only after confirming the exact target file and schema from the current codebase.
-
-When generating values for Custom Flow or MCP Tool Builder, keep command names marked as `planned` unless the bridge command list was actually checked.
-
+- Do not claim the program is connected just because registry values exist.
+- Do not mark a placeholder bridge as executable.
+- Do not invent SDK calls.
+- Do not write outside the workspace without explicit approval.
+- Do not store tokens, keys, sessions, or user-local runtime state in Git.

@@ -19,6 +19,46 @@ def yaml_quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def strip_existing_frontmatter(body: str) -> str:
+    text = body.lstrip("\ufeff").strip()
+    if not text.startswith("---"):
+        return text
+    parts = text.split("---", 2)
+    if len(parts) == 3:
+        return parts[2].strip()
+    return text
+
+
+def normalize_frontmatter(frontmatter: str) -> str:
+    text = frontmatter.lstrip("\ufeff").strip()
+    if not text:
+        raise SystemExit("Frontmatter file is empty.")
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            text = parts[1].strip()
+        else:
+            text = text.strip("-").strip()
+    if "toolName:" not in text:
+        raise SystemExit("Frontmatter must include toolName.")
+    if "description:" not in text:
+        raise SystemExit("Frontmatter must include description.")
+    if "learningLog:" not in text:
+        text = "\n".join(
+            [
+                text,
+                "learningLog:",
+                '  schemaVersion: "1"',
+                '  sourceSkill: "save-tool"',
+                "  observedFriction: []",
+                "  suggestedOptions: []",
+                "  selectedOptions: []",
+                "  deferredImprovements: []",
+            ]
+        )
+    return "\n".join(["---", text, "---", ""])
+
+
 def auto_description(name: str, body: str) -> str:
     first_body_line = next(
         (
@@ -44,6 +84,7 @@ def main() -> int:
     parser.add_argument("--version", default="1.0.0", help="Tool version")
     parser.add_argument("--section-id", default="servers", help="AI Program section id")
     parser.add_argument("--body-file", required=True, help="Markdown body file to include")
+    parser.add_argument("--frontmatter-file", default="", help="Approved YAML frontmatter to preserve")
     parser.add_argument("--output-dir", default="tool-drafts", help="Directory for generated draft")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite an existing draft")
     args = parser.parse_args()
@@ -57,44 +98,55 @@ def main() -> int:
     if target_path.exists() and not args.overwrite:
         raise SystemExit(f"Refusing to overwrite existing file: {target_path}")
 
-    body = body_path.read_text(encoding="utf-8-sig").strip()
+    body = strip_existing_frontmatter(body_path.read_text(encoding="utf-8-sig"))
     description = args.description.strip() or auto_description(args.name, body)
     created_at = datetime.now(timezone.utc).isoformat()
-    frontmatter = "\n".join(
-        [
-            "---",
-            "tool: true",
-            f"toolName: {yaml_quote(args.name)}",
-            f"version: {yaml_quote(args.version)}",
-            f"author: {yaml_quote(args.author)}",
-            f"description: {yaml_quote(description)}",
-            f"sectionId: {yaml_quote(section_id)}",
-            f"createdAt: {yaml_quote(created_at)}",
-            'source: "codex-save-tool"',
-            'risk: "read"',
-            "deterministic: true",
-            'executionMode: "manual"',
-            "requiredServers: []",
-            "mcpCommands: []",
-            "preflightChecks: []",
-            "resultSchema:",
-            '  type: "text"',
-            "  fields: []",
-            "failurePolicy:",
-            '  partialSuccess: "report"',
-            '  rollback: "none"',
-            "  log: true",
-            "settingsLayout:",
-            '  mode: "simple"',
-            "  sections: []",
-            "testCases: []",
-            "settings: []",
-            "inputs: []",
-            "outputs: []",
-            "---",
-            "",
-        ]
-    )
+    if args.frontmatter_file:
+        frontmatter = normalize_frontmatter(Path(args.frontmatter_file).read_text(encoding="utf-8-sig"))
+    else:
+        frontmatter = "\n".join(
+            [
+                "---",
+                "tool: true",
+                f"toolName: {yaml_quote(args.name)}",
+                f"version: {yaml_quote(args.version)}",
+                f"author: {yaml_quote(args.author)}",
+                f"description: {yaml_quote(description)}",
+                f"sectionId: {yaml_quote(section_id)}",
+                f"createdAt: {yaml_quote(created_at)}",
+                'source: "codex-save-tool"',
+                'risk: "read"',
+                "deterministic: true",
+                'executionMode: "manual"',
+                "requiredServers: []",
+                "mcpCommands: []",
+                "preflightChecks: []",
+                "resultSchema:",
+                '  type: "text"',
+                "  fields: []",
+                "failurePolicy:",
+                '  partialSuccess: "report"',
+                '  rollback: "none"',
+                "  log: true",
+                "settingsLayout:",
+                '  mode: "simple"',
+                "  sections: []",
+                "testCases: []",
+                "settings: []",
+                "actions: []",
+                "inputs: []",
+                "outputs: []",
+                "learningLog:",
+                '  schemaVersion: "1"',
+                '  sourceSkill: "save-tool"',
+                "  observedFriction: []",
+                "  suggestedOptions: []",
+                "  selectedOptions: []",
+                "  deferredImprovements: []",
+                "---",
+                "",
+            ]
+        )
 
     target_path.write_text(f"{frontmatter}{body}\n", encoding="utf-8")
     print(target_path)

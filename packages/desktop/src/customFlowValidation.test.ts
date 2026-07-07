@@ -141,6 +141,7 @@ describe("customFlowValidation", () => {
             preflightChecks: [],
             resultSchema: { type: "file", fields: [] },
             failurePolicy: { partialSuccess: "report", rollback: "none", log: true },
+            actions: [],
             settingsLayout: { mode: "simple", sections: [] },
             settings: [
               {

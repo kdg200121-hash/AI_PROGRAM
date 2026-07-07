@@ -11,6 +11,12 @@ export interface SettingPreset {
   updatedAt: number;
 }
 
+export function cloneSettingValues(
+  values: Record<string, ToolSettingValue>
+): Record<string, ToolSettingValue> {
+  return JSON.parse(JSON.stringify(values)) as Record<string, ToolSettingValue>;
+}
+
 export function createSettingPreset(
   toolId: string,
   name: string,
@@ -21,7 +27,7 @@ export function createSettingPreset(
     id: `preset-${now}-${Math.random().toString(36).slice(2, 8)}`,
     toolId,
     name: name.trim() || "저장한 설정",
-    values: { ...values },
+    values: cloneSettingValues(values),
     createdAt: now,
     updatedAt: now
   };
@@ -41,6 +47,7 @@ export function upsertSettingPreset(
   const existing = presets.find((item) => item.id === preset.id);
   const nextPreset: SettingPreset = {
     ...preset,
+    values: cloneSettingValues(preset.values),
     createdAt: existing?.createdAt ?? preset.createdAt,
     updatedAt: now
   };
@@ -50,6 +57,24 @@ export function upsertSettingPreset(
 
 export function removeSettingPreset(presets: SettingPreset[], presetId: string) {
   return presets.filter((preset) => preset.id !== presetId);
+}
+
+export function renameSettingPreset(
+  presets: SettingPreset[],
+  presetId: string,
+  name: string,
+  now = Date.now()
+) {
+  const nextName = name.trim() || "저장한 설정";
+  return presets.map((preset) =>
+    preset.id === presetId
+      ? {
+          ...preset,
+          name: nextName,
+          updatedAt: now
+        }
+      : preset
+  );
 }
 
 export function loadSettingPresets(storage: Storage = window.localStorage): SettingPreset[] {
@@ -74,7 +99,7 @@ export function loadSettingPresets(storage: Storage = window.localStorage): Sett
           name: String(item.name ?? "저장한 설정"),
           values:
             item.values && typeof item.values === "object" && !Array.isArray(item.values)
-              ? (item.values as Record<string, ToolSettingValue>)
+              ? cloneSettingValues(item.values as Record<string, ToolSettingValue>)
               : {},
           createdAt: Number(item.createdAt ?? Date.now()),
           updatedAt: Number(item.updatedAt ?? item.createdAt ?? Date.now())

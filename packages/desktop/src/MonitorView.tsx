@@ -1,6 +1,4 @@
-import type { McpTarget } from "@mcp-registry/shared";
 import type { ProcessLogEntry, ProcessState } from "./processMonitor";
-import { processStatusLabel } from "./processMonitor";
 
 interface MonitorViewProps {
   runningCount: number;
@@ -9,17 +7,11 @@ interface MonitorViewProps {
   logs: ProcessLogEntry[];
 }
 
-function bridgeState(processes: ProcessState[], target: McpTarget) {
-  return processes.find((process) => process.target === target);
-}
-
 function newestLogs(logs: ProcessLogEntry[]) {
   return [...logs].slice(-60).reverse();
 }
 
 export function MonitorView({ runningCount, totalCount, processes, logs }: MonitorViewProps) {
-  const cadState = bridgeState(processes, "cad");
-  const revitState = bridgeState(processes, "revit");
   const displayedLogs = newestLogs(logs);
   const errorLogs = displayedLogs.filter((log) => log.level === "stderr" || log.level === "error");
 
@@ -34,14 +26,9 @@ export function MonitorView({ runningCount, totalCount, processes, logs }: Monit
           </p>
         </div>
         <div className="panel monitorTile">
-          <span>CAD 브리지</span>
-          <strong>{processStatusLabel(cadState?.status ?? "unknown")}</strong>
-          <p>{cadState?.lastMessage ?? "AutoCAD MCP 포트 5100 상태를 확인합니다."}</p>
-        </div>
-        <div className="panel monitorTile">
-          <span>Revit 브리지</span>
-          <strong>{processStatusLabel(revitState?.status ?? "unknown")}</strong>
-          <p>{revitState?.lastMessage ?? "Revit MCP 포트 5001 상태를 확인합니다."}</p>
+          <span>등록 서버</span>
+          <strong>{processes.length}</strong>
+          <p>Settings의 서버 목록에서 선택한 MCP 서버를 실행하거나 중지할 수 있습니다.</p>
         </div>
       </div>
       <div className="panel logPanel">
@@ -58,11 +45,10 @@ export function MonitorView({ runningCount, totalCount, processes, logs }: Monit
               </p>
             ))
           ) : (
-            <>
-              <p>[대기] MCP 서버 상태 확인 준비</p>
-              <p>[대기] CAD 화면 정보 수집 준비</p>
-              <p>[대기] Revit 작업 큐 실행 준비</p>
-            </>
+            <p>
+              <strong>수집된 로그 없음</strong>
+              <span>MCP 서버를 실행하면 이 영역에 실행 로그가 표시됩니다.</span>
+            </p>
           )}
         </div>
       </div>

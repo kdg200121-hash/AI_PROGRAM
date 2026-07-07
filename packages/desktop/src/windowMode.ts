@@ -4,5 +4,5 @@ export interface WindowModeSize {
 }
 
 export function getWindowModeSize(isCompact: boolean): WindowModeSize {
-  return isCompact ? { width: 420, height: 760 } : { width: 1200, height: 760 };
+  return isCompact ? { width: 560, height: 780 } : { width: 1440, height: 900 };
 }

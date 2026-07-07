@@ -1,4 +1,4 @@
 interface:
   display_name: "/등록 Program MCP"
-  short_description: "/등록 명령으로 AutoCAD, Revit, Excel, Tekla 같은 프로그램 MCP 연결값을 만들고 실행 가능 여부를 점검합니다."
-  default_prompt: "/등록 명령으로 어떤 프로그램 MCP를 추가할지 선택지를 보여주고, AI Program에 넣을 서버 이름, URL, 포트, 실행 명령, 검증 순서를 정리해줘."
+  short_description: "AutoCAD, Revit, Excel, Tekla 같은 프로그램 MCP 브리지를 생성, 등록, 연결, 검증하는 절차를 안내합니다."
+  default_prompt: "/등록 명령으로 대상 프로그램을 고르고, MCP 브리지가 없으면 스캐폴드 생성부터 AI Program 등록, URL/포트 확인, 명령 목록 확인, 안전한 테스트 명령 실행까지 단계별로 진행해줘."

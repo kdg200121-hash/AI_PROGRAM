@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { ToolRuntimeSchema } from "../src/toolSettingsSchema";
+import type { ToolExecutionRequest, ToolExecutionResult } from "../src/toolExecutionModel";
+import type { OpenAiSettingsStatus } from "../src/openAiSettings";
 import type { RegistryFile } from "@mcp-registry/shared";
 import type { NewMcpServerInput, UpdateMcpServerInput } from "@mcp-registry/core";
 import type { ServerProcessResult } from "../src/processMonitor";
@@ -32,6 +34,18 @@ contextBridge.exposeInMainWorld("mcpProcesses", {
     ipcRenderer.invoke("mcp-processes:start-server", serverId) as Promise<ServerProcessResult>,
   stopServer: async (serverId: string) =>
     ipcRenderer.invoke("mcp-processes:stop-server", serverId) as Promise<ServerProcessResult>
+});
+
+contextBridge.exposeInMainWorld("toolExecution", {
+  run: async (request: ToolExecutionRequest) =>
+    ipcRenderer.invoke("tool-execution:run", request) as Promise<ToolExecutionResult>
+});
+
+contextBridge.exposeInMainWorld("openAiSettings", {
+  get: async () => ipcRenderer.invoke("openai-settings:get") as Promise<OpenAiSettingsStatus>,
+  save: async (input: { apiKey?: string; model?: string }) =>
+    ipcRenderer.invoke("openai-settings:save", input) as Promise<OpenAiSettingsStatus>,
+  clear: async () => ipcRenderer.invoke("openai-settings:clear") as Promise<OpenAiSettingsStatus>
 });
 
 contextBridge.exposeInMainWorld("skillInstaller", {
@@ -206,7 +220,13 @@ contextBridge.exposeInMainWorld("customTools", {
     }>,
   deleteToolFiles: async (paths: string[]) =>
     ipcRenderer.invoke("custom-tools:delete-tool-files", paths) as Promise<
-      { path: string; status: "deleted" | "skipped" | "failed"; message: string }[]
+      {
+        path: string;
+        status: "deleted" | "skipped" | "failed" | "requested";
+        message: string;
+        pullRequestUrl?: string;
+        pullRequestNumber?: number;
+      }[]
     >,
   copyMarkdownFile: async (
     sourcePath: string,
