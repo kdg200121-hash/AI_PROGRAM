@@ -30,8 +30,27 @@
 - [ ] Google 로그인 또는 GitHub 로그인 중 앱 계정 시스템 방식 결정
 - [x] 실행/중지 버튼을 실제 프로세스 관리 기능과 연결
 - [x] Process Monitor에 실행 로그와 상태 갱신 연결
-- [ ] MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장
+- [x] MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장
 - [ ] Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결
 - [x] Custom Flow 저장 그래프의 포트 호환성/누락 입력 검증 UI 추가
+- [x] MD 툴의 settings/inputs/outputs schema를 읽어 Custom Flow 노드 설정창에 표시
+- [x] Custom Tool 등록창에서 MD 설정창 미리보기, schema 검증, MCP 실행 계획 표시
+- [x] Custom Flow 노드 설정창에서 필수 설정 누락 검증과 예정 MCP 명령 계획 표시
+- [x] Custom Flow 노드 설정창에 매핑표/필터/정렬/반복목록 행 편집 UI 추가
+- [x] Custom Flow 실행 로그 타임라인, 노드별 결과 탭, 실행 전 영향 범위 표시
+- [x] Custom Flow 실행 범위 선택(전체/선택/선택까지/선택부터)과 단계별 실행 UI 보강
+- [x] Custom Flow 실행 범위를 노드 배열 순서가 아니라 연결선 기준 순서로 계산
+- [x] Custom Flow 그룹을 재사용 가능한 커스텀 플로우 툴로 저장하는 1차 기능 추가
+- [ ] Custom Flow 실제 실행 시 노드별 settingsValues를 MCP 명령 파라미터로 넘기는 실행 엔진 구현
+- [ ] 저장한 Custom Flow 그룹 툴을 도구 팔레트에서 다시 노드로 불러오는 UX 연결
+- [ ] 실행 로그의 예상 중간결과를 실제 MCP/AI 응답값으로 교체하고 결과 미리보기 노드와 연결
+- [x] Custom Flow 메인 페이지에서 공유 플로우 샘플과 내 저장 플로우 목록을 분리 표시
+- [x] Custom Flow 노드 설정 탭에서 툴 설정값 프리셋 저장/불러오기 지원
+- [ ] 공유 Custom Flow 목록을 GitHub 또는 서버에서 받아오는 기능 연결
+- [ ] CAD/Revit MCP 브리지에 현재 활성 파일명을 반환하는 endpoint(`/active-file` 또는 `/status`) 구현
+- [ ] Custom Flow 노드 드래그, 그룹 해제, 메모 삭제, 흐름 점검 팝업, 도구창 스크롤을 실제 UI 자동 테스트로 검증
+- [x] Custom Tools 로컬 MD 파일 읽기/복사/비교/업로드 IPC를 사용자가 선택한 툴 폴더 안으로 제한
+- [x] GitHub 토큰이 safeStorage 없이 평문 저장되지 않도록 차단
+- [x] `outputs/` 산출물 폴더를 Git 제외 대상으로 추가
 - [ ] `App.tsx` 추가 분리: `WorkflowView`, `ToolMarketDialog`, `TabStrip`, Settings 세부 패널 순서로 컴포넌트 경계 정리
 

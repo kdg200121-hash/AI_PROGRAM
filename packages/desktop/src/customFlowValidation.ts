@@ -1,5 +1,6 @@
 import type { FlowConnection, FlowNode } from "./customFlowModel";
 import { isFlowTypeCompatible } from "./customFlowModel";
+import { validateToolSettingsValues } from "./toolRuntimeValidation";
 
 export type FlowValidationSeverity = "error" | "warning";
 
@@ -69,6 +70,18 @@ export function validateFlowGraph(
   }
 
   for (const node of nodes) {
+    if (node.settingsSchema) {
+      validateToolSettingsValues(node.settingsSchema, node.settingsValues).forEach((issue) => {
+        issues.push({
+          id: `node-setting-${node.nodeId}-${issue.id}`,
+          severity: issue.severity === "error" ? "error" : "warning",
+          title: issue.title,
+          message: `${node.name}: ${issue.message}`,
+          nodeId: node.nodeId
+        });
+      });
+    }
+
     for (const input of node.inputs) {
       if (input.type === "cad") {
         continue;

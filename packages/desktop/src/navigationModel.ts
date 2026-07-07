@@ -23,6 +23,12 @@ export interface WorkflowStep {
   body: string;
 }
 
+export interface DefaultSubmenuItem {
+  id: string;
+  label: string;
+  description: string;
+}
+
 export const sidebarSections: SidebarSection[] = [
   { id: "servers", label: "CAD", shortLabel: "C" },
   { id: "revit", label: "Revit", shortLabel: "R" },
@@ -45,6 +51,31 @@ export const overviewCards: OverviewCard[] = [
     body: "레이어, 블록, 좌표, 패밀리 매핑 상태를 한눈에 확인합니다."
   }
 ];
+
+const sharedToolSubmenus: DefaultSubmenuItem[] = [
+  {
+    id: "tools",
+    label: "Share Tools",
+    description: "모든 사용자에게 기본으로 제공되는 공용 MCP 툴을 정리합니다."
+  },
+  {
+    id: "settings",
+    label: "Custom Tools",
+    description: "MD 파일 기반 커스텀 툴을 가져오고 상단고정으로 관리합니다."
+  }
+];
+
+const workflowSubmenus: DefaultSubmenuItem[] = [
+  { id: "add", label: "+", description: "새 Custom Flow 캔버스를 엽니다." }
+];
+
+export function shouldShowSubmenuAddButton(sectionId: SidebarSectionId) {
+  return sectionId === "workflow";
+}
+
+export function getDefaultSubmenuItemsForSection(sectionId: SidebarSectionId) {
+  return sectionId === "workflow" ? workflowSubmenus : [];
+}
 
 export const workflowSteps: WorkflowStep[] = [
   {

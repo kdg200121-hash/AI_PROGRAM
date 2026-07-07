@@ -1,6 +1,6 @@
 import type { McpServerRecord } from "@mcp-registry/shared";
 
-export type WorkspaceTabId = "registry" | "cad" | "revit" | "workflow";
+export type WorkspaceTabId = "registry" | "cad" | "revit" | "workflow" | "excel" | "tekla";
 
 export interface WorkspaceTab {
   id: WorkspaceTabId;

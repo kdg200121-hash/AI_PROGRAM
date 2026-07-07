@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from "electron";
 import { access, copyFile, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
   addServer,
   deleteServer,
@@ -14,6 +14,22 @@ import {
 } from "@mcp-registry/core";
 import { nicknameForGitHubLogin } from "../src/githubAuthProfile";
 import { getWindowModeSize } from "../src/windowMode";
+import {
+  detectToolRiskWarnings,
+  isToolMarkdown,
+  normalizeToolContent,
+  parseToolMetadata,
+  stripToolMetadata
+} from "../src/toolMarkdown";
+import { parseToolRuntimeSchema } from "../src/toolSettingsSchema";
+import {
+  assertPathInsideAllowedRoots,
+  normalizeAllowedPath
+} from "../src/filePathSecurity";
+import {
+  activeFileProbeUrls,
+  extractDetectedActiveFiles
+} from "../src/activeFileDetection";
 import type { OpenDialogOptions } from "electron";
 import type { McpServerRecord, McpStatus, RegistryFile } from "@mcp-registry/shared";
 import type {
@@ -116,6 +132,58 @@ function publicAuthProfile(profile: GitHubAuthProfile | null) {
   };
 }
 
+function approvedCustomToolRootsPath() {
+  return join(app.getPath("userData"), "custom-tool-roots.json");
+}
+
+let approvedCustomToolRoots: string[] | null = null;
+
+async function loadApprovedCustomToolRoots() {
+  if (approvedCustomToolRoots) {
+    return approvedCustomToolRoots;
+  }
+
+  try {
+    const storedRoots = JSON.parse(await readFile(approvedCustomToolRootsPath(), "utf8"));
+    approvedCustomToolRoots = Array.isArray(storedRoots)
+      ? storedRoots
+          .filter((root): root is string => typeof root === "string")
+          .map((root) => normalizeAllowedPath(root))
+      : [];
+  } catch {
+    approvedCustomToolRoots = [];
+  }
+
+  return approvedCustomToolRoots;
+}
+
+async function saveApprovedCustomToolRoots() {
+  await mkdir(app.getPath("userData"), { recursive: true });
+  await writeFile(
+    approvedCustomToolRootsPath(),
+    JSON.stringify(await loadApprovedCustomToolRoots(), null, 2),
+    "utf8"
+  );
+}
+
+async function approveCustomToolRoot(rootPath: string) {
+  const roots = await loadApprovedCustomToolRoots();
+  const normalizedRoot = normalizeAllowedPath(rootPath);
+  if (!roots.includes(normalizedRoot)) {
+    roots.push(normalizedRoot);
+    await saveApprovedCustomToolRoots();
+  }
+  return normalizedRoot;
+}
+
+async function approveCustomToolFile(filePath: string) {
+  await approveCustomToolRoot(dirname(filePath));
+}
+
+async function assertApprovedCustomToolPath(pathValue: string, label: string) {
+  assertPathInsideAllowedRoots(pathValue, await loadApprovedCustomToolRoots(), label);
+}
+
 async function githubClientId() {
   return (
     process.env.AI_PROGRAM_GITHUB_CLIENT_ID ??
@@ -136,7 +204,7 @@ function encryptGitHubAccessToken(accessToken?: string) {
   }
 
   if (!safeStorage.isEncryptionAvailable()) {
-    return accessToken;
+    throw new Error("GitHub 토큰을 안전하게 저장할 수 없어 로그인을 중단했습니다.");
   }
 
   return `${encryptedTokenPrefix}${safeStorage.encryptString(accessToken).toString("base64")}`;
@@ -157,6 +225,19 @@ function decryptGitHubAccessToken(accessToken?: string) {
 async function loadGitHubAuthProfile(): Promise<GitHubAuthProfile | null> {
   try {
     const profile = JSON.parse(await readFile(authProfilePath(), "utf8")) as GitHubAuthProfile;
+    if (profile.accessToken && !profile.accessToken.startsWith(encryptedTokenPrefix)) {
+      if (!safeStorage.isEncryptionAvailable()) {
+        const profileWithoutUnsafeToken = {
+          ...profile,
+          accessToken: undefined
+        };
+        await saveGitHubAuthProfile(profileWithoutUnsafeToken);
+        return profileWithoutUnsafeToken;
+      }
+
+      await saveGitHubAuthProfile(profile);
+    }
+
     return {
       ...profile,
       accessToken: decryptGitHubAccessToken(profile.accessToken)
@@ -261,6 +342,13 @@ async function pollGitHubDeviceLogin(deviceCode: string, nickname?: string) {
     return { status: "error", message: "GitHub access token을 받지 못했습니다." };
   }
 
+  if (!safeStorage.isEncryptionAvailable()) {
+    return {
+      status: "error",
+      message: "이 컴퓨터에서는 GitHub 토큰을 안전하게 저장할 수 없어 로그인을 중단했습니다."
+    };
+  }
+
   const userResponse = await fetch("https://api.github.com/user", {
     headers: {
       Accept: "application/vnd.github+json",
@@ -301,103 +389,68 @@ async function updateGitHubNickname(nickname: string) {
   return saveGitHubAuthProfile(profile);
 }
 
-function parseMetadata(content: string) {
-  if (!content.startsWith("---")) {
-    return {};
+function activeFileProgramForTarget(target: McpServerRecord["target"]) {
+  if (target === "cad") {
+    return "cad" as const;
   }
-
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  if (!match) {
-    return {};
+  if (target === "revit") {
+    return "revit" as const;
   }
-
-  return Object.fromEntries(
-    match[1]
-      .split(/\r?\n/)
-      .map((line) => line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/))
-      .filter((item): item is RegExpMatchArray => Boolean(item))
-      .map((item) => {
-        const rawValue = item[2].trim();
-        try {
-          return [item[1], JSON.parse(rawValue)];
-        } catch {
-          return [item[1], rawValue.replace(/^["']|["']$/g, "")];
-        }
-      })
-  );
+  return null;
 }
 
-function stripMetadata(content: string) {
-  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+async function fetchJsonWithTimeout(url: string, timeoutMs = 800) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-function normalizeContent(content: string) {
-  return stripMetadata(content)
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[^\p{L}\p{N}_ -]/gu, "")
-    .trim();
+async function detectActiveFilesFromMcpServers() {
+  const registry = await loadRegistry(registryPath());
+  const detectedFiles = [];
+
+  for (const server of registry.servers) {
+    const program = activeFileProgramForTarget(server.target);
+    if (!program || !server.url) {
+      continue;
+    }
+
+    for (const url of activeFileProbeUrls(server.url)) {
+      const payload = await fetchJsonWithTimeout(url);
+      const files = extractDetectedActiveFiles(payload, program, server.id);
+      if (files.length > 0) {
+        detectedFiles.push(...files);
+        break;
+      }
+    }
+  }
+
+  const uniqueFiles = new Map(detectedFiles.map((file) => [file.id, file]));
+  return [...uniqueFiles.values()];
 }
 
 function contentSimilarity(left: string, right: string) {
-  const leftWords = new Set(normalizeContent(left).split(" ").filter(Boolean));
-  const rightWords = new Set(normalizeContent(right).split(" ").filter(Boolean));
+  const leftWords = new Set(normalizeToolContent(left).split(" ").filter(Boolean));
+  const rightWords = new Set(normalizeToolContent(right).split(" ").filter(Boolean));
   if (leftWords.size === 0 || rightWords.size === 0) {
     return leftWords.size === rightWords.size ? 1 : 0;
   }
 
   const intersectionSize = [...leftWords].filter((word) => rightWords.has(word)).length;
   return intersectionSize / Math.max(leftWords.size, rightWords.size);
-}
-
-function isToolMarkdown(content: string) {
-  const metadata = parseMetadata(content) as Record<string, unknown>;
-  const normalized = normalizeContent(content);
-  const metadataSignals = [
-    metadata.toolName,
-    metadata.name,
-    metadata.version,
-    metadata.author,
-    metadata.sectionId
-  ].filter(Boolean).length;
-  const bodySignals = [
-    /\btool\b/i,
-    /\bcommand\b/i,
-    /\bparameters?\b/i,
-    /\binputs?\b/i,
-    /\boutputs?\b/i,
-    /\busage\b/i,
-    /사용법|입력|출력|명령|실행|파라미터|도구|툴/
-  ].filter((pattern) => pattern.test(normalized)).length;
-
-  return metadataSignals >= 2 || bodySignals >= 2;
-}
-
-function detectToolRiskWarnings(content: string) {
-  const normalized = normalizeContent(content);
-  const destructiveActionPattern =
-    /\b(delete|remove|erase|purge|destroy|wipe|clear)\b|삭제|제거|지우|소거|정리/;
-  const creationActionPattern =
-    /\b(create|add|insert|generate|make|place|draw)\b|생성|추가|삽입|배치|작성|그리/;
-  const modelObjectPattern =
-    /\b(object|objects|element|elements|entity|entities|block|blocks|family|families|wall|walls|layer|layers|model|geometry)\b|객체|요소|블록|패밀리|벽|레이어|모델|형상|도면|부재/;
-  const commandPattern =
-    /\b(command|execute|run|operation|action|tool)\b|명령|실행|작업|동작|툴|도구/;
-  const reasons: string[] = [];
-
-  if (destructiveActionPattern.test(normalized) && modelObjectPattern.test(normalized)) {
-    reasons.push("MD 내용에서 모델 객체나 요소를 삭제/제거할 수 있는 동작이 감지되었습니다.");
-  }
-
-  if (
-    creationActionPattern.test(normalized) &&
-    modelObjectPattern.test(normalized) &&
-    commandPattern.test(normalized)
-  ) {
-    reasons.push("MD 내용에서 모델 객체나 요소를 새로 생성/추가할 수 있는 동작이 감지되었습니다.");
-  }
-
-  return reasons;
 }
 
 function safeFilePart(value: string) {
@@ -438,7 +491,7 @@ function formatMetadata(metadata: CustomToolMetadata) {
 }
 
 function markdownWithMetadata(sourceContent: string, metadata: CustomToolMetadata) {
-  return `${formatMetadata(metadata)}${stripMetadata(sourceContent)}`;
+  return `${formatMetadata(metadata)}${stripToolMetadata(sourceContent)}`;
 }
 
 async function githubRequest<T>(
@@ -674,6 +727,91 @@ async function getGitHubPullRequestState(source: GitHubToolSource, pullRequestNu
   const pullRequest = await githubRequest<GitHubPullRequest>(
     `/repos/${source.owner}/${source.repo}/pulls/${pullRequestNumber}`,
     token
+  );
+
+  return {
+    number: pullRequest.number,
+    url: pullRequest.html_url,
+    state: pullRequest.merged_at ? ("merged" as const) : pullRequest.state,
+    mergedAt: pullRequest.merged_at ?? ""
+  };
+}
+
+async function deleteGitHubToolPath(githubPath: string) {
+  const prefix = "github:";
+  const normalized = githubPath.startsWith(prefix) ? githubPath.slice(prefix.length) : githubPath;
+  const [owner, repo, ...pathParts] = normalized.split("/");
+  const targetPath = pathParts.join("/");
+  if (!owner || !repo || !targetPath) {
+    throw new Error("삭제할 GitHub 툴 경로가 올바르지 않습니다.");
+  }
+
+  const profile = await loadGitHubAuthProfile();
+  if (!profile?.accessToken) {
+    throw new Error("GitHub 로그인이 필요합니다.");
+  }
+
+  const repoInfo = await githubRequest<GitHubRepository>(
+    `/repos/${owner}/${repo}`,
+    profile.accessToken
+  );
+  const content = await githubRequest<{ sha: string }>(
+    `/repos/${owner}/${repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}`,
+    profile.accessToken
+  );
+  await githubRequest(
+    `/repos/${owner}/${repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}`,
+    profile.accessToken,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Delete tool ${targetPath}`,
+        sha: content.sha,
+        branch: repoInfo.default_branch
+      })
+    }
+  );
+}
+
+async function deleteCustomToolFiles(paths: string[]) {
+  const uniquePaths = [...new Set(paths.filter(Boolean))];
+  const results: { path: string; status: "deleted" | "skipped" | "failed"; message: string }[] = [];
+
+  for (const targetPath of uniquePaths) {
+    try {
+      if (targetPath.startsWith("github:")) {
+        await deleteGitHubToolPath(targetPath);
+        results.push({ path: targetPath, status: "deleted", message: "GitHub 원본 파일 삭제 완료" });
+        continue;
+      }
+
+      await assertApprovedCustomToolPath(targetPath, "삭제할 툴 파일");
+      await rm(targetPath, { force: true });
+      results.push({ path: targetPath, status: "deleted", message: "로컬 원본 파일 삭제 완료" });
+    } catch (error) {
+      results.push({
+        path: targetPath,
+        status: "failed",
+        message: error instanceof Error ? error.message : "원본 파일 삭제 실패"
+      });
+    }
+  }
+
+  return results;
+}
+
+async function rejectGitHubPullRequest(source: GitHubToolSource, pullRequestNumber: number) {
+  const profile = await loadGitHubAuthProfile();
+  const token = profile?.accessToken ?? "";
+  const pullRequest = await githubRequest<GitHubPullRequest>(
+    `/repos/${source.owner}/${source.repo}/pulls/${pullRequestNumber}`,
+    token,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: "closed" })
+    }
   );
 
   return {
@@ -949,7 +1087,7 @@ async function listGithubMarkdownTools(source: GitHubToolSource) {
         throw new Error(`GitHub tool download failed: ${file.path}`);
       }
       const content = await contentResponse.text();
-      const metadata = parseMetadata(content) as Partial<CustomToolMetadata> & {
+      const metadata = parseToolMetadata(content) as Partial<CustomToolMetadata> & {
         toolName?: string;
       };
       const name = String(
@@ -966,7 +1104,8 @@ async function listGithubMarkdownTools(source: GitHubToolSource) {
         author: String(metadata.author ?? source.owner),
         sectionId: String(metadata.sectionId ?? "servers"),
         isToolLike: isToolMarkdown(content),
-        riskWarnings: detectToolRiskWarnings(content)
+        riskWarnings: detectToolRiskWarnings(content),
+        toolSchema: parseToolRuntimeSchema(content)
       };
     })
   );
@@ -1050,7 +1189,11 @@ function createWindow() {
     show: false,
     backgroundColor: "#eef4fb",
     webPreferences: {
-      preload: join(__dirname, "preload.cjs")
+      preload: join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true
     }
   });
 
@@ -1092,6 +1235,9 @@ ipcMain.handle("skills:install-save-tool", async () => installBundledSkill("save
 ipcMain.handle("skills:install-mcp-tool-builder", async () =>
   installBundledSkill("mcp-tool-builder")
 );
+ipcMain.handle("skills:install-program-mcp-registrar", async () =>
+  installBundledSkill("program-mcp-registrar")
+);
 
 ipcMain.handle("github-auth:get-profile", async () =>
   publicAuthProfile(await loadGitHubAuthProfile())
@@ -1112,6 +1258,8 @@ ipcMain.handle("github-auth:logout", async () => {
   return null;
 });
 
+ipcMain.handle("active-files:detect", async () => detectActiveFilesFromMcpServers());
+
 ipcMain.handle("custom-tools:choose-directory", async () => {
   const options: OpenDialogOptions = {
     properties: ["openDirectory", "createDirectory"]
@@ -1120,7 +1268,12 @@ ipcMain.handle("custom-tools:choose-directory", async () => {
     ? await dialog.showOpenDialog(mainWindow, options)
     : await dialog.showOpenDialog(options);
 
-  return result.canceled ? null : result.filePaths[0];
+  if (result.canceled || !result.filePaths[0]) {
+    return null;
+  }
+
+  await approveCustomToolRoot(result.filePaths[0]);
+  return result.filePaths[0];
 });
 
 ipcMain.handle("custom-tools:choose-md-file", async () => {
@@ -1137,17 +1290,25 @@ ipcMain.handle("custom-tools:choose-md-file", async () => {
   }
 
   const filePath = result.filePaths[0];
+  await approveCustomToolFile(filePath);
   const content = await readFile(filePath, "utf8");
+  const metadata = parseToolMetadata(content) as Partial<CustomToolMetadata> & {
+    toolName?: string;
+  };
+  const name = String(metadata.toolName ?? metadata.name ?? basename(filePath).replace(/\.(md|markdown)$/i, ""));
   return {
     path: filePath,
-    name: basename(filePath).replace(/\.(md|markdown)$/i, ""),
+    name,
+    description: String(metadata.description ?? ""),
     preview: content.slice(0, 4000),
     isToolLike: isToolMarkdown(content),
-    riskWarnings: detectToolRiskWarnings(content)
+    riskWarnings: detectToolRiskWarnings(content),
+    toolSchema: parseToolRuntimeSchema(content)
   };
 });
 
 ipcMain.handle("custom-tools:list-md-files", async (_event, directory: string) => {
+  await assertApprovedCustomToolPath(directory, "툴 폴더");
   const entries = await readdir(directory, { withFileTypes: true });
   const files = entries.filter(
     (entry) => entry.isFile() && /\.(md|markdown)$/i.test(entry.name)
@@ -1157,7 +1318,7 @@ ipcMain.handle("custom-tools:list-md-files", async (_event, directory: string) =
     files.map(async (file) => {
       const filePath = join(directory, file.name);
       const content = await readFile(filePath, "utf8");
-      const metadata = parseMetadata(content) as Partial<CustomToolMetadata> & {
+      const metadata = parseToolMetadata(content) as Partial<CustomToolMetadata> & {
         toolName?: string;
       };
       const name = String(metadata.toolName ?? metadata.name ?? basename(file.name).replace(/\.(md|markdown)$/i, ""));
@@ -1171,7 +1332,8 @@ ipcMain.handle("custom-tools:list-md-files", async (_event, directory: string) =
         author: String(metadata.author ?? "Unknown"),
         sectionId: String(metadata.sectionId ?? "servers"),
         isToolLike: isToolMarkdown(content),
-        riskWarnings: detectToolRiskWarnings(content)
+        riskWarnings: detectToolRiskWarnings(content),
+        toolSchema: parseToolRuntimeSchema(content)
       };
     })
   );
@@ -1189,13 +1351,26 @@ ipcMain.handle(
     source: GitHubToolSource,
     metadata: CustomToolMetadata,
     options: GitHubPublishOptions
-  ) => publishMarkdownToolToGitHub(sourcePath, source, metadata, options)
+  ) => {
+    await assertApprovedCustomToolPath(sourcePath, "툴 파일");
+    return publishMarkdownToolToGitHub(sourcePath, source, metadata, options);
+  }
 );
 
 ipcMain.handle(
   "custom-tools:get-pr-state",
   async (_event, source: GitHubToolSource, pullRequestNumber: number) =>
     getGitHubPullRequestState(source, pullRequestNumber)
+);
+
+ipcMain.handle(
+  "custom-tools:reject-pr",
+  async (_event, source: GitHubToolSource, pullRequestNumber: number) =>
+    rejectGitHubPullRequest(source, pullRequestNumber)
+);
+
+ipcMain.handle("custom-tools:delete-tool-files", async (_event, paths: string[]) =>
+  deleteCustomToolFiles(paths)
 );
 
 ipcMain.handle("app-updates:get-latest-release", async (_event, source: GitHubToolSource) =>
@@ -1210,21 +1385,25 @@ ipcMain.handle(
     targetDirectory: string,
     metadata?: CustomToolMetadata
   ) => {
-  await mkdir(targetDirectory, { recursive: true });
-  const targetPath = metadata
-    ? await uniqueMarkdownPath(targetDirectory, metadata)
-    : join(targetDirectory, basename(sourcePath));
-  if (metadata) {
-    const content = await readFile(sourcePath, "utf8");
-    await writeFile(targetPath, `${formatMetadata(metadata)}${stripMetadata(content)}`, "utf8");
-  } else {
-    await copyFile(sourcePath, targetPath);
-  }
-  return targetPath;
+    await assertApprovedCustomToolPath(sourcePath, "원본 툴 파일");
+    await assertApprovedCustomToolPath(targetDirectory, "저장할 툴 폴더");
+    await mkdir(targetDirectory, { recursive: true });
+    const targetPath = metadata
+      ? await uniqueMarkdownPath(targetDirectory, metadata)
+      : join(targetDirectory, basename(sourcePath));
+    if (metadata) {
+      const content = await readFile(sourcePath, "utf8");
+      await writeFile(targetPath, `${formatMetadata(metadata)}${stripToolMetadata(content)}`, "utf8");
+    } else {
+      await copyFile(sourcePath, targetPath);
+    }
+    return targetPath;
   }
 );
 
 ipcMain.handle("custom-tools:compare-md-file", async (_event, leftPath: string, rightPath: string) => {
+  await assertApprovedCustomToolPath(leftPath, "기존 툴 파일");
+  await assertApprovedCustomToolPath(rightPath, "새 툴 파일");
   const [leftContent, rightContent] = await Promise.all([
     readFile(leftPath, "utf8"),
     readFile(rightPath, "utf8")

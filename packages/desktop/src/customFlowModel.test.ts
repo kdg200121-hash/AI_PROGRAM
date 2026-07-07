@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultFlowNodes,
+  activeFileOutputPortForSelections,
   applyFlowNodeDrag,
   flowConnectionEndpoint,
   flowNodeDisplayIconName,
   flowNodeWidth,
+  normalizeStoredBasicFlowNode,
   parseDraggedFlowTool,
+  removeNodeIdsFromFlowGroups,
   flowToolPalette,
   type FlowNode
 } from "./customFlowModel";
@@ -19,6 +22,21 @@ describe("customFlowModel", () => {
     ]);
     expect(flowToolPalette[0].outputs.map((port) => port.label)).toEqual(["객체", "Excel"]);
     expect(flowToolPalette[2].inputs.map((port) => port.label)).toEqual(["Excel", "좌표"]);
+  });
+
+  it("keeps built-in flow tools executable with settings schemas", () => {
+    expect(flowToolPalette[0].settingsSchema?.requiredServers).toEqual(["cad"]);
+    expect(flowToolPalette[0].settingsSchema?.mcpCommands[0]).toMatchObject({
+      server: "cad",
+      command: "cad.read_objects"
+    });
+    expect(flowToolPalette[0].settingsSchema?.settings.map((field) => field.id)).toContain(
+      "selection_scope"
+    );
+    expect(flowToolPalette[1].settingsSchema?.settings.map((field) => field.type)).toContain(
+      "overwrite-policy"
+    );
+    expect(flowToolPalette[2].settingsSchema?.resultSchema.type).toBe("revit_element_ids");
   });
 
   it("connects lines to the center of the visible port connector", () => {
@@ -50,6 +68,45 @@ describe("customFlowModel", () => {
     expect(parsed?.outputs).toEqual([]);
   });
 
+  it("preserves dragged custom tool settings schemas", () => {
+    const parsed = parseDraggedFlowTool(
+      JSON.stringify({
+        id: "menu-cad-tool",
+        programIcon: "cad",
+        name: "CAD 테스트 툴",
+        description: "설정 스키마 테스트",
+        inputs: [],
+        outputs: [{ id: "result", label: "결과", type: "table" }],
+        settingsSchema: {
+          risk: "read",
+          executionMode: "mcp",
+          requiredServers: ["cad"],
+          mcpCommands: [],
+          preflightChecks: [],
+          resultSchema: { type: "table", fields: [] },
+          failurePolicy: { partialSuccess: "report", rollback: "none", log: true },
+          settingsLayout: { mode: "simple", sections: [] },
+          settings: [
+            {
+              id: "layer_name",
+              label: "레이어",
+              type: "layer",
+              required: false,
+              default: "",
+              description: "읽을 레이어입니다."
+            }
+          ],
+          inputs: [],
+          outputs: [{ id: "result", label: "결과", type: "table" }],
+          testCases: []
+        }
+      })
+    );
+
+    expect(parsed?.settingsSchema?.settings[0].id).toBe("layer_name");
+    expect(parsed?.settingsSchema?.requiredServers).toEqual(["cad"]);
+  });
+
   it("shows prompt nodes as detached until they are attached to another node", () => {
     const promptNode: FlowNode = {
       nodeId: "prompt-1",
@@ -69,6 +126,114 @@ describe("customFlowModel", () => {
     );
   });
 
+  it("shows active file nodes as unknown until exactly one program is selected", () => {
+    const activeFileNode: FlowNode = {
+      nodeId: "active-file-1",
+      id: "basic-active-file",
+      programIcon: "activeFileUnknown",
+      name: "활성 파일",
+      description: "현재 열려 있는 파일을 입력값으로 사용합니다.",
+      inputs: [],
+      outputs: [],
+      x: 0,
+      y: 0
+    };
+
+    expect(flowNodeDisplayIconName(activeFileNode)).toBe("activeFileUnknown");
+    expect(
+      flowNodeDisplayIconName({
+        ...activeFileNode,
+        activeFileSelections: [
+          {
+            id: "active-excel",
+            label: "현재 Excel 통합문서",
+            program: "excel",
+            path: "열려 있는 Excel 파일.xlsx"
+          }
+        ]
+      })
+    ).toBe("excel");
+    expect(
+      flowNodeDisplayIconName({
+        ...activeFileNode,
+        activeFileSelections: [
+          {
+            id: "active-excel",
+            label: "현재 Excel 통합문서",
+            program: "excel",
+            path: "열려 있는 Excel 파일.xlsx"
+          },
+          {
+            id: "active-cad",
+            label: "현재 CAD 도면",
+            program: "cad",
+            path: "열려 있는 CAD 도면.dwg"
+          }
+        ]
+      })
+    ).toBe("activeFileUnknown");
+  });
+
+  it("uses the selected active file program as the output port type", () => {
+    expect(
+      activeFileOutputPortForSelections([
+        {
+          id: "active-cad",
+          label: "평택 1층 평면.dwg",
+          program: "cad",
+          path: "C:/project/평택 1층 평면.dwg"
+        }
+      ])
+    ).toMatchObject({
+      label: "CAD",
+      type: "cad",
+      iconName: "cad"
+    });
+  });
+
+  it("keeps basic path and active file nodes output-only when restoring stored nodes", () => {
+    const pathNode = normalizeStoredBasicFlowNode({
+      nodeId: "path-1",
+      id: "basic-path-select",
+      programIcon: "customTools",
+      name: "경로 지정",
+      description: "",
+      inputs: [{ id: "stale-input", label: "입력", type: "text", iconName: "textData" }],
+      outputs: [],
+      x: 0,
+      y: 0
+    });
+    const activeFileNode = normalizeStoredBasicFlowNode({
+      nodeId: "active-file-1",
+      id: "basic-active-file",
+      programIcon: "activeFileUnknown",
+      name: "활성 파일",
+      description: "",
+      inputs: [{ id: "stale-input", label: "입력", type: "file", iconName: "customTools" }],
+      outputs: [],
+      x: 0,
+      y: 0
+    });
+
+    expect(pathNode.inputs).toEqual([]);
+    expect(pathNode.outputs.map((port) => port.label)).toEqual(["경로"]);
+    expect(activeFileNode.inputs).toEqual([]);
+    expect(activeFileNode.outputs.map((port) => port.label)).toEqual(["활성 파일"]);
+    expect(
+      normalizeStoredBasicFlowNode({
+        ...activeFileNode,
+        activeFileSelections: [
+          {
+            id: "active-cad",
+            label: "평택 1층 평면.dwg",
+            program: "cad",
+            path: "C:/project/평택 1층 평면.dwg"
+          }
+        ]
+      }).outputs[0]
+    ).toMatchObject({ label: "CAD", type: "cad", iconName: "cad" });
+  });
+
   it("moves dragged nodes from their drag origins instead of accumulating from current positions", () => {
     const nodes = defaultFlowNodes();
     const origins = nodes.map((node) => ({ nodeId: node.nodeId, x: node.x, y: node.y }));
@@ -79,5 +244,19 @@ describe("customFlowModel", () => {
     expect(secondMove[0].y).toBe(origins[0].y + 15);
     expect(secondMove[1].x).toBe(origins[1].x + 42);
     expect(secondMove[1].y).toBe(origins[1].y + 15);
+  });
+
+  it("removes node ids from flow groups and drops empty groups", () => {
+    expect(
+      removeNodeIdsFromFlowGroups(
+        [
+          { id: "group-1", name: "Group 1", color: "#bfdbfe", nodeIds: ["node-a", "node-b"] },
+          { id: "group-2", name: "Group 2", color: "#bbf7d0", nodeIds: ["node-c"] }
+        ],
+        ["node-a", "node-c"]
+      )
+    ).toEqual([
+      { id: "group-1", name: "Group 1", color: "#bfdbfe", nodeIds: ["node-b"] }
+    ]);
   });
 });

@@ -11,13 +11,13 @@ describe("tool sharing policy", () => {
     ).toBe(false);
   });
 
-  it("requires review for risky tools even in open registration mode", () => {
+  it("keeps risky tools direct in open registration mode", () => {
     expect(
       shouldRequireSharedToolReview({
         mode: "open",
         riskWarnings: ["객체 삭제 동작이 감지되었습니다."]
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("requires review for every tool in approval mode", () => {

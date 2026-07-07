@@ -1,4 +1,4 @@
 interface:
   display_name: "Save Tool"
-  short_description: "Create local MD tool drafts from /save requests."
-  default_prompt: "Use $save-tool when I type /save ToolName to create a local Markdown tool draft."
+  short_description: "/save 명령으로 현재 대화를 분석해 이름 후보와 설정창 목업을 확인한 뒤 MD 툴 초안으로 저장합니다."
+  default_prompt: "/save 명령으로 현재 대화를 AI Program용 Markdown tool draft로 저장해줘. 대화 내용을 보고 툴 이름 후보를 제안하고, 설정창 구성이 잡히면 목업을 보여준 뒤 확인받아줘."

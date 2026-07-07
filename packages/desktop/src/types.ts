@@ -1,6 +1,7 @@
 import type { RegistryFile } from "@mcp-registry/shared";
 import type { NewMcpServerInput, UpdateMcpServerInput } from "@mcp-registry/core";
 import type { ServerProcessResult } from "./processMonitor";
+import type { ToolRuntimeSchema } from "./toolSettingsSchema";
 
 declare global {
   interface Window {
@@ -23,6 +24,17 @@ declare global {
     skillInstaller?: {
       installSaveTool: () => Promise<{ installedPath: string }>;
       installMcpToolBuilder: () => Promise<{ installedPath: string }>;
+      installProgramMcpRegistrar: () => Promise<{ installedPath: string }>;
+    };
+    activeFiles?: {
+      detect: () => Promise<
+        {
+          id: string;
+          label: string;
+          program: "cad" | "revit" | "excel" | "tekla";
+          path: string;
+        }[]
+      >;
     };
     githubAuth?: {
       getProfile: () => Promise<{
@@ -66,9 +78,11 @@ declare global {
       chooseMarkdownFile: () => Promise<{
         path: string;
         name: string;
+        description: string;
         preview: string;
         isToolLike: boolean;
         riskWarnings: string[];
+        toolSchema: ToolRuntimeSchema;
       } | null>;
       listMarkdownTools: (directory: string) => Promise<
         {
@@ -81,6 +95,7 @@ declare global {
           sectionId: string;
           isToolLike: boolean;
           riskWarnings: string[];
+          toolSchema: ToolRuntimeSchema;
         }[]
       >;
       listGithubTools: (source: {
@@ -99,6 +114,7 @@ declare global {
           sectionId: string;
           isToolLike: boolean;
           riskWarnings: string[];
+          toolSchema: ToolRuntimeSchema;
         }[]
       >;
       publishGithubTool: (
@@ -141,6 +157,23 @@ declare global {
         state: "open" | "closed" | "merged";
         mergedAt: string;
       }>;
+      rejectPullRequest: (
+        source: {
+          owner: string;
+          repo: string;
+          path: string;
+          ref?: string;
+        },
+        pullRequestNumber: number
+      ) => Promise<{
+        number: number;
+        url: string;
+        state: "open" | "closed" | "merged";
+        mergedAt: string;
+      }>;
+      deleteToolFiles: (
+        paths: string[]
+      ) => Promise<{ path: string; status: "deleted" | "skipped" | "failed"; message: string }[]>;
       copyMarkdownFile: (
         sourcePath: string,
         targetDirectory: string,

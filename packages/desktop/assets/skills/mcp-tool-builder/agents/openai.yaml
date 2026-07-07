@@ -1,4 +1,4 @@
 interface:
-  display_name: "MCP Tool Builder"
-  short_description: "AI Program용 MCP/MD 툴을 설계하고 Markdown 파일로 만드는 과정을 안내합니다."
-  default_prompt: "AI Program에서 사용할 MCP TOOL md 파일을 만들 수 있게 질문하면서 도와줘."
+  display_name: "/make MCP Tool"
+  short_description: "/make 툴이름 명령으로 설정창 목업과 실행 schema를 확인하며 MCP/MD 툴을 만듭니다."
+  default_prompt: "/make 툴이름 형식으로 AI Program에서 사용할 MCP TOOL md 파일을 만들 수 있게 필요한 설정값과 실행 흐름을 질문해줘. 툴이름이 없으면 대화 내용을 보고 후보를 제안하고, 설정창 구성이 잡히면 목업을 보여준 뒤 확인받아줘."

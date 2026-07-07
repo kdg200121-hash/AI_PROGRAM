@@ -30,5 +30,5 @@ export function shouldRequireSharedToolReview(input: {
   mode: ToolRegistrationMode;
   riskWarnings: string[];
 }) {
-  return input.mode === "approval" || input.riskWarnings.length > 0;
+  return input.mode === "approval";
 }

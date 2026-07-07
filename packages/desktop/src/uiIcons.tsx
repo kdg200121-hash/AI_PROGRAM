@@ -1,15 +1,18 @@
 import type { SVGProps } from "react";
 
 export type AppIconName =
+  | "activeFileUnknown"
   | "cad"
   | "customTools"
   | "download"
   | "excel"
+  | "folder"
   | "home"
   | "monitor"
   | "moreTools"
   | "objectData"
   | "numberData"
+  | "preview"
   | "promptAttached"
   | "promptDetached"
   | "revit"
@@ -46,6 +49,15 @@ export function AppIcon({ name, className = "", title }: AppIconProps) {
 
 function renderIcon(name: AppIconName, title?: string) {
   switch (name) {
+    case "activeFileUnknown":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <rect x="4.5" y="4.5" width="15" height="15" rx="3" />
+          <path d="M9.4 9.2a2.7 2.7 0 0 1 5.2.8c0 2.1-2.6 2.2-2.6 4" />
+          <path d="M12 16.8h.01" />
+        </svg>
+      );
     case "home":
       return (
         <svg {...baseSvgProps} viewBox="0 0 24 24" fill="currentColor">
@@ -97,6 +109,22 @@ function renderIcon(name: AppIconName, title?: string) {
           <path d="M16.6 4 15 20" />
           <path d="M5 9h14" />
           <path d="M4 15h14" />
+        </svg>
+      );
+    case "preview":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M3.8 12s2.8-5.2 8.2-5.2 8.2 5.2 8.2 5.2-2.8 5.2-8.2 5.2S3.8 12 3.8 12Z" />
+          <circle cx="12" cy="12" r="2.4" />
+        </svg>
+      );
+    case "folder":
+      return (
+        <svg {...baseSvgProps} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          {title ? <title>{title}</title> : null}
+          <path d="M3.8 7.4a2 2 0 0 1 2-2h4l2 2h6.4a2 2 0 0 1 2 2v7.2a2 2 0 0 1-2 2H5.8a2 2 0 0 1-2-2Z" />
+          <path d="M4 10h16" />
         </svg>
       );
     case "textData":

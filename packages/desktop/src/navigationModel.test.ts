@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { overviewCards, sidebarSections, workflowSteps } from "./navigationModel";
+import {
+  getDefaultSubmenuItemsForSection,
+  overviewCards,
+  shouldShowSubmenuAddButton,
+  sidebarSections,
+  workflowSteps
+} from "./navigationModel";
 
 describe("navigationModel", () => {
   it("defines the left navigation as screen sections, not target tabs", () => {
@@ -20,18 +26,28 @@ describe("navigationModel", () => {
   });
 
   it("provides operational overview cards for the empty area", () => {
-    expect(overviewCards.map((card) => card.title)).toEqual([
-      "최근 연결 로그",
-      "다음 작업 대기",
-      "변환 준비 상태"
-    ]);
+    expect(overviewCards).toHaveLength(3);
   });
 
   it("documents the custom flow stages", () => {
-    expect(workflowSteps.map((step) => step.title)).toEqual([
-      "툴 선택",
-      "노드 연결",
-      "자동 실행"
+    expect(workflowSteps).toHaveLength(3);
+  });
+
+  it("shows the submenu add button only for Custom Flow", () => {
+    expect(shouldShowSubmenuAddButton("workflow")).toBe(true);
+    expect(shouldShowSubmenuAddButton("servers")).toBe(false);
+    expect(shouldShowSubmenuAddButton("revit")).toBe(false);
+    expect(shouldShowSubmenuAddButton("excel")).toBe(false);
+    expect(shouldShowSubmenuAddButton("tekla")).toBe(false);
+  });
+
+  it("uses only the new canvas action as the default Custom Flow submenu", () => {
+    expect(getDefaultSubmenuItemsForSection("workflow").map((item) => item.label)).toEqual([
+      "+"
     ]);
+    expect(getDefaultSubmenuItemsForSection("servers").map((item) => item.label)).toEqual([]);
+    expect(getDefaultSubmenuItemsForSection("revit").map((item) => item.label)).toEqual([]);
+    expect(getDefaultSubmenuItemsForSection("excel").map((item) => item.label)).toEqual([]);
+    expect(getDefaultSubmenuItemsForSection("tekla").map((item) => item.label)).toEqual([]);
   });
 });

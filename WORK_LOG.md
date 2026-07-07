@@ -1197,3 +1197,400 @@
 - 노드/그룹/메모 이동 업데이트를 `requestAnimationFrame` 단위로 묶어 마우스 이동 이벤트가 과하게 들어와도 화면 갱신은 프레임 단위로 안정적으로 일어나게 했다.
 - 드래그 위치 계산을 `applyFlowNodeDrag` 함수로 분리하고, 이미 한 번 이동된 노드 배열이 들어와도 시작 위치 기준으로만 계산한다는 회귀 테스트를 추가했다.
 - 패키징 중 기존 `AI_PROGRAM.exe` 프로세스 4개가 release 폴더를 잠그고 있어 `EBUSY`가 발생했다. 실행 중인 앱을 종료한 뒤 `pnpm --filter @mcp-registry/desktop package:win`을 다시 실행해 최신 exe와 zip을 생성했다.
+
+## 2026-07-06 추가 150
+
+- Custom Flow를 실제 Chrome 디버그 창에서 열어 노드 드래그를 12단계로 이동시키며 확인했다. 좌표가 입력한 이동량대로 일정하게 변해 테스트 화면에서는 튐 현상이 재현되지 않았다.
+- 그룹 안의 노드를 우클릭해 `그룹에서 제거`를 실제로 눌렀을 때 저장된 그룹 목록에서 노드가 빠지지 않던 문제를 수정했다. 메뉴 닫힘 이벤트와 충돌하지 않도록 우클릭 메뉴의 pointer 이벤트를 보강하고, 그룹 제거 로직을 `removeNodeIdsFromFlowGroups` 함수와 테스트로 분리했다.
+- 기본도구의 `연결값 도구` 목록에서 `공용`, `Input`, `Output` 배지는 방향별 색상으로 통일하고, 적용 가능한 프로그램은 별도 배지로 표시하도록 정리했다. `객체` 항목처럼 긴 프로그램명이 세로로 눌리지 않게 버튼 레이아웃을 3줄 구조로 고정했다.
+- 기본도구 창 위에서 마우스 휠을 돌릴 때 캔버스 줌이 같이 움직이지 않도록 도구창 내부 wheel 이벤트 전파를 차단했다.
+- 커스텀 입력/출력 포트의 삭제 X 버튼을 작은 원형 버튼으로 바꾸고 입력/출력 방향에 맞게 자연스럽게 정렬되도록 스타일을 정리했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop build`, `pnpm --filter @mcp-registry/desktop package:win` 통과 후 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 다시 생성했다.
+
+## 2026-07-06 추가 151
+
+- Custom Flow를 다시 직접 열어 노드 이동, 그룹 만들기/해제, 메모 생성/편집/우클릭 삭제, 노드 검색, 도구창 휠 동작, 실행 중 노드 강조, 뒤로/앞으로, 노드 위 휠버튼 화면 이동을 점검했다.
+- 저장된 연결선이 빈 배열일 때 기본 연결선으로 되살아나는 문제를 발견했다. 모든 연결을 지운 상태가 사용자 저장 상태로 유지되도록 `WorkflowView` 초기화 로직을 수정했다.
+- 위 문제 때문에 흐름 점검이 연결선 없는 상태를 통과로 표시하던 문제도 함께 해결했다. 연결선이 없으면 `입력 미연결`, `연결 없음` 경고와 노드 배지가 표시되는 것을 실제 브라우저에서 확인했다.
+- 흐름 점검 메시지 파일의 깨진 한글 문구를 정상 한글로 교체하고, 빈 연결/빈 플로우를 검증하는 테스트를 추가했다.
+- 사용성 검토 결과, 상단 도구막대가 너무 투명해 비활성 버튼처럼 보일 수 있고, 좁은 화면에서는 상단 탭 제목이 많이 잘리는 점을 후속 개선 후보로 남겼다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop build`, `pnpm --filter @mcp-registry/desktop package:win` 통과 후 최신 exe를 다시 생성했다.
+
+## 2026-07-06 추가 152
+
+- 실행 버튼을 눌렀을 때 흐름 문제가 있으면 실행 애니메이션을 돌리지 않고 `실행 중단` 이슈로 표시하도록 변경했다. 해당 이슈는 노드 경고/오류 아이콘과 상단 흐름 점검 패널에 함께 표시된다.
+- 노드 경고/오류 아이콘의 기본 브라우저 title 툴팁을 제거하고 앱 내부 툴팁으로 바꿨다. hover 판정 영역은 실제 원형 아이콘 19px보다 큰 34px 영역으로 넓혀 마우스를 올렸을 때 설명이 안정적으로 뜨게 했다.
+- 드래그 중 흰 화면 문제를 재현하기 위해 기본 상태, 그룹 상태, 실행 이슈/흐름 점검 패널이 열린 상태에서 반복 드래그를 수행했지만 개발 서버 화면에서는 재현되지 않았다. 대신 Custom Flow 전용 오류 보호 패널을 추가해 렌더링 오류가 발생해도 전체 흰 화면 대신 오류 메시지와 새로고침 버튼이 표시되도록 했다.
+- 브라우저에서 연결선 없는 상태로 실행을 눌러 `실행 중단: 입력 미연결` 툴팁과 상단 흐름 점검 패널이 함께 표시되는 것을 확인했다. 25회 반복 드래그에서도 흰 화면, 콘솔 오류, 오류 보호 패널은 발생하지 않았다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop build` 통과. 기존 `AI_PROGRAM.exe` 4개가 release 폴더를 잠가 패키징이 한 번 실패했으나 종료 후 `pnpm --filter @mcp-registry/desktop package:win`을 통과해 최신 exe를 다시 생성했다.
+
+## 2026-07-06 추가 153
+
+- 사용자가 전달한 `Custom Flow 화면 오류 / Minified React error #185` 화면을 기준으로 실제 EXE를 디버그 포트로 실행해 확인했다. 최신 패키지에서는 동일 저장 그래프, 실행 클릭, 경고 아이콘 hover, 반복 드래그 상황에서 오류 패널이 재현되지 않았다.
+- React #185가 상태 업데이트 반복 오류 계열이므로, 실행 이슈 배열이 같은 내용일 때는 `setFlowRunIssues`를 다시 호출하지 않도록 비교 함수를 추가했다. 연결/노드 변경으로 실행 이슈를 비울 때도 이미 빈 배열이면 상태 업데이트를 건너뛰도록 바꿨다.
+- 오류 보호 패널이 React minified 코드만 보여주지 않도록 #185 메시지를 한국어 안내로 바꾸고, `화면 새로고침` 버튼이 과하게 커지지 않도록 스타일을 고정했다.
+- 실제 EXE에서 사용자 저장 그래프 기준으로 실행 후 상단 흐름 점검 패널과 노드 경고 툴팁이 표시되는 것을 확인했고, 10회 반복 드래그에서도 오류 패널은 재현되지 않았다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win` 통과 후 최신 exe를 다시 생성했다.
+
+## 2026-07-06 추가 154
+
+- 사용자가 `노드를 잡고 빠르게 움직이고 바로 놓으면 오류가 나고, 1초 기다렸다 놓으면 오류가 안 난다`고 알려준 조건을 기준으로 드래그 종료 로직을 다시 분석했다.
+- 빠른 mouseup 시 마지막 그룹/프롬프트 부착 대상 상태를 읽기 위해 `setState` updater 안에서 다른 `setState`를 호출하던 구조를 제거했다. 마지막 drop/attach 대상은 ref에 저장하고, 드래그 종료 시 ref를 읽어 한 번만 후처리하도록 변경했다.
+- `pointerup`과 `pointercancel`이 거의 동시에 들어와도 드래그 종료 후처리가 중복 실행되지 않도록 노드/그룹/메모 드래그 종료 함수에 idempotent guard를 추가했다.
+- 개발 서버에서 한 번 크게 이동 후 즉시 mouseup 하는 빠른 드래그를 40회 반복했고 오류 패널/흰 화면/콘솔 오류가 없음을 확인했다. 최신 EXE에서도 같은 조건을 50회 반복해 오류가 없음을 확인했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win` 통과 후 최신 exe를 다시 생성했다.
+
+## 2026-07-06 추가 155
+
+- `활성 파일`, `경로 지정`처럼 입력 포트가 없고 출력만 있는 기본 도구의 출력 텍스트가 왼쪽으로 붙지 않도록 output-only 포트 레이아웃을 오른쪽 정렬로 보정했다.
+- `활성 파일` 노드에 감지된 활성 파일 목록을 표시하고, CAD/Revit/Excel/Tekla 파일을 복수 선택할 수 있게 했다. 선택한 프로그램이 하나면 노드 앞 아이콘이 해당 프로그램 아이콘으로 바뀌고, 없거나 여러 프로그램이면 `?` 사각형 아이콘으로 표시된다.
+- `경로 지정` 노드에는 파일 선택 버튼을 추가해 파일 탐색기에서 고른 파일명을 노드 하단에 표시하도록 했다.
+- 붙어 있는 `프롬프트` 노드는 상위 노드를 이동할 때 함께 움직이도록 노드/그룹 드래그 대상 계산에 포함했다.
+- `Esc` 입력 시 흐름 점검에서 선택했던 노드/선 강조와 실행 이슈도 함께 해제되도록 보강했다. 입력창에 커서가 있는 상태에서 `Esc`를 눌러도 입력 종료와 메뉴/강조 해제가 같이 처리된다.
+- 실제 브라우저에서 활성 파일 Excel 선택 시 아이콘 변경, output-only 오른쪽 정렬, 빠른 노드 드래그 20회 반복을 확인했다. 오류 패널/흰 화면/콘솔 오류는 재현되지 않았다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win` 통과 후 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 다시 생성하고 실행했다.
+
+## 2026-07-06 추가 156
+
+- Custom Flow 상단 툴바가 좁은 화면에서 버튼을 다 표시하지 못할 때 가로 스크롤이 가능하도록 바꾸고, 좌우 끝에 작은 화살표 힌트를 표시했다.
+- 기본도구 아이콘 배경을 회색 계열로 통일했다. `결과 미리보기`는 눈 모양, `경로 지정`은 폴더 모양, `활성 파일`은 물음표 사각형, `프롬프트`는 연결 상태 아이콘을 사용한다.
+- `활성 파일`과 `경로 지정` 노드의 출력 포트 왼쪽 위치에 현재 선택/인식된 파일명을 요약 표시하도록 추가했다. 파일이 없으면 각각 `인식된 파일 없음`, `선택된 파일 없음`으로 표시된다.
+- 기본도구 노드끼리 배경색이 달라 보이지 않도록 `basic-*` 노드는 공통 회색 배경 팔레트를 사용하게 했다.
+- 실제 브라우저에서 활성 파일/경로 지정 노드의 왼쪽 파일명 표시, 기본도구 아이콘 클래스와 회색 배경, 툴바 overflow 설정을 확인했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win` 통과 후 최신 exe를 다시 생성하고 실행했다.
+
+## 2026-07-06 추가 157
+
+- 상단 툴바 자체에 가로 스크롤을 넣었던 변경을 되돌렸다. 이 방식이 `노드 검색`, `도구`, 뒤로가기 메뉴 클릭을 방해할 수 있어 버튼 줄은 고정하고, 열린 팝업 내부만 스크롤되도록 수정했다.
+- `노드 검색` 결과 영역과 뒤로가기 기록 메뉴에 최대 높이와 내부 스크롤을 추가해, 목록이 많아도 아래쪽이 잘리지 않게 했다.
+- `경로 지정` 폴더 아이콘과 기본도구 노드 아이콘은 회색 배경으로 보이도록 노드 아이콘 스타일을 보강했다.
+- `활성 파일`, `경로 지정` 노드에 추가한 파일명 요약 박스의 세로 위치를 출력 포트 행과 맞추도록 조정했다.
+- `Excel 내보내기`를 Custom Flow 기본도구에 추가하고, 왼쪽 Excel 메뉴에도 `Excel 내보내기`, `표 읽기`, `셀 값 업데이트`가 나오도록 카탈로그를 분리했다. 기존에는 Excel/Tekla/Custom Flow 메뉴가 CAD 카탈로그를 재사용하는 구조였다.
+- 노드 펼침 영역을 `작동 원리` / `설정` 탭으로 바꿨다. 설정 탭에서는 노드 이름, 설명, 작업 대상, 실행 옵션, 메모를 수정할 수 있고 저장 그래프에 같이 보존된다.
+- 검증: 샌드박스에서 `pnpm typecheck`와 `vitest`는 프로세스 실행 권한 문제로 막혔지만, `node node_modules/typescript/bin/tsc`를 패키지별로 직접 실행한 타입 검사는 통과했다. 현재 브라우저 직접 확인과 EXE 재패키징은 권한/사용량 제한 때문에 완료하지 못했다.
+
+## 2026-07-07 추가 158
+
+- 전날 권한/사용량 제한 때문에 미완료였던 정식 검증과 패키징을 이어서 완료했다.
+- `pnpm typecheck`가 shared/core/desktop 모두 통과했다.
+- `pnpm test`가 19개 테스트 파일, 69개 테스트 기준으로 통과했다.
+- `pnpm package:win`으로 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 다시 생성했고, 생성 후 앱을 실행했다.
+
+## 2026-07-07 추가 159
+
+- `mcp-tool-builder` 스킬을 설정 schema 중심으로 재작성했다. 커스텀 툴 MD 파일을 만들 때 `settings`, `inputs`, `outputs`, 위험도, 실패 처리, 결정적 실행 조건을 빠뜨리지 않도록 질문 흐름을 강화했다.
+- AI Revit / AI CAD 애드인을 나중에 MD 툴로 변환할 때 필요한 후보 설정값을 스킬에 추가했다. Revit은 카테고리, 패밀리/타입, 레벨, 뷰, 작업세트, 파라미터, 트랜잭션, 결과 로그를 확인하게 했고, CAD는 객체 타입, 레이어, 블록명, 좌표 기준, 허용 오차, 결과 레이어, 내보내기 경로를 확인하게 했다.
+- `save-tool` 스킬도 `/save 툴이름` 실행 시 단순 대화 요약으로 바로 저장하지 않고, 설정창에 들어갈 값이나 결정적 실행에 필요한 정보가 부족하면 먼저 질문하도록 바꿨다.
+- 두 스킬 모두 사용자가 질문 일부만 답하면 남은 질문을 임의로 넘기지 않고, 이유와 함께 2-4개 선택지와 추천안을 제시하도록 규칙을 추가했다.
+- `/save` 초안 생성 스크립트가 frontmatter에 `tool: true`, `deterministic: true`, `settings`, `inputs`, `outputs` 기본값을 넣도록 수정했다.
+- 앱에 포함되는 스킬(`packages/desktop/assets/skills`)과 실제 Codex 로컬 스킬(`C:\Users\Donggeon\.codex\skills`)을 같은 내용으로 동기화했다.
+- 검증: TypeScript 직접 검사 통과, 번들 Python으로 `create_tool_draft.py` 실행 확인.
+
+## 2026-07-07 추가 160
+
+- MCP TOOL 만들기 스킬의 호출 방식을 `/make <툴이름>` 기준으로 바꿨다. `/make`만 입력하면 대화 내용을 보고 툴 이름 후보를 먼저 제안하고, 정보가 부족하면 선택지를 제시해 물어보도록 규칙을 추가했다.
+- 앱 홈 화면의 `MCP TOOL 만들기` 항목과 설치 완료 안내 문구도 `/make MCP TOOL 만들기`, `/make 툴이름` 기준으로 변경했다.
+- 앱에 포함되는 `mcp-tool-builder` 스킬 메타데이터와 기본 프롬프트를 `/make` 기준으로 갱신했다.
+- 실제 Codex 로컬 스킬(`C:\Users\Donggeon\.codex\skills\mcp-tool-builder`)에도 같은 내용을 동기화했고, 최신 EXE 패키지 내부 리소스에도 `/make` 문구가 포함된 것을 확인했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm package:win` 통과.
+
+## 2026-07-07 추가 161
+
+- `save-tool`도 `/make`와 같은 방식으로 바꿨다. `/save <툴이름>`이면 해당 이름으로 저장하고, `/save`만 입력하면 현재 대화 내용을 분석해 2-4개 툴 이름 후보와 추천안을 먼저 제안하도록 규칙을 추가했다.
+- 앱 홈 화면의 `채팅을 TOOL로 저장` 설명과 `/SAVE` 설치 완료 안내 문구를 `/save` 또는 `/save 툴이름` 기준으로 정리했다.
+- 앱에 포함되는 `save-tool` 메타데이터와 실제 Codex 로컬 스킬(`C:\Users\Donggeon\.codex\skills\save-tool`)을 같은 내용으로 동기화했다.
+- 최신 EXE 패키지 내부 리소스에도 `/save` 변경이 포함된 것을 확인했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm package:win` 통과.
+
+## 2026-07-07 추가 162
+
+- `mcp-tool-builder` 스킬을 실행 가능한 MCP 툴 명세에 가깝게 보강했다. `/make`로 툴을 만들 때 MCP 서버, 명령 이름, 파라미터 매핑, 실행 순서, 서버 미연결 대응을 질문하도록 추가했다.
+- MD 툴 참조 문서에 `executionMode`, `requiredServers`, `mcpCommands`, `preflightChecks`, `resultSchema`, `failurePolicy`, `settingsLayout`, `testCases`를 추가했다.
+- 설정창 UI schema를 확장했다. 기본형, 기본/고급 분리, 단계별 설정, 반복 테이블 설정을 고를 수 있게 하고, 설정 필드마다 `section`, `advanced`, `preview`, `confirmOnChange` 같은 UI 힌트를 넣을 수 있게 했다.
+- 위험도를 읽기 전용, 파일 생성, 원본 수정, 대량 수정, 삭제/덮어쓰기 단계로 세분화했다.
+- `save-tool`도 같은 기준을 따르도록 수정했고, 초안 생성 스크립트가 새 frontmatter 기본 항목을 생성하도록 변경했다.
+- 앱에 포함되는 스킬과 실제 Codex 로컬 스킬(`C:\Users\Donggeon\.codex\skills`)을 같은 내용으로 동기화했다.
+- 최신 EXE 패키지 내부 리소스에도 보강한 스킬 항목이 포함된 것을 확인했다.
+- 검증 완료: 초안 생성 스크립트 실행 확인, `pnpm typecheck`, `pnpm test`, `pnpm package:win` 통과.
+
+## 2026-07-07 추가 163
+
+- MCP 툴을 한 번도 만들지 않았고 AI 사용에도 익숙하지 않은 사용자를 가정해 `/make`, `/save` 시나리오를 점검했다.
+- 테스트에서 발견한 첫 번째 부족점은 기술 질문이 너무 빨리 나올 수 있다는 점이었다. `mcp-tool-builder`와 `save-tool`에 초보 사용자 모드를 추가해 MCP 명령 이름, 포트, schema 같은 용어를 직접 묻지 않고, 실제 업무 기준 질문으로 받은 뒤 AI가 기술 명세 후보를 제안하도록 바꿨다.
+- 두 번째 부족점은 새 MD frontmatter의 `risk: modify/delete/bulk-modify` 같은 값이 앱 위험 감지에 직접 반영되지 않을 수 있다는 점이었다. `toolMarkdown` helper를 추가하고 Electron 메인 프로세스가 이를 사용하도록 바꿔, `tool: true`, `executionMode`, `mcpCommands`, `settings`, `inputs`, `outputs`를 툴 인식 신호로 보고 새 위험도도 경고로 감지하게 했다.
+- 세 번째 부족점은 참조 문서가 `name/program` 예시를 쓰고, 앱과 `/save`는 `toolName/sectionId`를 우선 사용해 기준이 섞일 수 있다는 점이었다. MD 참조 문서를 앱 기준인 `toolName`, `sectionId` 중심으로 통일하고 `name`, `program`은 호환/가독성 용도로만 설명했다.
+- 새 위험 감지 단위 테스트를 추가했다. 실행 가능한 MCP metadata가 있는 MD를 툴로 인식하는지, `risk: delete`, `risk: bulk-modify`, `mcpCommands` 기반 수정 위험을 감지하는지 확인한다.
+- 검증 완료: 초안 생성 스크립트가 `risk: "read"`와 실행 명세 필드를 생성하는 것 확인, `pnpm typecheck` 통과, `pnpm test` 20개 파일/73개 테스트 통과.
+- `pnpm package:win`으로 최신 EXE를 다시 생성했고, 패키지 내부 스킬 리소스와 번들 코드에 초보 사용자 모드 및 새 위험 감지 로직이 포함된 것을 확인했다.
+
+## 2026-07-07 추가 164
+
+- MD 툴 frontmatter의 실행/설정 schema를 앱에서 읽을 수 있도록 `toolSettingsSchema` 파서를 추가했다. `settings`, `inputs`, `outputs`, `requiredServers`, `mcpCommands.params`, `preflightChecks`, `resultSchema`, `failurePolicy`, `visibleWhen`을 읽는다.
+- Custom Tool 또는 More Tools에서 불러온 MD 툴의 schema가 Custom Flow 노드로 전달되도록 연결했다. 노드의 `설정` 탭에서는 schema에 따라 기본 설정, 고급 설정, 실행 전 요약, 실행 전 점검을 자동으로 표시한다.
+- CAD 객체 읽기, Excel 내보내기, Revit 배치 기본 노드에 1차 설정 schema를 넣었다. 선택 범위, 객체 타입, 저장 경로, 기존 파일 처리, 패밀리/레벨, 파라미터 매핑, 실패 처리 같은 설정을 노드 안에서 편집할 수 있다.
+- 설정창 UI에서 선택지가 없는 `layer`, `level`, `family-type`, `parameter` 같은 필드는 빈 드롭다운 대신 텍스트 입력으로 보이게 했다. 고급 설정 섹션은 접고 펼칠 수 있게 했다.
+- `/make`와 `/save` 스킬에 설정창 목업 확인 단계를 추가했다. 설정창 구성이 어느 정도 잡히면 AI가 한글 목업을 보여주고, 그대로 진행/항목 추가/항목 제거/순서 변경 중 선택을 받은 뒤 MD 파일을 만들도록 했다.
+- MD 툴 참조 문서에 `scope-picker`, `unit`, `tolerance`, `mapping-table`, `filter-builder`, `sort-rule`, `overwrite-policy`, `conflict-policy`, `backup-policy`, `transaction-policy`, `version-compatibility` 같은 설정 타입을 추가했다.
+- 앱에 포함되는 스킬과 실제 Codex 로컬 스킬(`C:\Users\Donggeon\.codex\skills`)을 같은 내용으로 동기화했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-07 추가 165
+
+- Custom Tool 등록창에 `설정창 미리보기` 패널을 추가했다. MD 파일의 schema가 앱에서 어떤 설정창으로 보일지 섹션, 필드, 입력/출력 포트, 위험도, 필요 MCP 서버 기준으로 확인할 수 있다.
+- `toolRuntimeValidation.ts`를 추가해 schema 정의 오류, 필수 설정값 누락, MCP 실행 계획 생성을 분리했다. `mcpCommands.params`의 `settings.xxx` 참조를 현재 설정값 또는 기본값으로 풀어 실행 계획을 만든다.
+- Custom Tool 저장 시 MCP 명령의 서버/명령 이름 같은 schema 오류가 있으면 저장 전에 막도록 했다. 경고는 미리보기 패널에서 보여주되 저장은 가능하다.
+- Custom Flow 흐름 점검에 노드별 필수 설정값 누락 검사를 연결했다. 노드 설정 탭에서 저장 경로, 레벨, 패밀리 타입 같은 필수값이 비어 있으면 흐름 점검과 노드 배지에 오류로 표시된다.
+- Custom Flow 노드 설정 탭에 `설정 검증`과 `테스트 실행 요약`을 추가했다. 노드가 실제 MCP 호출로 넘어가기 전에 필요한 서버, preflight, 설정 요약, 예정 MCP 명령과 파라미터를 볼 수 있다.
+- CAD 객체 읽기, Excel 내보내기, Revit 배치 기본 노드에 `planned` MCP 명령 계획을 추가했다. 실제 실행 엔진 연결 시 `buildToolExecutionPlan(schema, settingsValues).commands`를 호출 큐로 넘기면 된다.
+- 설정 필드 UI를 보강했다. `mapping-table`, `filter-builder`, `sort-rule`, `repeatable-list`는 textarea 대신 행 추가/삭제 방식의 작은 표 UI로 편집한다.
+- 기본 Excel 내보내기 노드의 저장 경로는 앱 첫 실행부터 오류가 뜨지 않도록 `ask_on_run` 기본값으로 바꿨다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 통과. 테스트는 22개 파일, 82개 테스트 기준으로 통과했다.
+
+## 2026-07-07 추가 166
+
+- Custom Flow 실행 모델을 `customFlowRunModel.ts`로 분리했다. 실행 범위(`전체`, `선택 노드만`, `선택 노드까지`, `선택 노드부터`), 노드별 중간결과 미리보기, 실행 전 영향 범위, 그룹을 재사용 툴 schema로 바꾸는 로직을 담당한다.
+- 실행 설정 메뉴를 확장해 `일괄 실행`/`단계별 실행`에 더해 실행 범위를 고를 수 있게 했다. 단계별 실행은 선택 범위 안에서 한 단계만 실행하는 방식으로 동작한다.
+- 실행 후 오른쪽에 실행 로그 타임라인 패널을 표시한다. 각 단계는 대기/실행 중/완료 상태를 보여주고, 상단에는 이번 실행의 영향 범위와 필요한 MCP 서버/예정 명령을 요약한다.
+- 노드 상세 탭에 `결과` 탭을 추가했다. 실행 로그 항목을 클릭하면 해당 노드로 이동하고 결과 탭이 열려 예상 중간결과와 영향 범위를 확인할 수 있다.
+- 그룹 헤더에 `툴 저장` 버튼을 추가했다. 그룹 내부 노드의 입력/출력/필요 MCP/명령 계획을 읽어 Custom Flow 기반 커스텀 툴로 저장한다.
+- 실행 로그/흐름 점검 패널 클릭이 캔버스 빈 곳 클릭으로 전파되어 선택이 해제되는 문제를 막았다.
+- 검증 완료: `customFlowRunModel.test.ts` 3개 테스트 통과, 전체 `vitest run` 23개 파일/85개 테스트 통과, shared/core/desktop 직접 TypeScript 검사 통과, `pnpm --filter @mcp-registry/desktop build` 통과. 브라우저에서 Custom Flow 실행 로그 5/5 완료와 로그 클릭 후 결과 탭 표시를 확인했다.
+
+## 2026-07-07 추가 167
+
+- 전체 리뷰에서 나온 우선순위 항목을 반영했다.
+- Custom Flow 실행 범위 계산을 노드 배열 순서가 아니라 연결선 그래프 기준 순서로 바꿨다. `전체`, `선택 노드까지`, `선택 노드부터`는 연결된 앞/뒤 노드를 따라 계산하고, 단계별 실행은 해당 범위의 첫 단계만 실행한다.
+- 그룹을 커스텀 플로우 툴로 저장할 때도 그룹 내부 노드를 연결선 기준 순서로 정렬해 입력/출력 fallback과 MCP 명령 순서가 화면 흐름과 맞도록 했다.
+- Custom Tools의 로컬 MD 파일 읽기/복사/비교/GitHub 업로드 IPC에 허용 경로 검사를 추가했다. 사용자가 선택한 툴 폴더는 Electron 사용자 데이터 폴더의 `custom-tool-roots.json`에 저장되고, 그 폴더 밖의 파일은 처리하지 않는다.
+- GitHub access token은 `safeStorage`로 암호화할 수 없으면 저장하지 않도록 바꿨다. 기존 평문 토큰 파일은 암호화 가능하면 자동 재저장하고, 불가능하면 토큰을 제거한다.
+- Electron `BrowserWindow` 보안 옵션을 명시했다. `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, `webSecurity: true` 기준이다.
+- `outputs/` 폴더를 `.gitignore`에 추가해 100MB 이상 산출물과 채팅 export가 실수로 커밋되지 않게 했다.
+- `README_HANDOFF.md`의 현재 안내 문구를 `/save`와 현재 사용자 홈 기준 경로로 정리했다.
+
+## 2026-07-07 추가 168
+
+- Custom Flow의 `활성 파일` 노드가 선택한 프로그램을 출력 포트 타입으로 사용하도록 수정했다. CAD만 선택하면 출력 포트가 `cad` 타입이 되어 `CAD 객체 읽기`의 CAD 입력과 포트 타입 불일치 경고가 나오지 않는다.
+- 저장된 `basic-active-file` 노드도 복원 시 선택된 프로그램 기준 출력 포트로 정규화되도록 했다.
+- `활성 파일` 노드의 첫 상세 탭 표시를 `작동 원리`에서 `프로그램`으로 바꿨다.
+- `활성 파일` 노드에 `새로고침` 버튼을 추가했다. Electron main process가 등록된 CAD/Revit MCP 서버의 `/active-file`, `/active_file`, `/current-file`, `/current_file`, `/status` endpoint를 시도하고, 응답에서 현재 파일명을 추출해 노드 선택 목록에 반영한다.
+- 아직 저장소 안에는 실제 CAD/Revit 브리지 endpoint 구현이 없으므로, 실제 파일명 표시가 되려면 브리지 쪽에서 위 endpoint 중 하나로 현재 파일 정보를 반환해야 한다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 25개 파일/93개 테스트 통과, `pnpm --filter @mcp-registry/desktop build` 통과. 브라우저에서 `도구`/`노드 검색` 상호 닫힘과 노드 `설정` 탭의 이름/설명 입력칸 제거를 확인했다.
+
+## 2026-07-07 추가 169
+
+- Custom Flow 오른쪽 위 도구막대에서 `도구` 버튼을 열 때 `노드 검색`, 실행 설정, 뒤로가기 목록이 같이 닫히도록 수정했다. 반대로 `노드 검색`을 열 때도 기존처럼 다른 메뉴가 닫힌다.
+- Custom Flow 노드 상세의 `설정` 탭에서 `노드 이름`, `설명` 직접 수정 칸을 제거했다. 설정 탭은 MCP 툴 실행에 필요한 설정값만 보여주는 방향으로 정리했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 25개 파일/93개 테스트 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 170
+
+- Custom Flow를 제외한 `Share Tools`, `Custom Tools`, 개별 커스텀 툴 페이지의 상단 제목/설명은 더 이상 클릭해서 수정할 수 없도록 했다.
+- 편집 가능 여부 규칙을 `submenuEditPolicy.ts`로 분리하고 테스트를 추가했다. 일반 사용자 생성 소메뉴는 계속 제목/설명 편집이 가능하다.
+- 검증 완료: `submenuEditPolicy.test.ts` 3개 테스트 통과, `pnpm typecheck`, `pnpm test` 26개 파일/96개 테스트 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 171
+
+- 우측 상단 MCP 상태 배지를 누르면 등록된 HTTP/SSE MCP 서버 URL, `/status`, `/active-file` endpoint를 실제로 요청해 화면 상태를 갱신하도록 했다. stdio 서버는 앱이 실행한 프로세스 상태를 기준으로 표시한다.
+- Custom Flow 노드의 `설정` 탭에 `저장한 설정` 영역을 추가했다. 현재 설정값을 프리셋으로 저장하고, 같은 툴 ID를 쓰는 다른 노드에서도 불러오거나 삭제할 수 있다.
+- Custom Flow 기본 진입 화면을 캔버스에서 메인 페이지로 바꿨다. 왼쪽은 샘플 공유 플로우, 오른쪽은 이 컴퓨터에 저장한 내 플로우 목록이며, `새 Custom Flow 만들기`를 누르면 기존 캔버스 편집 화면으로 들어간다.
+- 편집 화면 도구막대에 `메인`, `저장` 버튼을 추가했다. 저장한 플로우는 localStorage `mcp-registry:saved-custom-flows`에 저장된다. 공유 플로우의 실제 GitHub/서버 연결은 후속 단계로 남겼다.
+- `settingPresetModel.ts`, `customFlowLibrary.ts`를 추가해 프리셋과 저장 플로우 로직을 UI와 분리했고 테스트를 추가했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 28개 파일/102개 테스트 통과, `pnpm --filter @mcp-registry/desktop build` 통과. 브라우저에서 Custom Flow 메인 페이지, 새 플로우 진입, 설정 프리셋 영역, MCP 상태 점검 중 표시를 확인했다.
+- 사용자가 실제 화면이 그대로라고 알려준 뒤 확인한 결과, 실행 중인 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`가 오전 10:29 이전 빌드라 최신 코드가 반영되지 않은 상태였다. 실행 중인 기존 EXE 프로세스를 종료하고 `pnpm package:win`을 다시 실행해 오후 1:58 기준 최신 EXE를 생성한 뒤 실행했다.
+
+## 2026-07-07 추가 172
+
+- Custom Flow 캔버스에서 `Ctrl+S` 또는 `Meta+S`를 누르면 브라우저/앱 기본 저장창을 열지 않고 현재 캔버스 그래프를 즉시 저장하도록 했다.
+- 저장이 끝나면 기존 앱 하단 알림 시스템에 `저장되었습니다` 알림이 뜨도록 연결했다.
+- 단축키 판정을 `customFlowShortcut.ts`로 분리하고 테스트를 추가했다.
+- 검증 완료: `customFlowShortcut.test.ts` 2개 테스트 통과, `pnpm typecheck`, `pnpm test` 29개 파일/104개 테스트 통과.
+
+## 2026-07-07 추가 173
+
+- Custom Flow 노드 펼침/접힘 화살표 크기를 키워 클릭 위치를 더 명확하게 보이도록 했다.
+- Custom Flow 메인페이지에서는 `Ctrl+S` 저장과 자동저장이 작동하지 않도록 제한하고, 캔버스 편집 화면에서만 저장되게 했다.
+- `Ctrl+S` 저장 완료 알림은 일반 업데이트/설치 알림과 분리해 작은 `저장되었습니다` 토스트로 표시하고 약 2.2초 후 자동으로 사라지게 했다.
+- 왼쪽 메뉴의 `+` 소메뉴는 Custom Flow에만 남겼다. Custom Flow의 `+`는 커스텀툴 추가가 아니라 새 캔버스를 바로 여는 동작으로 바꿨다.
+- Custom Flow 소메뉴는 `공유 플로우`, `내 플로우`, `+` 구성으로 정리했다. CAD/Revit/Excel/Tekla 메뉴의 기본 `+`는 제거했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 30개 파일/110개 테스트 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 174
+
+- Custom Flow 왼쪽 메뉴를 `공유 플로우`, `내 플로우` 분류 항목이 아니라 실제 플로우 항목 목록으로 바꿨다.
+- 공유 플로우 샘플과 이 컴퓨터에 저장된 내 플로우를 왼쪽 메뉴에 함께 표시하고, 내 플로우는 최신 수정 순서로 정렬한다.
+- 왼쪽 메뉴에서 플로우 이름을 누르면 해당 플로우 그래프가 바로 Custom Flow 캔버스 편집 화면으로 열린다.
+- 저장/가져오기/복제/삭제/이름 변경으로 `savedFlows`가 바뀌면 왼쪽 메뉴 목록도 같이 갱신되도록 상위 App 상태와 동기화했다.
+- `customFlowLibrary`에 workflow 메뉴용 flow id 생성/파싱/목록화 함수를 추가하고 테스트를 보강했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 30개 파일/112개 테스트 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 175
+
+- Custom Flow 메인페이지 상단의 `새 Custom Flow 만들기` 버튼을 제거하고, `내 플로우` 패널 헤더 오른쪽의 작은 `+` 버튼으로 옮겼다.
+- 메인페이지의 `내 플로우` 카드에서 플로우 이름과 설명을 직접 수정할 수 있게 했다. 수정 내용은 저장 목록과 왼쪽 Custom Flow 메뉴에 함께 반영된다.
+- 왼쪽 메뉴에서 개별 플로우를 연 뒤 Custom Flow 메인 메뉴를 선택해도 내부 편집 모드가 메인페이지로 전환되도록 `homeRequestId` 흐름을 추가했다.
+- 개별 플로우 메뉴 항목이 일반 소메뉴 페이지로 렌더링되어 Custom Flow 캔버스가 숨겨질 수 있던 원인을 수정했다. workflow flow submenu는 `WorkflowView`가 계속 렌더링되게 처리한다.
+- 저장된 개인 플로우를 편집 중일 때 그래프가 저장본과 달라지면 메인페이지 이동 시 저장되지 않은 변경 경고를 띄운다. `Ctrl+S` 또는 편집 화면의 `저장` 버튼을 누르면 현재 개인 플로우 그래프에 덮어 저장한다.
+- `customFlowLibrary`에 저장 플로우 이름/설명 수정, 그래프 덮어쓰기, dirty 감지 함수를 추가하고 테스트를 보강했다.
+- 검증 완료: `customFlowLibrary.test.ts` 7개 테스트 통과, `pnpm typecheck`, `pnpm test` 30개 파일/114개 테스트 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 176
+
+- Custom Flow 왼쪽 메뉴의 `+`를 눌렀을 때 임시 캔버스만 열리고 저장 목록/메뉴에는 바로 추가되지 않던 흐름을 수정했다.
+- 이제 `+`를 누르면 즉시 `새 Custom Flow` 저장 항목을 만들고, 왼쪽 메뉴에 바로 추가한 뒤 해당 플로우 캔버스로 이동한다.
+- 다른 메뉴 화면에서 Custom Flow `+`를 눌러도 먼저 Custom Flow 화면으로 전환한 다음 새 플로우를 생성하도록 해서 화면 상태가 꼬이지 않게 했다.
+- Custom Flow 메인페이지의 `내 플로우 +` 버튼도 클릭 이벤트가 생성 source 값으로 잘못 들어가지 않도록 명시적으로 `menu` source를 넘기게 수정했다.
+- 검증 완료: `pnpm test` 30개 파일/114개 테스트 통과, `pnpm typecheck` 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 177
+
+- Home 메인페이지의 Other Tools 카드에서 `MCP 툴 만들기` 제목 앞에 붙어 있던 `/make` 표기를 제거했다. 사용 방법 설명에는 `/make 툴이름` 명령 안내를 유지했다.
+- CAD/Revit/Excel/Tekla 같은 프로그램 메뉴의 왼쪽 소메뉴에서 `Share Tools`, `Custom Tools` 분류 항목이 기본으로 뜨지 않도록 했다. 이제 프로그램 메뉴에는 실제 공유 툴과 등록된 커스텀 툴 항목만 표시된다.
+- Custom Flow 메뉴의 `+` 새 플로우 항목은 그대로 유지했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test -- navigationModel`, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 178
+
+- Home 메인페이지 Other Tools의 `MCP 툴 만들기` 설명에서 `툴이름` 문구를 제거했다. 설명은 `/make 명령하면 질문을 따라 설정, 입출력 포트가 있는 TOOL md 파일을 만듭니다.`로 정리했다.
+- Custom Flow 메뉴의 `+` 동작을 다시 점검했다. 이전 수정에서 `+` 클릭 시 즉시 저장 플로우를 만들고 저장 플로우 메뉴로 이동하던 것이 화면 꼬임의 원인이었다.
+- `+`는 이제 저장 목록을 만들지 않고 빈 캔버스만 연다. 사용자가 `저장` 또는 `Ctrl+S`로 저장할 때 내 플로우 목록과 왼쪽 메뉴에 추가된다.
+- 한 번 소비한 새 캔버스 생성 요청은 상위 상태에서 비워, 화면 전환이나 재렌더링 때 같은 요청이 반복 실행되지 않게 했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test -- customFlowLibrary navigationModel` 통과.
+
+## 2026-07-07 추가 179
+
+- 툴 상세 페이지 레이아웃을 사진 기준으로 재배치했다. `작동 원리`는 상단 전체 폭의 가로 패널로 두고, `설정`은 그 아래 전체 폭의 넓은 패널로 배치했다.
+- 커스텀 툴 MD에서 읽은 `settings` schema가 있으면 하단 `설정` 패널에 실제 설정 입력 UI가 표시되도록 연결했다. schema가 없는 기본 툴은 기존 작업 대상/실행 옵션/메모 기본 폼을 계속 보여준다.
+- 설정 schema가 많은 커스텀 툴도 하단 패널 안에서 스크롤되도록 하고, 일반 화면에서는 설정 필드를 2열로, 간소화/좁은 화면에서는 1열로 표시되게 했다.
+- `/make`, `/save` 스킬 문서에 새 툴 페이지 기준을 반영했다. 앞으로 설정창 목업은 상단 `작동 원리`, 하단 `설정` 패널 구조를 기준으로 만들도록 했다.
+- 앱에 포함된 스킬과 실제 Codex 로컬 스킬(`C:\Users\Donggeon\.codex\skills`)을 같은 내용으로 동기화했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test` 30개 파일/114개 테스트 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 180
+
+- Custom Flow 소메뉴 클릭 시 메인페이지가 뜨거나 더블클릭 후 `새 페이지` fallback이 보이던 원인을 수정했다.
+- 원인은 저장 플로우 소메뉴 ID가 `saved-flow:<flow-id>`처럼 내부에 `:`를 포함하는데, 탭/소메뉴 키 파서가 `workflow:saved-flow:<flow-id>`를 단순 `split(":")`로 잘라 실제 flow id를 버리던 문제였다.
+- 소메뉴 키 파서를 첫 번째 `:`만 기준으로 나누도록 바꿔 `workflow`와 `saved-flow:<flow-id>`가 정상 분리되게 했다.
+- Custom Flow 메뉴의 `+`는 사용자가 의도한 대로 `내 플로우`에 `새 페이지` 저장 항목을 즉시 만들고, 해당 캔버스를 바로 열도록 다시 맞췄다.
+- 검증 완료: `pnpm typecheck`, `pnpm test -- customFlowLibrary navigationModel`, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 178
+
+- `CAD 도면번호 일괄 순번 변경` MCP 툴 설계를 시작했다.
+- CAD DWG 파일을 여러 개 직접 선택하고, 불러온 목록에서 파일 추가/선택 삭제/위로 이동/아래로 이동으로 처리 순서를 조정하는 방향으로 정했다.
+- 첫 DWG에서 도곽 후보 블록을 표시해 사용자가 도곽을 선택하고, 기준 검색 문자(`P-` 등)를 포함한 Text/MText 위치를 도곽 기준 상대 위치로 인식하는 흐름으로 정했다.
+- 새 도면번호는 접두어, 시작번호, 직접 지정 자리수, 증가값을 기준으로 좌상단에서 우하단 방향으로 순번을 부여하는 방식으로 정했다.
+- 설정창 검토용 HTML 목업을 `outputs/cad-drawing-number-batch-renumber-mockup.html`에 추가했다.
+
+## 2026-07-07 추가 179
+
+- `/make`용 `mcp-tool-builder` 스킬과 `/save`용 `save-tool` 스킬의 절차를 업데이트했다.
+- 두 스킬 모두 MD 파일을 작성하기 전에 전체 도구 사양을 먼저 추출해 사용자 확인을 받도록 했다.
+- 전체 사양 승인 후 실제 HTML 설정창 목업을 `outputs/<safe-tool-name>-settings-mockup.html` 형태로 만들고, 그 HTML 화면을 확인받은 뒤에만 최종 MD 작성/저장을 진행하도록 했다.
+- HTML 목업에는 실제 AI Program 설정창 형태, 필드, 버튼, 경고, 미리보기/결과 영역, 목록 추가/삭제/정렬 컨트롤, 위험 작업 최종 확인 영역을 포함하도록 명시했다.
+- 앱 내장 스킬(`packages/desktop/assets/skills/...`)과 개인 설치 스킬(`C:\Users\Donggeon\.codex\skills\...`)을 같은 내용으로 동기화했다.
+
+## 2026-07-07 추가 180
+
+- 다른 채팅에서 수정된 `mcp-tool-builder` 스킬 지침을 다시 확인했다.
+- 새 지침의 HTML 목업 요구사항에 맞춰 `작동 원리`를 상단 전체 폭 패널로, `설정`을 하단의 큰 전체 폭 패널로 배치하는 구조를 반영했다.
+- 기존 오른쪽 설정 사이드바형 목업 대신 AI Program 툴 페이지 구조에 가까운 새 목업을 `outputs/cad-drawing-number-batch-renumber-settings-mockup.html`에 추가했다.
+- 새 목업에는 DWG 직접 선택/추가/삭제/순서 조정, 도곽 후보 선택, 기준 문자 기반 Text/MText 위치 인식, 새 도면번호 규칙, 변경 전/후 미리보기, 원본 DWG 직접 수정 확인 영역을 포함했다.
+
+## 2026-07-07 추가 181
+
+- 사용자가 HTML 설정창 목업을 승인해 `CAD 도면번호 일괄 순번 변경` 툴 MD 초안을 작성했다.
+- 초안 파일은 `tool-drafts/cad-drawing-number-batch-renumber.md`에 저장했다.
+- frontmatter에는 `risk: bulk-modify`, `requiredServers: cad`, planned CAD MCP 명령 계획, preflight checks, result schema, failure policy, settings layout, settings schema, inputs/outputs, test cases를 포함했다.
+- 본문에는 목적, 작동 원리, 설정 설명, MCP 명령 계획, 실행 조건, 주의사항, 예상 결과, 실패 처리, 테스트 예시를 정리했다.
+- planned MCP 명령은 아직 실제 CAD 브리지 구현/확인이 필요하다는 주석을 남겼다.
+
+## 2026-07-07 추가 182
+
+- `/make`와 `/save` 스킬에 승인된 한글 툴 이름을 frontmatter `toolName`과 첫 Markdown 제목에 그대로 넣도록 명시했다.
+- 영어 파일명, slug, command id는 저장 파일명/id/MCP 명령명에만 쓰고 AI Program 표시명에는 쓰지 않도록 규칙을 추가했다.
+- 사용자가 설명을 따로 주지 않아도 대상 프로그램, 입력/범위, 핵심 동작, 결과를 바탕으로 한글 한 문장 `description`을 자동 생성하도록 스킬 지침을 보강했다.
+- `mcp-tool-builder` reference 문서에도 `toolName` 한글 표시명 유지와 `description` 필수 생성 규칙을 추가했다.
+- `save-tool/scripts/create_tool_draft.py`가 `--description`이 비어 있을 때 본문 첫 설명 문장에서 자동 설명을 만들도록 수정했고, UTF-8 BOM이 있는 본문에서도 제목이 설명으로 들어가지 않게 처리했다.
+- AI Program 단일 MD 파일 선택 핸들러가 파일명 대신 frontmatter `toolName`을 우선 표시명으로 읽고, `description`도 등록 폼에 자동 입력되도록 `main.ts`, `types.ts`, `App.tsx`를 수정했다.
+- 기존 `tool-drafts/cad-drawing-number-batch-renumber.md`에는 호환용 `name: "CAD 도면번호 일괄 순번 변경"`을 추가했다.
+- 검증 완료: `pnpm test -- toolMarkdown` 30개 파일/114개 테스트 통과, `pnpm typecheck` 통과, `pnpm --filter @mcp-registry/desktop build` 통과, `create_tool_draft.py` 임시 실행에서 한글 `toolName`과 자동 생성 `description` 저장 확인, `git diff --check` 공백 오류 없음.
+
+## 2026-07-07 추가 182
+
+- Custom Flow의 `내 플로우` 페이지에서 상단 제목과 설명을 직접 수정할 수 있게 했다.
+- 원인은 저장 플로우 캔버스 페이지가 일반 소메뉴 렌더링을 막기 위해 `displaySubmenuItem`을 숨기면서, 기존 상단 `EditableText` 편집 UI도 같이 숨겨지던 구조였다.
+- 저장 플로우(`saved-flow`)일 때만 별도의 상단 편집 분기를 열고, 제목/설명 변경 요청을 `WorkflowView` 내부 저장 플로우 상태와 App의 왼쪽 메뉴 표시 상태에 함께 반영하도록 연결했다.
+- 공유 플로우는 기존처럼 읽기 전용으로 유지하고, 내 플로우만 편집 가능하게 했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test -- customFlowLibrary submenuEditPolicy`, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 183
+
+- 로그인하지 않은 상태에서는 프로그램 전체를 사용할 수 없도록 계정 접근 조건을 강화했다. 이제 GitHub 로그인 전에는 라이선스/승인 여부와 관계없이 `로그인이 필요합니다` 화면이 먼저 표시된다.
+- 로그인 후에는 기존처럼 관리자 승인, 라이선스 정책을 이어서 확인한다.
+- 툴 등록 폼의 `제작자`는 로그인한 계정의 닉네임으로 자동 입력되고 읽기 전용으로 표시되게 했다. 신규 등록과 버전 업데이트 저장 시에도 사용자가 입력한 값이 아니라 현재 로그인 닉네임을 강제로 사용한다.
+- 툴 등록 폼이 열린 상태에서 닉네임이 변경되면 제작자 표시도 자동으로 갱신되게 했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test -- githubAuthProfile toolSharingPolicy`, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 184
+
+- 커스텀 툴 등록 정책에서 `자유 등록`이면 위험 경고가 있어도 앱 승인/PR 검토를 강제로 요구하지 않도록 수정했다. 위험 경고는 카드의 `주의` 표시로만 남긴다.
+- Custom Tools 카드 UI를 정리했다. `주의` 배지는 툴 이름 왼쪽에 표시하고, 버전과 제작자는 오른쪽에 같은 줄로 정렬되게 했다. 의심 툴 카드 전체가 과하게 노란 배경으로 보이던 스타일도 완화했다.
+- 승인 대기 툴 목록에서 항목을 우클릭하면 관리자가 `거절`할 수 있게 했다. PR로 올라온 툴은 거절 시 GitHub PR도 닫도록 IPC를 추가했다.
+- 관리자 계정에서는 다른 사용자가 올린 새 승인 대기/PR 대기 툴이 감지되면 앱 알림이 뜨도록 했다.
+- 검증 완료: `pnpm test -- toolSharingPolicy`, `pnpm typecheck`, `pnpm --filter @mcp-registry/desktop build`, `pnpm package:win` 통과. 최신 exe를 다시 실행했다.
+
+## 2026-07-07 추가 185
+
+- 커스텀 툴 설정 schema의 `repeatable-list`에 파일 목록 메타데이터를 추가했다. `itemType: file`, `valueKey: file_path`, `accept: .dwg,.dxf`를 읽어 `항목 추가`가 파일 선택으로 동작하고 선택한 경로를 목록 값으로 저장하게 했다.
+- 설정창의 실행 전 요약, 점검, 설정 검증, 테스트 실행 요약은 기본 화면에 길게 펼치지 않고 하단 `검토` 아이콘 영역에서 필요할 때만 열어보도록 바꿨다.
+- `CAD 도면번호 일괄 순번 변경` MD와 HTML 목업을 단순화했다. 섹션은 `DWG 파일`, `인식 기준`, `번호 규칙`, 접힌 `실행`으로 줄이고, DWG 파일 목록은 실제 파일 선택 기반 repeatable-list로 명시했다.
+- `/make`와 `/save` 스킬 및 `ai-program-md-tool` reference에 파일 목록 설정 규칙과 검토 아이콘 접힘 패널 규칙을 추가했고, 개인 Codex 스킬 디렉터리에도 동기화했다.
+- 검증 완료: `pnpm test -- toolSettingsSchema` 30개 파일/115개 테스트 통과, `pnpm typecheck` 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 185
+
+- 프로그램 MCP 연결값을 만들고 검증하는 새 `/등록` 스킬(`program-mcp-registrar`)을 추가했다.
+- `/등록` 스킬은 AutoCAD, Revit, Excel, Tekla, Dynamo, 기타 프로그램 선택지를 먼저 제시하고, AI Program MCP 서버 등록값과 연결/실행 검증 순서를 정리하도록 했다.
+- 앱 홈의 Other Tools에 `프로그램 MCP 등록` 다운로드 항목을 추가하고, Electron IPC/preload/types에 설치 함수를 연결했다.
+- `/save 툴이름` 방식은 제거하고 `/save`만 지원하도록 `save-tool` 스킬 본문과 Other Tools 설명을 수정했다. `/save` 뒤에 적힌 말은 확정 이름이 아니라 참고 힌트로만 쓰게 했다.
+- 앱 내장 스킬과 현재 컴퓨터의 로컬 Codex 스킬 폴더를 동기화했다.
+- 설정 schema 렌더링의 기존 타입 오류(`repeatable-list` 안에서 불가능한 `field.type === "file"` 비교)를 정리했다.
+- 검증 완료: 스킬 frontmatter 간이 검증, `pnpm typecheck`, `pnpm test -- rendererBuild appNotificationModel`, `pnpm --filter @mcp-registry/desktop build`, `pnpm package:win` 통과. 최신 exe를 다시 실행했다.
+
+## 2026-07-07 추가 186
+
+- 관리자 계정에서 More Tools/Custom Tools 툴 항목을 우클릭하면 `삭제` 메뉴가 보이도록 했다.
+- 삭제 전 앱 디자인에 맞춘 확인창을 띄우고, 확인 시 앱 목록에서 제거하면서 연결된 원본 MD 파일도 삭제하도록 했다. 로컬 파일은 승인된 툴 경로에서 삭제하고, `github:` 경로는 GitHub contents API로 원본 파일을 삭제한다.
+- Custom Tools 목록 상단에 `전체`, `주의`, `승인 대기`, `등록됨`, `미등록` 필터를 추가했다.
+- 커스텀 툴 항목에 `createdAt` 등록일을 저장하고, 승인 대기 툴 목록에 `등록일` 열을 추가했다. 기존 날짜가 없는 툴은 `-`로 표시한다.
+- 검증 완료: `pnpm typecheck`, `pnpm test -- rendererBuild toolSharingPolicy`, `pnpm --filter @mcp-registry/desktop build`, `pnpm package:win` 통과. 최신 exe를 다시 실행했다.
+
+## 2026-07-07 추가 187
+
+- More Tools에서 앱 승인 상태와 GitHub PR 상태가 모두 `승인 대기`로 보여 사용자가 승인 후에도 승인 대기처럼 보이던 문제를 수정했다.
+- `승인 대기` 필터는 앱 승인 대기(`approvalStatus: pending`)만 걸러내도록 변경했다.
+- GitHub PR이 아직 열려 있는 경우 툴 이름 옆 배지는 `PR 대기`로 표시해 앱 승인 상태와 구분되게 했다.
+- 관리자가 앱 승인 버튼을 누르면 해당 툴은 즉시 `approved`와 `registered: true` 상태가 되도록 했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test -- rendererBuild toolSharingPolicy`, `pnpm --filter @mcp-registry/desktop build`, `pnpm package:win` 통과. 최신 exe를 다시 실행했다.
+
+## 2026-07-07 추가 186
+
+- `CAD 도면번호 일괄 순번 변경` 설정창 목업의 DWG 파일 목록에 파일별 분석 결과 표시를 추가했다.
+- 미리보기 전에는 `미분석`으로 보이고, 도곽/기준 문자 분석 후에는 각 파일 행에 `도곽 N개`와 `P-101~P-103` 같은 배정 번호 범위가 표시되는 방식으로 정했다.
+- MD 명세에도 `file_summaries` 출력 포트와 결과 표의 `파일별 도곽 수`, `파일별 번호 범위` 필드를 추가했다.
+
+## 2026-07-07 추가 187
+
+- 실제 설정 schema 렌더러도 파일별 분석 요약 배지를 표시할 수 있게 확장했다.
+- `repeatable-list` 파일 필드에 `showItemSummary`, `summaryCountKey`, `summaryRangeKey`, `pendingSummaryLabel`, `pendingRangeLabel`을 추가했다.
+- DWG 파일 목록 설정은 `title_block_count`와 `number_range`를 읽어 각 파일 행에 `도곽 N개`, `P-101~P-103` 형태로 표시하도록 명세를 갱신했다.
+- `/make`, `/save` 스킬과 MD reference에도 파일별 preview summary를 파일 행 옆 배지로 표시하는 규칙을 추가했고, 개인 Codex 스킬 디렉터리에 동기화했다.
+- 검증 완료: `pnpm test -- toolSettingsSchema` 30개 파일/115개 테스트 통과, `pnpm typecheck` 통과, `pnpm --filter @mcp-registry/desktop build` 통과.
+
+## 2026-07-07 추가 188
+
+- `data/registry.json` 기준 AutoCAD MCP(`localhost:5100`)와 Revit MCP(`localhost:5001`)는 이미 등록되어 있음을 확인했다.
+- Excel MCP를 `Excel MCP Bridge`, `http://localhost:5200/mcp`, 포트 `5200` 값으로 추가했다.
+- 현재 registry target 타입은 `cad | revit | other`만 지원하므로 Excel MCP는 임시로 `other` target에 등록했다.
+- 실제 실행 앱이 쓰는 `C:\Users\Donggeon\AppData\Roaming\ai-program\registry.json`에도 AutoCAD/Revit/Excel MCP 3개를 병합 등록했다. 기존 자동 감지 서버는 유지했고, 수정 전 백업은 같은 폴더의 `registry.backup-before-program-mcp-20260707.json`에 저장했다.
+- `Test-NetConnection` 확인 결과 AutoCAD/Revit/Excel MCP 포트는 모두 현재 응답하지 않았다. 실제 실행 확인은 각 프로그램과 MCP 브리지 실행 후 다시 해야 한다.

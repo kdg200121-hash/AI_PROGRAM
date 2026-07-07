@@ -19,6 +19,23 @@ def yaml_quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def auto_description(name: str, body: str) -> str:
+    first_body_line = next(
+        (
+            line.lstrip("\ufeff").strip()
+            for line in body.splitlines()
+            if line.lstrip("\ufeff").strip() and not line.lstrip("\ufeff").lstrip().startswith("#")
+        ),
+        "",
+    )
+    if first_body_line:
+        sentence = re.split(r"(?<=[.!?。！？])\s+|(?<=다\.)\s*", first_body_line, maxsplit=1)[0].strip()
+        sentence = sentence.strip("-: ")
+        if sentence:
+            return sentence[:120]
+    return f"{name} 작업을 AI Program에서 재사용할 수 있는 도구로 실행합니다."
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create a local AI Program Markdown tool draft.")
     parser.add_argument("--name", required=True, help="Tool name")
@@ -40,18 +57,40 @@ def main() -> int:
     if target_path.exists() and not args.overwrite:
         raise SystemExit(f"Refusing to overwrite existing file: {target_path}")
 
-    body = body_path.read_text(encoding="utf-8").strip()
+    body = body_path.read_text(encoding="utf-8-sig").strip()
+    description = args.description.strip() or auto_description(args.name, body)
     created_at = datetime.now(timezone.utc).isoformat()
     frontmatter = "\n".join(
         [
             "---",
+            "tool: true",
             f"toolName: {yaml_quote(args.name)}",
             f"version: {yaml_quote(args.version)}",
             f"author: {yaml_quote(args.author)}",
-            f"description: {yaml_quote(args.description)}",
+            f"description: {yaml_quote(description)}",
             f"sectionId: {yaml_quote(section_id)}",
             f"createdAt: {yaml_quote(created_at)}",
             'source: "codex-save-tool"',
+            'risk: "read"',
+            "deterministic: true",
+            'executionMode: "manual"',
+            "requiredServers: []",
+            "mcpCommands: []",
+            "preflightChecks: []",
+            "resultSchema:",
+            '  type: "text"',
+            "  fields: []",
+            "failurePolicy:",
+            '  partialSuccess: "report"',
+            '  rollback: "none"',
+            "  log: true",
+            "settingsLayout:",
+            '  mode: "simple"',
+            "  sections: []",
+            "testCases: []",
+            "settings: []",
+            "inputs: []",
+            "outputs: []",
             "---",
             "",
         ]

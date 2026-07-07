@@ -25,4 +25,12 @@ describe("getToolsForWorkspace", () => {
       "플로우 실행"
     ]);
   });
+
+  it("shows Excel tools on the Excel menu", () => {
+    expect(getToolsForWorkspace("excel").map((tool) => tool.name)).toEqual([
+      "Excel 내보내기",
+      "표 읽기",
+      "셀 값 업데이트"
+    ]);
+  });
 });

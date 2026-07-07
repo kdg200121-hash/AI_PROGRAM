@@ -1,5 +1,11 @@
 import { sidebarSections, type SidebarSectionId } from "./navigationModel";
 import type { AppIconName } from "./uiIcons";
+import {
+  defaultToolRuntimeSchema,
+  flowPortTypeFromToolType,
+  type ToolRuntimeSchema,
+  type ToolSettingValue
+} from "./toolSettingsSchema";
 
 export const customFlowGraphStorageKey = "mcp-registry:custom-flow-graph";
 
@@ -31,6 +37,7 @@ export interface FlowTool {
   description: string;
   inputs: FlowPort[];
   outputs: FlowPort[];
+  settingsSchema?: ToolRuntimeSchema;
 }
 
 export interface FlowNode extends FlowTool {
@@ -39,7 +46,39 @@ export interface FlowNode extends FlowTool {
   y: number;
   promptText?: string;
   attachedToNodeId?: string;
+  activeFileSelections?: FlowActiveFileSelection[];
+  pathSelection?: FlowPathSelection;
+  settings?: FlowNodeSettings;
+  settingsValues?: Record<string, ToolSettingValue>;
 }
+
+export interface FlowNodeSettings {
+  target: string;
+  options: string;
+  memo: string;
+}
+
+export interface FlowActiveFileSelection {
+  id: string;
+  label: string;
+  program: "cad" | "revit" | "excel" | "tekla";
+  path: string;
+}
+
+export interface FlowPathSelection {
+  name: string;
+  path: string;
+}
+
+const activeFileProgramOutputMeta: Record<
+  FlowActiveFileSelection["program"],
+  { label: string; type: FlowPortType; iconName: AppIconName }
+> = {
+  cad: { label: "CAD", type: "cad", iconName: "cad" },
+  revit: { label: "Revit", type: "revit", iconName: "revit" },
+  excel: { label: "Excel", type: "excel", iconName: "excel" },
+  tekla: { label: "Tekla", type: "object", iconName: "tekla" }
+};
 
 export interface FlowConnection {
   id: string;
@@ -87,6 +126,7 @@ interface FlowSubmenuItem {
   id: string;
   label: string;
   description: string;
+  settingsSchema?: ToolRuntimeSchema;
 }
 
 function sidebarLabel(sectionId: SidebarSectionId) {
@@ -113,7 +153,102 @@ export const flowToolPalette: FlowTool[] = [
     outputs: [
       makeFlowPort("objects", "객체", "object"),
       makeFlowPort("excel-table", "Excel", "excel")
-    ]
+    ],
+    settingsSchema: {
+      ...defaultToolRuntimeSchema,
+      risk: "read",
+      executionMode: "mcp",
+      requiredServers: ["cad"],
+      mcpCommands: [
+        {
+          server: "cad",
+          command: "cad.read_objects",
+          status: "planned",
+          params: {
+            scope: "settings.selection_scope",
+            objectTypes: "settings.object_types",
+            unit: "settings.unit",
+            tolerance: "settings.tolerance"
+          }
+        }
+      ],
+      settingsLayout: {
+        mode: "sections",
+        sections: [
+          { id: "input", label: "입력", defaultOpen: true },
+          { id: "filter", label: "필터", defaultOpen: true },
+          { id: "advanced", label: "고급 설정", defaultOpen: false }
+        ]
+      },
+      settings: [
+        {
+          id: "selection_scope",
+          label: "선택 범위",
+          type: "scope-picker",
+          required: true,
+          default: "current_selection",
+          description: "읽어올 CAD 객체 범위를 선택합니다.",
+          section: "input",
+          preview: true
+        },
+        {
+          id: "object_types",
+          label: "객체 타입",
+          type: "multi-select",
+          required: true,
+          default: ["line", "polyline", "block", "text"],
+          description: "수집할 CAD 객체 종류입니다.",
+          section: "filter",
+          options: [
+            { value: "line", label: "Line" },
+            { value: "polyline", label: "Polyline" },
+            { value: "block", label: "Block" },
+            { value: "text", label: "Text/MText" },
+            { value: "dimension", label: "Dimension" },
+            { value: "hatch", label: "Hatch" }
+          ],
+          preview: true
+        },
+        {
+          id: "unit",
+          label: "단위",
+          type: "unit",
+          required: true,
+          default: "mm",
+          description: "좌표와 길이를 해석할 단위입니다.",
+          section: "advanced",
+          advanced: true
+        },
+        {
+          id: "tolerance",
+          label: "허용 오차",
+          type: "tolerance",
+          required: false,
+          default: 0,
+          description: "중복/근접 판정에 사용할 거리 허용 오차입니다.",
+          section: "advanced",
+          advanced: true
+        }
+      ],
+      preflightChecks: [
+        {
+          id: "cad_connected",
+          label: "CAD MCP 연결",
+          severity: "error",
+          message: "CAD MCP 서버가 연결되어 있어야 합니다.",
+          blocksExecution: true
+        }
+      ],
+      resultSchema: {
+        type: "table",
+        fields: [
+          { id: "handle", label: "객체 핸들", type: "text" },
+          { id: "layer", label: "레이어", type: "text" },
+          { id: "x", label: "X 좌표", type: "number" },
+          { id: "y", label: "Y 좌표", type: "number" }
+        ]
+      }
+    }
   },
   {
     id: "excel-export",
@@ -121,7 +256,79 @@ export const flowToolPalette: FlowTool[] = [
     name: "Excel 내보내기",
     description: "앞 노드의 결과값을 Excel 표 형식으로 정리합니다.",
     inputs: [makeFlowPort("objects", "객체", "object")],
-    outputs: [makeFlowPort("excel-file", "Excel", "excel")]
+    outputs: [makeFlowPort("excel-file", "Excel", "excel")],
+    settingsSchema: {
+      ...defaultToolRuntimeSchema,
+      risk: "create",
+      executionMode: "mcp",
+      requiredServers: ["excel"],
+      mcpCommands: [
+        {
+          server: "excel",
+          command: "excel.write_table",
+          status: "planned",
+          params: {
+            source: "previous.result",
+            outputFolder: "settings.export_path",
+            fileName: "settings.file_name_template",
+            overwritePolicy: "settings.overwrite_policy"
+          }
+        }
+      ],
+      settingsLayout: {
+        mode: "sections",
+        sections: [
+          { id: "output", label: "결과", defaultOpen: true },
+          { id: "advanced", label: "고급 설정", defaultOpen: false }
+        ]
+      },
+      settings: [
+        {
+          id: "export_path",
+          label: "저장 경로",
+          type: "folder",
+          required: true,
+          default: "ask_on_run",
+          description: "Excel 파일을 저장할 폴더입니다. 기본값은 실행할 때 선택입니다.",
+          section: "output",
+          preview: true
+        },
+        {
+          id: "file_name_template",
+          label: "파일명 규칙",
+          type: "naming-template",
+          required: true,
+          default: "mcp_result_{date}.xlsx",
+          description: "저장할 Excel 파일명 규칙입니다.",
+          section: "output",
+          preview: true
+        },
+        {
+          id: "overwrite_policy",
+          label: "기존 파일 처리",
+          type: "overwrite-policy",
+          required: true,
+          default: "rename",
+          description: "같은 이름의 파일이 있을 때 처리 방식입니다.",
+          section: "advanced",
+          advanced: true,
+          confirmOnChange: true
+        }
+      ],
+      preflightChecks: [
+        {
+          id: "output_folder_exists",
+          label: "저장 폴더 확인",
+          severity: "error",
+          message: "Excel 파일을 저장할 폴더가 필요합니다.",
+          blocksExecution: true
+        }
+      ],
+      resultSchema: {
+        type: "file",
+        fields: [{ id: "path", label: "Excel 파일 경로", type: "file" }]
+      }
+    }
   },
   {
     id: "revit-place",
@@ -132,7 +339,88 @@ export const flowToolPalette: FlowTool[] = [
       makeFlowPort("excel-file", "Excel", "excel"),
       makeFlowPort("coordinates", "좌표", "number")
     ],
-    outputs: [makeFlowPort("revit-elements", "Revit", "revit")]
+    outputs: [makeFlowPort("revit-elements", "Revit", "revit")],
+    settingsSchema: {
+      ...defaultToolRuntimeSchema,
+      risk: "modify",
+      executionMode: "mcp",
+      requiredServers: ["revit"],
+      mcpCommands: [
+        {
+          server: "revit",
+          command: "revit.place_elements",
+          status: "planned",
+          params: {
+            familyType: "settings.family_type",
+            level: "settings.level",
+            parameterMapping: "settings.parameter_mapping",
+            transactionPolicy: "settings.transaction_policy"
+          }
+        }
+      ],
+      settingsLayout: {
+        mode: "sections",
+        sections: [
+          { id: "input", label: "입력", defaultOpen: true },
+          { id: "mapping", label: "매핑", defaultOpen: true },
+          { id: "safety", label: "안전 확인", defaultOpen: true }
+        ]
+      },
+      settings: [
+        {
+          id: "family_type",
+          label: "패밀리/타입",
+          type: "family-type",
+          required: true,
+          default: "",
+          description: "배치하거나 수정할 Revit 패밀리 타입입니다.",
+          section: "input",
+          preview: true
+        },
+        {
+          id: "level",
+          label: "레벨",
+          type: "level",
+          required: true,
+          default: "",
+          description: "요소를 배치할 기준 레벨입니다.",
+          section: "input",
+          preview: true
+        },
+        {
+          id: "parameter_mapping",
+          label: "파라미터 매핑",
+          type: "mapping-table",
+          required: false,
+          default: [],
+          description: "Excel 열과 Revit 파라미터를 연결합니다.",
+          section: "mapping"
+        },
+        {
+          id: "transaction_policy",
+          label: "실패 처리",
+          type: "transaction-policy",
+          required: true,
+          default: "rollback_all",
+          description: "실패했을 때 Revit 변경을 어떻게 처리할지 정합니다.",
+          section: "safety",
+          confirmOnChange: true
+        }
+      ],
+      preflightChecks: [
+        {
+          id: "revit_model_open",
+          label: "Revit 모델 열림",
+          severity: "error",
+          message: "Revit 모델이 열려 있어야 합니다.",
+          blocksExecution: true
+        }
+      ],
+      resultSchema: {
+        type: "revit_element_ids",
+        fields: [{ id: "element_id", label: "Revit 요소 ID", type: "text" }]
+      }
+    }
   }
 ];
 
@@ -140,8 +428,40 @@ export function flowNodeDisplayIconName(node: FlowNode): AppIconName {
   if (node.id === "basic-custom-prompt") {
     return node.attachedToNodeId ? "promptAttached" : "promptDetached";
   }
+  if (node.id === "basic-active-file") {
+    const programs = Array.from(
+      new Set((node.activeFileSelections ?? []).map((selection) => selection.program))
+    );
+    if (programs.length === 1) {
+      return programs[0];
+    }
+    return "activeFileUnknown";
+  }
 
   return node.programIcon;
+}
+
+export function activeFileOutputPortForSelections(
+  selections: FlowActiveFileSelection[] = []
+): FlowPort {
+  const programs = Array.from(new Set(selections.map((selection) => selection.program)));
+  if (programs.length === 1) {
+    const meta = activeFileProgramOutputMeta[programs[0]];
+    return makeFlowPort("active-file", meta.label, meta.type, meta.iconName);
+  }
+
+  return makeFlowPort("active-file", "활성 파일", "file", "activeFileUnknown");
+}
+
+export function withActiveFileOutputPort(node: FlowNode): FlowNode {
+  if (node.id !== "basic-active-file") {
+    return node;
+  }
+
+  return {
+    ...node,
+    outputs: [activeFileOutputPortForSelections(node.activeFileSelections)]
+  };
 }
 
 export function defaultFlowNodePosition(index: number) {
@@ -231,8 +551,17 @@ function flowToolFromMenuItem(sectionId: SidebarSectionId, submenu: FlowSubmenuI
     programIcon,
     name: submenu.label,
     description: submenu.description,
-    inputs: [makeFlowPort("input", sidebarLabel(sectionId), baseType, programIcon)],
-    outputs: [makeFlowPort("result", "결과", "any", programIcon)]
+    inputs: submenu.settingsSchema?.inputs.length
+      ? submenu.settingsSchema.inputs.map((port, index) =>
+          makeFlowPort(port.id || `input-${index}`, port.label, flowPortTypeFromToolType(port.type), programIcon)
+        )
+      : [makeFlowPort("input", sidebarLabel(sectionId), baseType, programIcon)],
+    outputs: submenu.settingsSchema?.outputs.length
+      ? submenu.settingsSchema.outputs.map((port, index) =>
+          makeFlowPort(port.id || `output-${index}`, port.label, flowPortTypeFromToolType(port.type), programIcon)
+        )
+      : [makeFlowPort("result", "결과", "any", programIcon)],
+    settingsSchema: submenu.settingsSchema
   };
 }
 
@@ -280,7 +609,8 @@ export function parseDraggedFlowTool(raw: string): FlowTool | null {
         : [makeFlowPort("input", "입력", "any")],
       outputs: Array.isArray(parsed.outputs)
         ? parsed.outputs.map((port, index) => normalizeFlowPort(port, `output-${index}`))
-        : [makeFlowPort("result", "결과", "any")]
+        : [makeFlowPort("result", "결과", "any")],
+      settingsSchema: parsed.settingsSchema
     };
   } catch {
     return null;
@@ -306,7 +636,8 @@ export function cloneFlowTool(tool: FlowTool): FlowTool {
   return {
     ...tool,
     inputs: tool.inputs.map((port) => ({ ...port })),
-    outputs: tool.outputs.map((port) => ({ ...port }))
+    outputs: tool.outputs.map((port) => ({ ...port })),
+    settingsSchema: tool.settingsSchema ? { ...tool.settingsSchema } : undefined
   };
 }
 
@@ -323,10 +654,22 @@ export function applyFlowNodeDrag(
   });
 }
 
+export function removeNodeIdsFromFlowGroups(groups: FlowGroup[], nodeIds: string[]) {
+  const removeSet = new Set(nodeIds);
+
+  return groups
+    .map((group) => ({
+      ...group,
+      nodeIds: group.nodeIds.filter((nodeId) => !removeSet.has(nodeId))
+    }))
+    .filter((group) => group.nodeIds.length > 0);
+}
+
 export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
   if (node.id === "basic-result-preview") {
     return {
       ...node,
+      programIcon: "preview",
       name: "결과 미리보기",
       description: "앞 노드의 결과를 이 노드 안에서 바로 확인합니다.",
       inputs: node.inputs.filter((port) => port.id === "result"),
@@ -337,6 +680,7 @@ export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
   if (node.id === "basic-path-select") {
     return {
       ...node,
+      programIcon: "folder",
       name: "경로 지정",
       description: "파일이나 폴더 경로를 다음 노드 입력값으로 전달합니다.",
       inputs: [],
@@ -347,18 +691,19 @@ export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
   }
 
   if (node.id === "basic-active-file") {
-    return {
+    return withActiveFileOutputPort({
       ...node,
+      programIcon: "activeFileUnknown",
       name: "활성 파일",
       description: "CAD, Excel, Revit처럼 현재 열려 있는 파일을 입력값으로 사용합니다.",
-      inputs: [],
-      outputs: [makeFlowPort("active-file", "활성 파일", "file", "customTools")]
-    };
+      inputs: []
+    });
   }
 
   if (node.id === "basic-custom-prompt") {
     return {
       ...node,
+      programIcon: node.attachedToNodeId ? "promptAttached" : "promptDetached",
       name: "프롬프트",
       description: "노드 아래에 붙여 실행 프롬프트에 문장을 추가합니다.",
       inputs: [],
@@ -369,7 +714,6 @@ export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
 
   return node;
 }
-
 export function defaultFlowNodes() {
   return [
     { ...cloneFlowTool(flowToolPalette[0]), nodeId: "node-cad-read", ...defaultFlowNodePosition(0) },
@@ -427,7 +771,44 @@ export function loadStoredFlowGraph(): StoredFlowGraph | null {
           y: Number(node.y ?? defaultFlowNodePosition(index).y),
           promptText: typeof node.promptText === "string" ? node.promptText : undefined,
           attachedToNodeId:
-            typeof node.attachedToNodeId === "string" ? node.attachedToNodeId : undefined
+            typeof node.attachedToNodeId === "string" ? node.attachedToNodeId : undefined,
+          activeFileSelections: Array.isArray(node.activeFileSelections)
+            ? node.activeFileSelections
+                .map((selection) => ({
+                  id: String(selection.id ?? ""),
+                  label: String(selection.label ?? ""),
+                  program: selection.program,
+                  path: String(selection.path ?? "")
+                }))
+                .filter((selection) =>
+                  selection.id &&
+                  selection.label &&
+                  ["cad", "revit", "excel", "tekla"].includes(selection.program)
+                )
+            : undefined,
+          pathSelection:
+            node.pathSelection && typeof node.pathSelection === "object"
+              ? {
+                  name: String(node.pathSelection.name ?? ""),
+                  path: String(node.pathSelection.path ?? "")
+                }
+              : undefined,
+          settings:
+            node.settings && typeof node.settings === "object"
+              ? {
+                  target: String(node.settings.target ?? ""),
+                  options: String(node.settings.options ?? ""),
+                  memo: String(node.settings.memo ?? "")
+                }
+              : undefined,
+          settingsSchema:
+            node.settingsSchema && typeof node.settingsSchema === "object"
+              ? (node.settingsSchema as ToolRuntimeSchema)
+              : toolDefaults?.settingsSchema,
+          settingsValues:
+            node.settingsValues && typeof node.settingsValues === "object"
+              ? (node.settingsValues as Record<string, ToolSettingValue>)
+              : undefined
         });
       }),
       connections: parsed.connections

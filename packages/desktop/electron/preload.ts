@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { ToolRuntimeSchema } from "../src/toolSettingsSchema";
 import type { RegistryFile } from "@mcp-registry/shared";
 import type { NewMcpServerInput, UpdateMcpServerInput } from "@mcp-registry/core";
 import type { ServerProcessResult } from "../src/processMonitor";
@@ -37,7 +38,21 @@ contextBridge.exposeInMainWorld("skillInstaller", {
   installSaveTool: async () =>
     ipcRenderer.invoke("skills:install-save-tool") as Promise<{ installedPath: string }>,
   installMcpToolBuilder: async () =>
-    ipcRenderer.invoke("skills:install-mcp-tool-builder") as Promise<{ installedPath: string }>
+    ipcRenderer.invoke("skills:install-mcp-tool-builder") as Promise<{ installedPath: string }>,
+  installProgramMcpRegistrar: async () =>
+    ipcRenderer.invoke("skills:install-program-mcp-registrar") as Promise<{ installedPath: string }>
+});
+
+contextBridge.exposeInMainWorld("activeFiles", {
+  detect: async () =>
+    ipcRenderer.invoke("active-files:detect") as Promise<
+      {
+        id: string;
+        label: string;
+        program: "cad" | "revit" | "excel" | "tekla";
+        path: string;
+      }[]
+    >
 });
 
 contextBridge.exposeInMainWorld("githubAuth", {
@@ -89,6 +104,7 @@ contextBridge.exposeInMainWorld("customTools", {
       preview: string;
       isToolLike: boolean;
       riskWarnings: string[];
+      toolSchema: ToolRuntimeSchema;
     } | null>,
   listMarkdownTools: async (directory: string) =>
     ipcRenderer.invoke("custom-tools:list-md-files", directory) as Promise<
@@ -102,6 +118,7 @@ contextBridge.exposeInMainWorld("customTools", {
         sectionId: string;
         isToolLike: boolean;
         riskWarnings: string[];
+        toolSchema: ToolRuntimeSchema;
       }[]
     >,
   listGithubTools: async (source: {
@@ -121,6 +138,7 @@ contextBridge.exposeInMainWorld("customTools", {
         sectionId: string;
         isToolLike: boolean;
         riskWarnings: string[];
+        toolSchema: ToolRuntimeSchema;
       }[]
     >,
   publishGithubTool: async (
@@ -171,6 +189,25 @@ contextBridge.exposeInMainWorld("customTools", {
       state: "open" | "closed" | "merged";
       mergedAt: string;
     }>,
+  rejectPullRequest: async (
+    source: {
+      owner: string;
+      repo: string;
+      path: string;
+      ref?: string;
+    },
+    pullRequestNumber: number
+  ) =>
+    ipcRenderer.invoke("custom-tools:reject-pr", source, pullRequestNumber) as Promise<{
+      number: number;
+      url: string;
+      state: "open" | "closed" | "merged";
+      mergedAt: string;
+    }>,
+  deleteToolFiles: async (paths: string[]) =>
+    ipcRenderer.invoke("custom-tools:delete-tool-files", paths) as Promise<
+      { path: string; status: "deleted" | "skipped" | "failed"; message: string }[]
+    >,
   copyMarkdownFile: async (
     sourcePath: string,
     targetDirectory: string,

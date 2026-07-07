@@ -98,7 +98,7 @@ logs
 - GitHub OAuth scope는 `read:user public_repo`입니다. 기존 로그인 토큰에 `public_repo` 권한이 없으면 툴 등록 PR 생성이 실패할 수 있으므로 로그아웃 후 다시 로그인해야 합니다.
 - GitHub OAuth App Client ID는 `data/github-oauth.json`에 들어 있으며 패키징된 앱에 포함됩니다. 일반 사용자는 별도 환경 변수를 설정하지 않아도 됩니다.
 - 개발 중 다른 OAuth App을 쓰고 싶으면 실행 환경에 `AI_PROGRAM_GITHUB_CLIENT_ID` 또는 `VITE_GITHUB_CLIENT_ID`를 설정해 bundled 값을 덮어쓸 수 있습니다.
-- GitHub access token은 renderer localStorage가 아니라 Electron 사용자 데이터 폴더의 `github-auth.json`에 저장합니다. Electron `safeStorage`를 사용할 수 있으면 `safe:` prefix로 암호화해 저장하고, renderer에는 GitHub ID/닉네임/아바타 URL만 노출합니다.
+- GitHub access token은 renderer localStorage가 아니라 Electron 사용자 데이터 폴더의 `github-auth.json`에 저장합니다. Electron `safeStorage`로 암호화할 수 있을 때만 `safe:` prefix로 저장하고, 암호화할 수 없으면 토큰 저장과 로그인을 중단합니다. renderer에는 GitHub ID/닉네임/아바타 URL만 노출합니다.
 - 같은 GitHub 계정으로 다시 인증할 때 닉네임 입력이 비어 있으면 GitHub 이름으로 덮지 않고 기존 저장 닉네임을 유지합니다. 사용자가 회원정보에서 새 닉네임을 저장하거나 재인증 화면에서 새 닉네임을 입력한 경우에만 닉네임이 바뀝니다.
 - `github-auth.json`은 Electron 사용자 데이터 폴더에 남기 때문에 로그아웃하지 않는 한 앱 재시작이나 PC 재부팅 후에도 로그인 상태가 유지됩니다. GitHub 토큰이 사용자가 직접 취소되거나 파일이 삭제되면 다시 인증해야 합니다.
 - 툴 등록 신규 폼의 제작자 기본값은 로그인 닉네임을 우선 사용하고, 로그인 전에는 `kdg200121-hash`를 사용합니다.
@@ -111,7 +111,7 @@ logs
 - 회원가입 승인제에서 승인 대기 계정은 `Settings > 관리 > 회원 목록`에 표시됩니다.
 - 툴 등록 승인제에서 일반 사용자가 추가한 커스텀 툴은 `승인 대기` 배지와 함께 Custom Tools / More Tools 목록에 표시되고, 관리자 승인 후 등록/해제 버튼을 사용할 수 있습니다.
 - 현재 계정 정책과 회원 목록은 앱 localStorage 기반입니다. 다른 컴퓨터까지 중앙에서 강제하려면 GitHub 저장소 또는 별도 서버에 정책/회원 목록을 동기화하는 후속 구현이 필요합니다.
-- Home의 `Other Tools` 카드는 `채팅을 TOOL로 저장` 안내와 다운로드 아이콘 버튼을 표시합니다. 버튼을 누르면 앱에 포함된 `save-tool` Codex 스킬이 현재 사용자 `~/.codex/skills/save-tool`에 설치되어, `/SAVE 툴이름` 명령으로 해당 채팅을 로컬 MD TOOL 초안으로 저장할 수 있습니다.
+- Home의 `Other Tools` 카드는 `채팅을 TOOL로 저장` 안내와 다운로드 아이콘 버튼을 표시합니다. 버튼을 누르면 앱에 포함된 `save-tool` Codex 스킬이 현재 사용자 `~/.codex/skills/save-tool`에 설치되어, `/save 툴이름` 명령으로 해당 채팅을 로컬 MD TOOL 초안으로 저장할 수 있습니다.
 - `save-tool` 설치 원본은 `packages/desktop/assets/skills/save-tool`에 있으며, Windows 패키징 시 release 앱 리소스에 같이 포함됩니다.
 - `save-tool` 설치 경로는 Electron `app.getPath("home")` 기준이라 다른 컴퓨터에서는 그 컴퓨터의 현재 사용자 홈 아래 `.codex/skills/save-tool`에 설치됩니다.
 - 앱 하단에는 검정 배경/흰 글씨의 전역 알림 토스트 영역이 있습니다. 현재는 업데이트/중요 안내 표시 위치를 확인하는 기본 알림을 띄우며, 실제 새 버전 확인 로직은 아직 연결되지 않았습니다.
@@ -124,7 +124,7 @@ logs
 - Custom Tools / More Tools를 열거나 새로고침하면 PR 번호가 있는 툴의 GitHub PR 상태를 갱신합니다.
 - Settings > 관리에는 `승인 대기 툴` 목록이 있으며 앱 승인, PR 보기, PR 상태 새로고침을 할 수 있습니다.
 - 툴 등록 폼은 `.md/.markdown` 파일 선택 후 MD 미리보기와 위험 감지 결과를 표시합니다.
-- Codex 사용자 스킬 `save-tool`은 `C:\Users\DONG KIM\.codex\skills\save-tool`에 설치되어 있습니다. 사용자가 `/save 툴이름`을 요청하면 GitHub 업로드 없이 로컬 `tool-drafts/툴이름.md` 초안을 만드는 용도입니다.
+- Codex 사용자 스킬 `save-tool`은 현재 Windows 사용자 홈의 `.codex\skills\save-tool`에 설치됩니다. 사용자가 `/save 툴이름`을 요청하면 GitHub 업로드 없이 로컬 `tool-drafts/툴이름.md` 초안을 만드는 용도입니다.
 - GitHub에서 읽어오는 목록 동기화, GitHub Device Flow 로그인, 안전 툴 직접 commit, 위험/승인제 툴 Pull Request 생성, Pull Request 상태 추적은 연결되어 있습니다.
 - GitHub Releases latest를 확인해 현재 앱 버전보다 새 릴리스가 있으면 하단 알림을 표시합니다. 실제 자동 업데이트 설치는 아직 연결되지 않았습니다.
 - `packages/desktop/src/toolSharingPolicy.ts`는 공유 승인 정책과 버전 비교를 담당합니다. `App.tsx`가 커져 있으므로 이후 컴포넌트 분리는 `ToolMarketDialog`, `SettingsManagementPanel`, `TabStrip` 순서로 진행하는 것이 좋습니다.
@@ -144,7 +144,9 @@ logs
 - Custom Flow 캔버스 오른쪽 위에는 `흐름 점검` 아이콘 위젯이 있습니다. `packages/desktop/src/customFlowValidation.ts`에서 없는 노드/포트, 포트 타입 불일치, 연결되지 않은 입력을 검사합니다.
 - 흐름 점검 아이콘은 정상/경고/오류 상태별로 색이 다르고, 경고/오류가 있으면 왼쪽 위 배지에 개수를 표시합니다. 항목을 클릭하면 관련 연결선이나 노드가 붉은색 계열로 하이라이트됩니다.
 - Custom Flow 캔버스 오른쪽 위에는 뒤로가기, 되돌릴 위치 선택, 앞으로가기, 실행, 실행 설정 도구막대가 있습니다. 평소에는 반투명이고 hover/focus 시 선명해집니다.
-- 실행 설정에서는 `일괄 실행`과 `단계별 실행`을 고를 수 있습니다. 현재는 실제 MCP 실행 엔진 연결 전 UI 단계라 실행 중인 노드 강조 상태만 표시합니다.
+- 실행 설정에서는 `일괄 실행`과 `단계별 실행`을 고르고, 실행 범위를 `전체 흐름`, `선택 노드만`, `선택 노드까지`, `선택 노드부터` 중에서 선택할 수 있습니다. 현재는 실제 MCP 실행 엔진 연결 전 UI/모델 단계라 실행 중인 노드 강조, 실행 로그, 예상 중간결과를 표시합니다.
+- Custom Flow를 실행하면 오른쪽에 실행 로그 타임라인이 열립니다. 상단에는 이번 실행의 영향 범위, 필요 MCP 서버, 예정 MCP 명령을 요약하고, 각 로그 항목을 클릭하면 해당 노드로 이동해 `결과` 탭을 엽니다.
+- Custom Flow 노드 상세에는 `작동 원리`, `설정`, `결과` 탭이 있습니다. `결과` 탭은 실행 후 노드별 중간결과 미리보기, 주요 값, 샘플 행, 실행 전 영향 범위를 보여줍니다.
 - Custom Flow에서는 빈 캔버스를 드래그해 여러 노드를 박스 선택할 수 있고, 선택된 노드 하나를 드래그하면 선택 묶음이 함께 이동합니다. `Ctrl/Shift` 클릭은 노드 선택을 토글합니다.
 - Custom Flow에서 노드 헤더를 `Shift`를 누른 상태로 드래그하면 Smart Guides가 활성화됩니다. 다른 노드의 left/center/right, top/middle/bottom 기준에 가까우면 위치가 자동으로 붙고, 세 노드가 나란히 있을 때 같은 간격 위치도 스냅합니다. 같은 간격 스냅에는 `60px` 같은 치수 라벨이 함께 표시됩니다.
 - Smart Guides 계산은 `packages/desktop/src/customFlowSmartGuides.ts`에 있으며, UI 표시선은 `.flowSmartGuideLayer`/`.flowSmartGuide` CSS가 담당합니다.
@@ -156,12 +158,15 @@ logs
 - Custom Flow 흐름 점검은 오른쪽 위 고정 아이콘 위젯입니다. hover하면 상세가 보이고, 클릭하면 상세가 고정되며 다시 클릭하면 접힙니다. 상세 창은 최대 크기가 제한되어 있고 항목이 많으면 내부 목록만 스크롤됩니다.
 - Custom Flow에서 `Esc`는 선택, 선택 박스, 연결 대기, 우클릭 메뉴, 드래그/패닝 임시 상태를 취소합니다.
 - Custom Flow에서 노드 설명은 여러 개를 동시에 펼칠 수 있습니다. 노드 화살표를 눌러도 다른 노드의 펼침 상태는 유지됩니다.
+- Custom Flow의 `활성 파일` 노드는 선택한 프로그램이 하나일 때 그 프로그램을 출력 포트 타입으로 사용합니다. 예를 들어 CAD를 선택하면 출력 포트가 `cad` 타입이 되어 `CAD 객체 읽기` 입력과 호환됩니다.
+- `활성 파일` 노드의 첫 상세 탭은 `프로그램`으로 표시되며, `새로고침` 버튼은 등록된 CAD/Revit MCP 서버의 `/active-file`, `/current-file`, `/status` 계열 endpoint에서 현재 파일명을 읽으려고 시도합니다. 브리지가 해당 응답을 제공하지 않으면 앱에는 감지 실패 안내가 표시됩니다.
 - Custom Flow에서 선택된 노드를 우클릭해 `그룹 만들기`를 누르거나 `Ctrl+G`를 누르면 그룹 박스를 생성합니다. 그룹 박스를 드래그하면 포함된 노드들이 함께 이동합니다.
 - Custom Flow 그룹과 메모는 박스 선택 또는 직접 클릭으로 선택할 수 있습니다. 선택한 메모는 Delete/Backspace로 삭제되고, 선택한 그룹은 노드를 삭제하지 않고 그룹 박스만 해제합니다.
 - 메모 텍스트 영역에 포커스가 있을 때는 일반 Delete/Backspace가 텍스트 편집에 쓰입니다. 이 상태에서 메모 자체를 삭제하려면 `Ctrl+Delete`를 사용합니다. 메모 위에서 `Shift+드래그`하면 메모 이동 대신 선택 박스가 시작됩니다.
 - Custom Flow 메모를 우클릭하면 `복제`, `삭제` 메뉴가 나타납니다. 텍스트 편집 중인 메모를 확실히 삭제하려면 우클릭 메뉴 삭제 또는 `Ctrl+Delete`를 사용합니다.
 - Custom Flow 메모/노드 우클릭 메뉴는 좁은 창에서도 화면 밖으로 잘리지 않도록 위치를 자동 보정합니다. 메모 제목 입력칸이나 본문 textarea 안에서 우클릭해도 같은 `복제`/`삭제` 메뉴가 열립니다.
 - Custom Flow 그룹 헤더에서는 그룹 이름과 배경색을 바로 수정할 수 있습니다. 그룹 색상은 현재 색상 점을 클릭하면 팔레트가 펼쳐지는 방식입니다. 그룹 이름, 색상, 포함 노드 정보는 localStorage `mcp-registry:custom-flow-graph`의 `groups`에 저장됩니다.
+- Custom Flow 그룹 헤더에는 `툴 저장` 버튼이 있습니다. 이 버튼은 그룹 내부 노드의 입력/출력, 필요 MCP 서버, 예정 명령을 읽어 Custom Flow 기반 커스텀 툴 schema로 저장합니다. 저장한 그룹 툴을 팔레트에서 다시 불러오는 UX는 아직 다음 단계입니다.
 - Custom Flow에서 노드를 그룹 박스 안으로 드래그하면 그룹이 추가 대상처럼 강조되고, 그 상태에서 놓으면 해당 그룹에 포함됩니다. `그룹에서 제거`를 누르면 선택 노드는 그룹 소속에서 빠지고 그룹 바깥쪽으로 이동해 결과가 눈에 보입니다.
 - Custom Flow 오른쪽 위 도구막대의 `기본도구` 버튼은 기본 보조 도구 창을 엽니다. 창은 `툴`과 `연결값 도구` 탭으로 나뉩니다.
 - Custom Flow 오른쪽 위 도구막대는 검색, 뒤로가기, 되돌릴 위치 선택, 앞으로가기, 실행, 실행 설정 화살표, 기본도구 순서로 표시됩니다. 기본도구 버튼은 흐름 점검 아이콘 바로 왼쪽에 붙어 보이도록 오른쪽 끝에 정렬합니다. 실행 설정은 톱니바퀴가 아니라 실행 버튼 옆 작은 화살표입니다.
@@ -181,6 +186,12 @@ logs
 - Custom Flow 마우스 휠 줌 범위는 28%~180%입니다.
 - 메모 제목/본문 입력 중 `Esc`를 누르면 입력 focus를 해제하고 열린 메뉴/색상 팔레트를 닫습니다. 입력칸이 아닌 캔버스, 노드, 그룹을 클릭해도 현재 입력칸 focus가 해제됩니다.
 - Custom Flow의 포트/노드/저장/드래그 직렬화 모델은 `packages/desktop/src/customFlowModel.ts`로 분리되어 있습니다. UI 렌더링은 아직 `App.tsx`의 `WorkflowView`에 남아 있습니다.
+- MD 툴 frontmatter의 `settings`, `inputs`, `outputs`, `requiredServers`, `mcpCommands`, `preflightChecks`, `resultSchema`, `failurePolicy`는 `packages/desktop/src/toolSettingsSchema.ts`에서 파싱합니다. Custom Tools / More Tools에서 읽은 schema는 Custom Flow 노드로 전달되고, 노드의 `설정` 탭에서 자동 설정창으로 표시됩니다.
+- schema의 정의 오류, 필수 설정값 누락, 예정 MCP 명령 파라미터 해석은 `packages/desktop/src/toolRuntimeValidation.ts`가 담당합니다. Custom Tool 등록창에서는 설정창 미리보기/검증/테스트 실행 요약을 보여주고, Custom Flow 검증은 노드별 필수 설정 누락을 흐름 점검에 포함합니다.
+- Custom Flow 기본 CAD/Excel/Revit 노드에는 `mcpCommands.status: planned` 명령 계획이 들어 있습니다. 실제 MCP 호출 엔진을 붙일 때는 `buildToolExecutionPlan(schema, node.settingsValues)` 결과의 `commands`를 서버 호출 큐로 넘기면 됩니다.
+- Custom Flow 실행 범위, 실행 로그, 노드별 미리보기, 그룹 툴 schema 생성 로직은 `packages/desktop/src/customFlowRunModel.ts`에 있습니다. 실제 MCP 실행 엔진을 붙일 때는 이 모델의 `buildFlowRunRecords`가 만드는 예상 결과를 실제 실행 응답으로 대체하면 됩니다.
+- `/make`와 `/save` 스킬은 설정창 구성이 어느 정도 잡히면 한글 목업을 먼저 보여주고 승인받은 뒤 MD 파일을 만들도록 되어 있습니다. 앱 내 스킬 리소스와 `C:\Users\Donggeon\.codex\skills` 로컬 스킬이 동기화되어 있습니다.
+- 현재 설정창 렌더링은 2차 UI입니다. `mapping-table`, `filter-builder`, `sort-rule`, `repeatable-list`는 행 추가/삭제 방식으로 편집할 수 있습니다. 다음 단계에서는 실제 CAD/Revit/Excel 서버 상태를 읽어 레이어, 레벨, 패밀리, 파라미터 선택지를 동적으로 채우는 작업이 필요합니다.
 - 상단 탭이 공간을 넘치면 `+` 대신 `...` 버튼이 나타나며, 화면에 보이지 않는 탭만 목록에 표시하고 목록 하단에서 새 탭을 만들 수 있습니다.
 - 새 탭 `+`는 Home 페이지를 엽니다. Home 페이지에는 공지사항, 신규 커스텀 툴, Other Tools 카드가 있습니다.
 - 탭 overflow(`...`) 리스트에서도 탭을 드래그해 순서를 바꿀 수 있고, 각 항목의 닫기 버튼으로 탭을 닫을 수 있습니다.
