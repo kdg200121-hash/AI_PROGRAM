@@ -1,0 +1,19 @@
+{
+  "name": "CAD 좌표 기반 Revit 배치",
+  "description": "저장된 Custom Flow입니다.",
+  "version": "1.0.0",
+  "author": "김동건",
+  "createdAt": 1783496306536,
+  "updatedAt": 1783496312116,
+  "graph": {
+    "nodes": [],
+    "connections": [],
+    "groups": [],
+    "notes": [],
+    "scale": 1,
+    "pan": {
+      "x": 0,
+      "y": 0
+    }
+  }
+}
