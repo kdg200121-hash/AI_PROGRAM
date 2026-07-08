@@ -34,8 +34,8 @@ mcpCommands:
     command: cad.select_title_block_candidate
     status: planned
     params:
-      candidateId: runtime.selected_title_block_candidate_id
-      fallbackManualSelection: settings.allow_manual_title_block_selection
+      candidateId: settings.selected_title_block_candidate_id
+      fallbackManualSelection: true
   - server: cad
     command: cad.find_text_in_title_block
     status: planned
@@ -45,14 +45,15 @@ mcpCommands:
         - text
         - mtext
       contains: settings.reference_search_text
+      preferredTextHandle: settings.selected_reference_text_handle
   - server: cad
     command: cad.apply_relative_text_position_to_drawings
     status: planned
     params:
       dwgFiles: settings.dwg_files
       relativePosition: previous.result.relative_position
-      tolerance: settings.position_tolerance
-      titleBlockSortOrder: settings.title_block_sort_order
+      tolerance: 10
+      titleBlockSortOrder: top_left_to_bottom_right
   - server: cad
     command: cad.update_text_values
     status: planned
@@ -62,15 +63,16 @@ mcpCommands:
         prefix: settings.number_prefix
         startNumber: settings.start_number
         digitCount: settings.digit_count
-        increment: settings.increment
-      previewOnly: settings.preview_only
+        increment: 1
+      previewOnly: 'runtime.action == "preview"'
   - server: cad
     command: cad.save_dwg
     status: planned
+    condition: 'runtime.action == "apply"'
     params:
       filePath: settings.dwg_files.current.file_path
-      backupPolicy: settings.backup_policy
-      requireFinalConfirmation: settings.require_final_confirmation
+      backupPolicy: none
+      requireFinalConfirmation: true
 preflightChecks:
   - id: cad_connected
     label: "CAD MCP 서버 연결 확인"
@@ -142,21 +144,61 @@ settingsLayout:
   mode: "sections"
   sections:
     - id: input
-      label: "DWG 파일"
+      label: "설정 입력"
       defaultOpen: true
-    - id: recognition
-      label: "인식 기준"
+    - id: candidate
+      label: "후보 확인"
       defaultOpen: true
-    - id: numbering
-      label: "번호 규칙"
-      defaultOpen: true
-    - id: execution
-      label: "실행"
-      defaultOpen: false
+executionSteps:
+  - id: input
+    label: "설정 입력"
+    description: "수정할 DWG 파일을 직접 선택하고, 기준 검색 문자와 새 번호 규칙을 입력합니다."
+    section: input
+    state: active
+  - id: preview
+    label: "분석 미리보기"
+    description: "원본을 저장하지 않고 도곽 수, 번호 범위, 변경 전/후 목록을 계산합니다."
+    actionId: preview
+    state: waiting
+  - id: candidate
+    label: "후보 확인"
+    description: "첫 DWG에서 추정한 도곽 후보와 기준 문자 위치가 맞는지 확인합니다."
+    section: candidate
+    state: waiting
+  - id: apply
+    label: "원본에 적용"
+    description: "미리보기 결과가 맞으면 최종 확인 후 원본 DWG에 저장합니다."
+    actionId: apply
+    state: waiting
+actions:
+  - id: preview
+    label: "분석 미리보기"
+    runtimeAction: preview
+    primary: true
+    description: "원본 DWG를 수정하지 않고 도곽 후보, 도면번호 위치, 파일별 번호 범위를 계산합니다."
+  - id: apply
+    label: "원본에 적용"
+    runtimeAction: apply
+    requiresPreview: true
+    confirm: true
+    description: "미리보기 결과 확인 후 원본 DWG에 변경된 도면번호를 저장합니다."
+learningLog:
+  schemaVersion: "1"
+  sourceSkill: "mcp-tool-builder"
+  observedFriction:
+    - "DWG 파일 목록은 텍스트 행이 아니라 파일 선택으로 추가되어야 했다."
+    - "도곽 수와 번호 범위는 사용자 설정값이 아니라 미리보기 후 표시되는 파생 결과였다."
+    - "미리보기와 원본 적용은 체크박스가 아니라 별도 실행 action이어야 했다."
+  suggestedOptions:
+    - "도곽 후보는 첫 DWG에서 추정 리스트를 보여주고 필요 시 직접 선택하는 방식으로 정리했다."
+  selectedOptions:
+    - "여러 DWG 파일 직접 선택, 목록 순서대로 처리, Text/MText 기준 문자 위치 인식"
+  deferredImprovements:
+    - "실제 CAD MCP 브리지에서 planned 명령 구현 및 AutoCAD 실도면 검증 필요"
 testCases:
   - name: "파일 목록 순서와 도곽 위치 순서대로 순번 부여"
     given: "DWG 2개, 각 파일에 같은 도곽 블록 2개, 기준 검색 문자 P-를 포함한 Text/MText가 각 도곽에 1개씩 있음"
-    settings: "파일 순서: A.dwg, B.dwg / 접두어 P- / 시작번호 101 / 자리수 3 / 증가값 1 / 도곽 순서 좌상단→우하단"
+    settings: "파일 순서: A.dwg, B.dwg / 기준 검색 문자 P- / 접두어 P- / 시작번호 101 / 자리수 3"
     expect: "A.dwg의 도곽 1,2가 P-101, P-102로 바뀌고 B.dwg의 도곽 1,2가 P-103, P-104로 바뀐다."
   - name: "기준 문자를 찾지 못하면 실행 중단"
     given: "첫 DWG의 선택 도곽 안에 P-를 포함한 Text/MText가 없음"
@@ -194,90 +236,22 @@ settings:
     preview: true
     description: "항목 추가를 누르면 DWG 파일 선택창을 열고, 선택한 도면 경로를 목록 값으로 저장합니다. 불러온 뒤 삭제와 위/아래 이동으로 처리 순서를 조정합니다. 미리보기 후 각 파일 행에 인식 도곽 수와 배정 번호 범위를 표시합니다."
     validationMessage: "DWG 파일을 1개 이상 선택하세요."
-  - id: file_order_mode
-    label: "파일 처리 순서"
-    type: select
-    required: true
-    default: manual_list_order
-    section: input
-    preview: true
-    options:
-      - value: manual_list_order
-        label: "화면 목록 순서 그대로 사용"
-    description: "도면번호 순번은 사용자가 정렬한 파일 목록 순서를 기준으로 이어서 부여합니다."
-  - id: title_block_detection_mode
-    label: "도곽 선택 방식"
-    type: select
-    required: true
-    default: candidate_list_from_first_dwg
-    section: recognition
-    preview: true
-    options:
-      - value: candidate_list_from_first_dwg
-        label: "첫 DWG에서 도곽 후보 블록 리스트 표시"
-      - value: manual_select_first_dwg
-        label: "첫 DWG에서 도곽 직접 선택"
-    description: "반복 개수, 블록 크기, Paper Space/Model Space 위치를 기준으로 도곽 후보를 표시합니다."
-  - id: allow_manual_title_block_selection
-    label: "도곽 직접 선택 허용"
-    type: checkbox
-    required: false
-    default: true
-    section: recognition
-    advanced: true
-    description: "도곽 후보가 틀렸을 때 사용자가 첫 DWG에서 도곽을 직접 선택할 수 있게 합니다."
-  - id: title_block_sort_order
-    label: "도곽 순서"
-    type: select
-    required: true
-    default: top_left_to_bottom_right
-    section: recognition
-    preview: true
-    options:
-      - value: top_left_to_bottom_right
-        label: "좌상단 → 우하단"
-    description: "한 DWG 안에 도곽이 여러 개 있을 때 순번을 부여할 위치 순서입니다."
   - id: reference_search_text
     label: "기준 검색 문자"
     type: text
     required: true
     default: "P-"
-    section: recognition
+    section: input
     preview: true
     placeholder: "예: P-"
     description: "첫 DWG의 선택 도곽 내부에서 이 문자를 포함한 Text/MText를 찾아 도면번호 위치로 인식합니다."
     validationMessage: "기준 검색 문자를 입력하세요."
-  - id: target_text_types
-    label: "검색 대상 문자"
-    type: multi-select
-    required: true
-    default:
-      - text
-      - mtext
-    section: recognition
-    advanced: true
-    options:
-      - value: text
-        label: "Text"
-      - value: mtext
-        label: "MText"
-    description: "도면번호로 인식할 CAD 문자 객체 종류입니다."
-  - id: position_tolerance
-    label: "상대 위치 허용 오차"
-    type: tolerance
-    required: true
-    default: 10
-    min: 0
-    step: 1
-    section: recognition
-    advanced: true
-    description: "다른 도곽에서 같은 상대 위치 주변의 Text/MText를 찾을 허용 거리입니다. 단위는 DWG 단위를 따릅니다."
   - id: number_prefix
     label: "접두어"
     type: text
     required: true
     default: "P-"
-    section: numbering
+    section: input
     preview: true
     description: "새 도면번호 앞에 붙일 문자입니다."
   - id: start_number
@@ -287,7 +261,7 @@ settings:
     default: 101
     min: 0
     step: 1
-    section: numbering
+    section: input
     preview: true
     description: "첫 번째 도곽에 부여할 시작 번호입니다."
   - id: digit_count
@@ -298,46 +272,27 @@ settings:
     min: 1
     max: 12
     step: 1
-    section: numbering
+    section: input
     preview: true
     description: "번호를 몇 자리로 맞출지 지정합니다. 예: 3이면 P-001 형식입니다."
-  - id: increment
-    label: "증가값"
-    type: number
+  - id: selected_title_block_candidate_id
+    label: "선택한 도곽 후보"
+    type: object-selection
     required: true
-    default: 1
-    min: 1
-    step: 1
-    section: numbering
-    description: "도곽마다 증가할 번호 값입니다."
-  - id: preview_only
-    label: "미리보기만 실행"
-    type: dry-run
-    required: false
-    default: true
-    section: execution
-    advanced: true
-    description: "켜져 있으면 원본 DWG를 수정하지 않고 변경 전/후 목록만 생성합니다."
-  - id: backup_policy
-    label: "백업 정책"
-    type: backup-policy
+    default: ""
+    section: candidate
+    preview: true
+    description: "분석 미리보기에서 나온 도곽 후보 중 실제 도곽으로 사용할 항목입니다. 후보가 틀리면 CAD에서 직접 선택합니다."
+    validationMessage: "사용할 도곽 후보를 선택하세요."
+  - id: selected_reference_text_handle
+    label: "선택한 기준 문자"
+    type: object-selection
     required: true
-    default: none
-    section: execution
-    confirmOnChange: true
-    advanced: true
-    options:
-      - value: none
-        label: "백업 없이 원본 바로 수정"
-    description: "현재 설계는 백업 없이 원본 DWG를 직접 수정합니다."
-  - id: require_final_confirmation
-    label: "실행 전 최종 확인"
-    type: checkbox
-    required: true
-    default: true
-    section: execution
-    advanced: true
-    description: "원본 DWG 직접 수정 전 경고와 변경 목록을 확인해야 실행됩니다."
+    default: ""
+    section: candidate
+    preview: true
+    description: "첫 DWG의 도곽 안에서 도면번호 위치 기준으로 사용할 Text/MText입니다."
+    validationMessage: "도면번호 위치 기준 문자를 선택하세요."
 ---
 
 # CAD 도면번호 일괄 순번 변경
@@ -348,57 +303,66 @@ settings:
 
 이 툴은 도면번호가 블록 속성이 아니라 일반 `Text` 또는 `MText`로 들어있는 CAD 도면을 대상으로 합니다.
 
-## 작동 원리
+## 실행 단계
 
-### 1. DWG 파일 목록 구성
+### 1. 설정 입력
 
 사용자가 수정할 DWG 파일을 직접 선택합니다. 불러온 목록에서 파일을 추가하거나 잘못 불러온 파일을 삭제할 수 있고, 위로/아래로 이동해서 처리 순서를 직접 정합니다.
 
-파일 처리 순서는 화면에 표시된 목록 순서 그대로 사용합니다.
+화면에 보이는 파일 목록 순서가 처리 순서입니다. 기준 검색 문자, 접두어, 시작번호, 번호 자리수도 이 단계에서 입력합니다.
 
 미리보기 전에는 각 파일 행의 분석 상태를 `미분석`으로 표시합니다. 도곽 후보와 기준 문자 위치가 확인되면 파일별로 인식한 도곽 수와 해당 파일에 배정될 도면번호 범위를 계산해 같은 행에 표시합니다. 예: `도곽 2개`, `P-101~P-102`.
 
-### 2. 도곽 후보 인식
+### 2. 분석 미리보기
+
+`분석 미리보기`는 원본 DWG를 저장하지 않고 다음 정보를 계산합니다.
 
 첫 번째 DWG에서 반복되는 블록, 블록 크기, Paper Space/Model Space 위치를 기준으로 도곽으로 추정되는 블록 후보를 표시합니다.
-
-사용자는 후보 목록에서 도곽을 선택합니다. 후보가 틀렸을 때는 첫 DWG에서 도곽을 직접 선택할 수 있습니다.
-
-### 3. 도면번호 위치 인식
 
 사용자가 `P-` 같은 기준 검색 문자를 입력하면, 첫 DWG의 선택 도곽 내부에서 그 문자를 포함한 `Text` 또는 `MText`를 찾습니다.
 
 찾은 텍스트의 도곽 기준 상대 위치를 저장하고, 다른 DWG와 다른 도곽에서는 같은 상대 위치 주변의 Text/MText를 도면번호로 인식합니다.
 
-### 4. 새 도면번호 생성
+### 3. 후보 확인
+
+사용자는 첫 DWG에서 추정된 도곽 후보와 기준 문자 위치가 맞는지 확인합니다. 후보가 틀렸을 때는 첫 DWG에서 도곽을 직접 선택할 수 있습니다.
+
+### 4. 원본에 적용
 
 새 도면번호는 다음 규칙으로 생성합니다.
 
 - 접두어: 예 `P-`
 - 시작번호: 예 `101`
 - 번호 자리수: 예 `3`
-- 증가값: 기본 `1`
 
 예를 들어 접두어가 `P-`, 시작번호가 `101`, 자리수가 `3`이면 `P-101`, `P-102`, `P-103` 순서로 생성됩니다.
 
 한 DWG 안에 도곽이 여러 개 있으면 좌상단에서 우하단 방향으로 순번을 부여합니다. 다음 DWG로 넘어가도 번호는 이어서 증가합니다.
 
-### 5. 미리보기 후 원본 수정
-
-실행 전에 변경 전/후 도면번호 목록을 표로 표시합니다. 사용자가 원본 DWG 직접 수정 경고를 확인해야 실제 수정이 실행됩니다.
+사용자가 미리보기 결과와 원본 DWG 직접 수정 경고를 확인하면 `원본에 적용` action이 실제 저장을 수행합니다.
 
 현재 설계는 백업 없이 원본 DWG를 직접 수정합니다.
 
-## 설정
+## 단계별 설정
 
 설정 schema는 frontmatter의 `settings`에 정의되어 있습니다. 사용자에게 보이는 핵심 설정은 다음과 같습니다.
 
 - DWG 파일 목록: `항목 추가`를 누르면 DWG 파일 선택창을 열고, 선택한 도면 경로를 목록 값으로 저장합니다. 불러온 뒤 삭제/정렬합니다.
 - 파일별 미리보기: 도곽 수와 해당 도면에 들어갈 번호 범위는 사용자가 입력하지 않고 미리보기/분석 결과로 표시합니다.
-- 인식 기준: 첫 DWG에서 도곽 후보 블록을 고르고, `P-` 같은 기준 검색 문자로 도면번호 위치를 찾습니다.
-- 새 도면번호 규칙: 접두어, 시작번호, 자리수, 증가값.
-- 실행 옵션: 미리보기, 백업 정책, 최종 확인은 접힌 실행 섹션에 둡니다.
+- 기준 검색 문자: `P-` 같은 문자로 첫 DWG 도곽 내부의 도면번호 위치를 찾습니다.
+- 새 도면번호 규칙: 접두어, 시작번호, 자리수.
+- 후보 확인: 분석 미리보기 후 선택한 도곽 후보와 기준 문자 Text/MText를 확정합니다. 이 단계는 설정 입력과 별도 화면으로 표시합니다.
 - 실행 전 요약, 점검, 검증, 테스트 요약은 설정창 하단의 검토 아이콘을 눌렀을 때만 펼쳐서 봅니다.
+
+다음 값은 사용자가 고르는 설정이 아니라 고정 실행 규칙입니다.
+
+- 검색 대상 문자: `Text`, `MText`
+- 파일 처리 순서: 화면 목록 순서
+- 도곽 정렬 순서: 좌상단에서 우하단
+- 상대 위치 허용 오차: `10`
+- 번호 증가값: `1`
+- 백업 정책: 백업 없이 원본 직접 수정
+- 최종 확인: `원본에 적용` action 실행 전 필수
 
 HTML 설정창 목업은 `outputs/cad-drawing-number-batch-renumber-settings-mockup.html`에 있습니다.
 
@@ -418,9 +382,11 @@ HTML 설정창 목업은 `outputs/cad-drawing-number-batch-renumber-settings-moc
 - Parameter mapping:
   - `settings.dwg_files` → 처리할 DWG 파일 목록
   - `settings.reference_search_text` → 도면번호 위치 검색 문자
-  - `settings.title_block_sort_order` → 도곽 내부 순번 기준
-  - `settings.number_prefix`, `settings.start_number`, `settings.digit_count`, `settings.increment` → 새 도면번호 생성 규칙
-  - `settings.backup_policy`, `settings.require_final_confirmation` → 원본 수정 안전 정책
+  - 도곽 내부 순번 기준 → 고정값 `top_left_to_bottom_right`
+  - `settings.number_prefix`, `settings.start_number`, `settings.digit_count`와 고정 증가값 `1` → 새 도면번호 생성 규칙
+  - `runtime.action == "preview"` → 원본 저장 없이 분석 미리보기
+  - `runtime.action == "apply"` → 최종 확인 후 원본 저장
+  - 백업 정책과 최종 확인 → 고정 안전 정책
 - Fallback/manual step:
   - 도곽 후보가 부정확하면 사용자가 첫 DWG에서 도곽을 직접 선택합니다.
   - 기준 검색 문자가 여러 Text/MText에서 발견되면 미리보기에서 사용자가 대상 텍스트를 확정해야 합니다.
@@ -489,7 +455,7 @@ Custom Flow에서 사용할 경우 `dwg_files`를 이전 노드의 파일 목록
 ### 기본 순번 변경
 
 - 입력: `A.dwg`, `B.dwg`
-- 설정: 접두어 `P-`, 시작번호 `101`, 자리수 `3`, 증가값 `1`, 도곽 순서 `좌상단 → 우하단`
+- 설정: 기준 검색 문자 `P-`, 접두어 `P-`, 시작번호 `101`, 자리수 `3`
 - 예상 결과: `A.dwg`의 도곽 1,2가 `P-101`, `P-102`로 바뀌고 `B.dwg`의 도곽 1,2가 `P-103`, `P-104`로 바뀝니다.
 
 ### 기준 문자 미발견

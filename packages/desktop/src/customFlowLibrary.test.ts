@@ -2,17 +2,21 @@ import { describe, expect, it } from "vitest";
 import {
   createSavedFlow,
   duplicateSavedFlow,
-  listWorkflowMenuFlowItems,
+  flowRegistrationKey,
+  isFlowRegistered,
+  isStoredFlowGraphDirty,
   listSavedFlows,
+  listWorkflowMenuFlowItems,
   parseDraggedSavedFlow,
   parseWorkflowMenuFlowId,
+  removeSharedFlowByIdentity,
   removeSavedFlow,
   renameSavedFlow,
   serializeSavedFlowForDrag,
   updateSavedFlowDetails,
   updateSavedFlowGraph,
   upsertSharedFlow,
-  isStoredFlowGraphDirty,
+  upsertSharedFlowByIdentity,
   workflowMenuFlowId,
   type SavedCustomFlow
 } from "./customFlowLibrary";
@@ -57,6 +61,7 @@ describe("customFlowLibrary", () => {
     expect(duplicated[0].name).toBe("원본 복사본");
     expect(removeSavedFlow(duplicated, flow.id).map((item) => item.name)).toEqual(["원본 복사본"]);
   });
+
   it("lists shared and saved flows as direct workflow menu items", () => {
     const shared = createSavedFlow("Shared CAD flow", graph, 100);
     const savedOld = createSavedFlow("Saved old", graph, 200);
@@ -86,10 +91,15 @@ describe("customFlowLibrary", () => {
 
   it("updates saved flow name and description from the home page", () => {
     const flow = createSavedFlow("Old name", graph, 100, "Old description");
-    const updated = updateSavedFlowDetails([flow], flow.id, {
-      name: "New name",
-      description: "New description"
-    }, 300);
+    const updated = updateSavedFlowDetails(
+      [flow],
+      flow.id,
+      {
+        name: "New name",
+        description: "New description"
+      },
+      300
+    );
 
     expect(updated[0]).toMatchObject({
       id: flow.id,
@@ -110,8 +120,11 @@ describe("customFlowLibrary", () => {
     expect(isStoredFlowGraphDirty(changedGraph, changedGraph)).toBe(false);
   });
 
-  it("upserts shared flows without mutating the original graph", () => {
-    const flow = createSavedFlow("Shared flow", graph, 100, "Ready to share");
+  it("upserts shared flows with metadata without mutating the original graph", () => {
+    const flow = createSavedFlow("Shared flow", graph, 100, "Ready to share", {
+      version: "1.2.3",
+      author: "김동건"
+    });
     const shared = upsertSharedFlow([], flow, 300);
 
     expect(shared).toHaveLength(1);
@@ -119,9 +132,69 @@ describe("customFlowLibrary", () => {
       id: flow.id,
       name: "Shared flow",
       description: "Ready to share",
+      version: "1.2.3",
+      author: "김동건",
       updatedAt: 300
     });
     expect(shared[0].graph).not.toBe(flow.graph);
+  });
+
+  it("matches shared flow registration by stable metadata after GitHub refresh changes ids", () => {
+    const local = createSavedFlow("CAD layout flow", graph, 100, "Ready to share", {
+      version: "1.0.0",
+      author: "kim"
+    });
+    const refreshedFromGithub: SavedCustomFlow = {
+      ...local,
+      id: "github-refreshed-id",
+      sourcePath: "flows/cad-layout-flow-1-0-0.json"
+    };
+
+    expect(flowRegistrationKey(local)).toBe(flowRegistrationKey(refreshedFromGithub));
+    expect(isFlowRegistered([refreshedFromGithub], local)).toBe(true);
+  });
+
+  it("upserts shared flows by registration identity to prevent duplicate registrations", () => {
+    const original = createSavedFlow("CAD layout flow", graph, 100, "Ready to share", {
+      version: "1.0.0",
+      author: "kim"
+    });
+    const refreshedFromGithub: SavedCustomFlow = {
+      ...original,
+      id: "github-refreshed-id",
+      sourcePath: "flows/cad-layout-flow-1-0-0.json"
+    };
+
+    const shared = upsertSharedFlowByIdentity([refreshedFromGithub], original, 300);
+
+    expect(shared).toHaveLength(1);
+    expect(shared[0]).toMatchObject({
+      id: original.id,
+      name: original.name,
+      version: "1.0.0",
+      author: "kim",
+      updatedAt: 300
+    });
+  });
+
+  it("removes shared flows by registration identity", () => {
+    const original = createSavedFlow("CAD layout flow", graph, 100, "Ready to share", {
+      version: "1.0.0",
+      author: "kim"
+    });
+    const refreshedFromGithub: SavedCustomFlow = {
+      ...original,
+      id: "github-refreshed-id",
+      sourcePath: "flows/cad-layout-flow-1-0-0.json"
+    };
+    const other = createSavedFlow("Other", graph, 200, "Other flow", {
+      version: "1.0.0",
+      author: "kim"
+    });
+
+    const remaining = removeSharedFlowByIdentity([refreshedFromGithub, other], original);
+
+    expect(remaining).toEqual([other]);
   });
 
   it("serializes saved flows for canvas drag and drop", () => {

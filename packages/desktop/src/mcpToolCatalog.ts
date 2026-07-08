@@ -1,10 +1,12 @@
 import type { WorkspaceTabId } from "./workspaceTabs";
+import type { ToolRuntimeSchema } from "./toolSettingsSchema";
 
 export interface McpToolPreview {
   name: string;
   description: string;
   version?: string;
   author?: string;
+  settingsSchema?: ToolRuntimeSchema;
 }
 
 const toolCatalog: Record<WorkspaceTabId, McpToolPreview[]> = {

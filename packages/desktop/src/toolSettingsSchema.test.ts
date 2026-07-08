@@ -229,6 +229,43 @@ actions:
     ]);
   });
 
+  it("parses configurable execution steps for staged tool pages", () => {
+    const schema = parseToolRuntimeSchema(`---
+tool: true
+toolName: 단계형 툴
+executionSteps:
+  - id: input
+    label: 설정 입력
+    description: 실행에 필요한 값을 먼저 입력합니다.
+    section: input
+    state: active
+  - id: preview
+    label: 미리보기
+    description: 원본을 바꾸기 전에 예상 결과를 확인합니다.
+    actionId: preview
+    state: waiting
+---`);
+
+    expect(schema.executionSteps).toEqual([
+      {
+        id: "input",
+        label: "설정 입력",
+        description: "실행에 필요한 값을 먼저 입력합니다.",
+        section: "input",
+        actionId: undefined,
+        state: "active"
+      },
+      {
+        id: "preview",
+        label: "미리보기",
+        description: "원본을 바꾸기 전에 예상 결과를 확인합니다.",
+        section: undefined,
+        actionId: "preview",
+        state: "waiting"
+      }
+    ]);
+  });
+
   it("ignores learningLog metadata when building runtime schema", () => {
     const schema = parseToolRuntimeSchema(`---
 tool: true

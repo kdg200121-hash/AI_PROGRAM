@@ -72,6 +72,7 @@ Before writing the draft, show:
 - Purpose and reusable workflow.
 - Input source, selections/files, and scope.
 - Settings sections and fields, including defaults and required values.
+- Execution steps for the tool page. Each step must have `id`, `label`, `description`, and when relevant `section` or `actionId`.
 - Fixed constants, single-option values, derived preview badges, and runtime actions separately from editable settings.
 - UI pattern: simple/sectioned for read or export, workflow actions for analyze-then-modify CAD/Revit tools.
 - MCP server and command plan. Mark unavailable commands as `planned`.
@@ -98,8 +99,10 @@ After the full tool specification is approved, create a realistic HTML settings-
 Requirements:
 
 - Save under `outputs/<safe-tool-name>-settings-mockup.html`.
-- Use the AI Program tool page structure: top full-width `작동 원리`, lower large `설정` panel.
-- Put all custom settings inside the lower `설정` panel.
+- Use the AI Program tool page structure: top full-width `실행 단계`, lower large selected-step panel.
+- Show selectable steps such as `1 설정 입력`, `2 미리보기`, `3 후보 선택`, `4 적용`. The number of steps can change per tool.
+- Put operation-principle explanation inside each step description. Do not create a separate old-style `작동 원리` panel.
+- Put all custom settings inside the lower selected-step panel by connecting `executionSteps[].section` to `settingsLayout.sections[].id`.
 - Show actual fields, buttons, warnings, preview/result areas, disabled/enabled states, and list controls if needed.
 - For file-list settings, `항목 추가` must open a file picker and store selected file paths as list item values. Use `type: repeatable-list`, `itemType: file`, `valueKey: file_path`, and an `accept` filter such as `.dwg,.dxf` when the list is a set of files.
 - When a file-list tool can calculate per-file preview results, add row summary metadata such as `showItemSummary: true`, `summaryCountKey: title_block_count`, `summaryRangeKey: number_range`, `pendingSummaryLabel`, and `pendingRangeLabel`. Show these badges in the HTML mockup beside each file row, not as a separate long table.
@@ -161,6 +164,7 @@ failurePolicy:
 settingsLayout:
   mode: "simple"
   sections: []
+executionSteps: []
 testCases: []
 settings: []
 actions: []

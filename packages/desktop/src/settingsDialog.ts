@@ -1,4 +1,4 @@
-export type SettingsSectionId = "servers" | "ai" | "display" | "account" | "management";
+export type SettingsSectionId = "servers" | "display" | "account" | "management";
 export type ColorMode = "light" | "dark";
 
 export interface SettingsSection {
@@ -8,7 +8,6 @@ export interface SettingsSection {
 
 export const settingsSections: SettingsSection[] = [
   { id: "servers", label: "MCP 서버" },
-  { id: "ai", label: "AI 연결" },
   { id: "display", label: "화면 모드" },
   { id: "account", label: "계정 정보" },
   { id: "management", label: "관리" }

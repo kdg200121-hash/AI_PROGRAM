@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { ToolRuntimeSchema } from "../src/toolSettingsSchema";
 import type { ToolExecutionRequest, ToolExecutionResult } from "../src/toolExecutionModel";
-import type { OpenAiSettingsStatus } from "../src/openAiSettings";
+import type { SavedCustomFlow } from "../src/customFlowLibrary";
 import type { RegistryFile } from "@mcp-registry/shared";
 import type { NewMcpServerInput, UpdateMcpServerInput } from "@mcp-registry/core";
 import type { ServerProcessResult } from "../src/processMonitor";
@@ -41,11 +41,30 @@ contextBridge.exposeInMainWorld("toolExecution", {
     ipcRenderer.invoke("tool-execution:run", request) as Promise<ToolExecutionResult>
 });
 
-contextBridge.exposeInMainWorld("openAiSettings", {
-  get: async () => ipcRenderer.invoke("openai-settings:get") as Promise<OpenAiSettingsStatus>,
-  save: async (input: { apiKey?: string; model?: string }) =>
-    ipcRenderer.invoke("openai-settings:save", input) as Promise<OpenAiSettingsStatus>,
-  clear: async () => ipcRenderer.invoke("openai-settings:clear") as Promise<OpenAiSettingsStatus>
+contextBridge.exposeInMainWorld("customFlows", {
+  listGithubFlows: async (source: { owner: string; repo: string; path: string; ref?: string }) =>
+    ipcRenderer.invoke("custom-flows:list-github-flows", source) as Promise<SavedCustomFlow[]>,
+  deleteGithubFlow: async (githubPath: string) =>
+    ipcRenderer.invoke("custom-flows:delete-github-flow", githubPath) as Promise<{
+      kind: "deleted" | "missing" | "pull_request";
+      branch?: string;
+      pullRequestUrl?: string;
+      pullRequestNumber?: number;
+      pullRequestState?: "open" | "closed" | "merged";
+    }>,
+  publishGithubFlow: async (
+    flow: SavedCustomFlow,
+    source: { owner: string; repo: string; path: string; ref?: string },
+    options: { requireReview: boolean }
+  ) =>
+    ipcRenderer.invoke("custom-flows:publish-github-flow", flow, source, options) as Promise<{
+      kind: "direct" | "pull_request";
+      path: string;
+      branch: string;
+      pullRequestUrl: string;
+      pullRequestNumber: number;
+      pullRequestState: "open" | "closed" | "merged";
+    }>
 });
 
 contextBridge.exposeInMainWorld("skillInstaller", {

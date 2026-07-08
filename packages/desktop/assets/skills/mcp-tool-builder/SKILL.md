@@ -29,6 +29,10 @@ If a select-like field has only one possible option, it is not a setting. Do not
 
 Preview/analyze flows must be modeled as actions, not as user settings. For example, use buttons such as `분석 미리보기` and `원본에 적용`; map the preview button to `runtime.action == "preview"` or an equivalent execution state. Do not add a `preview_only` / `dry-run` checkbox unless the user genuinely needs to choose between preview-only and applying from the same execution button.
 
+Do not render the same preview/apply action in multiple places. If an execution step has `actionId`, show its button only in the execution step/action area for that step. Do not also add another `분석 미리보기`, `실행`, or `원본에 적용` button inside a settings section or candidate-selection panel.
+
+Do not add an extra internal workflow strip such as `입력 / 미리보기 / 실행` inside the selected action panel. The full-width top `실행 단계` panel is the only place that should show the workflow order. The lower selected-step panel should contain only the controls and results for the currently selected step.
+
 When converting AI CAD or AI Revit add-ins, choose the UI pattern from the add-in's actual behavior:
 
 - Read-only, export, report, or one-shot create tools: use a simple or sectioned settings form plus a result panel.
@@ -172,6 +176,7 @@ The review must include:
 - Purpose and one-sentence user workflow.
 - Input source, required selections/files, and file/object scope.
 - Settings sections and fields, including defaults and required values.
+- Execution steps shown on the tool page. Each step must have `id`, `label`, `description`, and when relevant `section` or `actionId`.
 - MCP server and command plan. Mark unavailable commands as `planned`.
 - Outputs, result schema, logs, and Custom Flow ports if relevant.
 - Risk level, overwrite/backup behavior, preflight checks, failure policy, and rollback/logging behavior.
@@ -197,9 +202,15 @@ HTML mockup requirements:
 
 - Save the file under the current workspace, preferably `outputs/<safe-tool-name>-settings-mockup.html`.
 - Use a realistic AI Program settings-window layout, not a plain text mockup.
-- Match the current AI Program tool page layout: put `작동 원리` in a full-width horizontal panel at the top, then put the editable `설정` area in a large full-width panel below it.
-- Design custom tool settings so they fit inside the lower `설정` panel. Group fields into clear sections, keep long tables/lists scrollable, and avoid assuming the settings panel is a narrow right sidebar.
+- Match the current AI Program tool page layout: put `실행 단계` in a full-width horizontal panel at the top. Show selectable steps such as `1 설정 입력`, `2 미리보기`, `3 후보 선택`, `4 적용`.
+- Put the editable controls for the selected step in the large lower panel. Each step should point to a `settingsLayout.sections[].id` through `executionSteps[].section`, or to a button/action through `executionSteps[].actionId`.
+- If the settings window shows preset/profile buttons such as `저장` and `불러오기`, place them in the selected-step panel header on the far right. Do not center them between the title/description and the empty right side.
+- Make each selected-step panel visually and functionally distinct. An input step should show user-editable controls; a preview/action step should show analysis status, result summaries, and the single relevant action; a candidate/confirmation step should show detected candidates and selection controls. Do not duplicate the same input form for candidate review unless the user is actually editing those same values again.
+- Do not place a second workflow summary row inside the selected-step panel. If the top `실행 단계` already shows `설정 입력`, `분석 미리보기`, `후보 확인`, and `원본에 적용`, the lower panel must not repeat simplified cards such as `입력`, `미리보기`, and `실행`.
+- Mix operation-principle explanation into each execution step description. Do not create a separate old-style `작동 원리` panel.
+- Design custom tool settings so they fit inside the lower selected-step panel. Group fields into clear sections, keep long tables/lists scrollable, and avoid assuming the settings panel is a narrow right sidebar.
 - Show the actual sections, fields, buttons, warnings, preview/result area, and disabled/enabled states implied by the tool.
+- For detected-object workflows such as CAD title block candidates or Revit element candidates, the candidate step must be a review/selection view based on analysis results. It should not look like the original settings input step. Show candidate names, counts, confidence/status, selected object handles/ids, and a clear confirm-selection control.
 - For list-based tools, show add/delete/reorder controls when relevant.
 - For file-list settings, `항목 추가` must open a file picker and store the selected file paths as list item values. Use `type: repeatable-list`, `itemType: file`, `valueKey: file_path`, and an `accept` filter such as `.dwg,.dxf` when the list is a set of files.
 - When a file-list tool can calculate per-file preview results, add row summary metadata such as `showItemSummary: true`, `summaryCountKey: title_block_count`, `summaryRangeKey: number_range`, `pendingSummaryLabel`, and `pendingRangeLabel`. Show these badges in the HTML mockup beside each file row, not as a separate long table.
@@ -253,14 +264,18 @@ Ask enough to make the tool executable later:
 Before writing or saying the tool is ready, check:
 
 - A novice can understand what to click or select.
+- Every execution step has a different purpose on screen. `설정 입력` gathers editable inputs, `분석 미리보기` runs or displays analysis, `후보 확인` selects detected objects/results, and `원본에 적용` confirms modification. If two step panels look the same, revise the mockup and MD before finalizing.
 - Every visible `settings` field is something the user can meaningfully choose. Fixed values, derived preview badges, and clicked-button states are not settings.
 - No select-like setting has only one option. Single-option values are fixed constants and must not take space in the settings window.
 - Preview/analyze behavior is represented as an execution action or runtime state, not as an unnecessary `preview_only` checkbox.
+- Preview/apply buttons are not duplicated across the step header, action step, and settings panel. There should be one clear place to run each action.
+- The lower selected-step panel does not repeat the top workflow as compact cards. If a mockup shows both the top `실행 단계` and another `입력 / 미리보기 / 실행` row below it, remove the lower row.
+- Settings preset/profile controls such as `저장` and `불러오기` are aligned to the far right of the selected-step header.
 - The approved Korean tool name appears exactly in frontmatter `toolName`; any English slug is used only for filename/id.
 - Frontmatter `description` is filled with a Korean one-sentence summary. Do not leave it blank or as `Short description`.
 - No execution-critical value is hidden in prose only; it is represented in frontmatter or a clear section.
 - CAD/Revit add-ins use the correct UI pattern: simple/sectioned for read or export, workflow actions for analyze-then-modify.
-- `risk`, `requiredServers`, `mcpCommands`, `preflightChecks`, `settingsLayout`, `settings`, `inputs`, `outputs`, `resultSchema`, `failurePolicy`, and `testCases` are either filled or intentionally empty with a reason.
+- `risk`, `requiredServers`, `mcpCommands`, `preflightChecks`, `settingsLayout`, `executionSteps`, `settings`, `inputs`, `outputs`, `resultSchema`, `failurePolicy`, and `testCases` are either filled or intentionally empty with a reason.
 - All destructive or broad changes require confirmation.
 - Units, scope, overwrite behavior, and result path are explicit when relevant.
 - The body includes an “아직 구현/확인 필요” note for any `planned` command.

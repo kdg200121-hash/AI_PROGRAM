@@ -58,6 +58,7 @@ import {
   cloneStoredFlowGraph,
   createSavedFlow,
   duplicateSavedFlow,
+  isFlowRegistered,
   isStoredFlowGraphDirty,
   listWorkflowMenuFlowItems,
   listSavedFlows,
@@ -65,12 +66,13 @@ import {
   loadSavedFlows,
   parseDraggedSavedFlow,
   parseWorkflowMenuFlowId,
+  removeSharedFlowByIdentity,
   removeSavedFlow,
   sampleSharedFlows,
   saveSharedFlows,
   saveSavedFlows,
   serializeSavedFlowForDrag,
-  upsertSharedFlow,
+  upsertSharedFlowByIdentity,
   updateSavedFlowDetails,
   updateSavedFlowGraph,
   workflowMenuFlowId,
@@ -129,7 +131,6 @@ import {
   type SmartGuideRect
 } from "./customFlowSmartGuides";
 import {
-  buildFlowGroupToolSchema,
   buildFlowRunRecords,
   resolveFlowRunNodeIds,
   type FlowRunRecord,
@@ -137,10 +138,16 @@ import {
 } from "./customFlowRunModel";
 import { validateFlowGraph, type FlowValidationIssue } from "./customFlowValidation";
 import {
+  buildSkillUpdateDraft,
+  collectToolLearningEntries,
+  type ToolLearningLogEntry
+} from "./skillLearningDashboard";
+import {
   defaultToolRuntimeSchema,
   defaultSettingOptions,
   isSelectLikeSetting,
   settingDefaultValue,
+  type ToolExecutionStep,
   type ToolRuntimeSchema,
   type ToolSettingField,
   type ToolSettingValue
@@ -150,8 +157,6 @@ import {
   buildToolExecutionRequest,
   type TitleBlockCandidate
 } from "./toolExecutionModel";
-import { openAiToolRunnerDefaultModel } from "./openAiToolRunner";
-import type { OpenAiSettingsStatus } from "./openAiSettings";
 import {
   buildToolExecutionPlan,
   validateToolRuntimeSchema,
@@ -185,6 +190,7 @@ function normalizeToolRuntimeSchemaForRender(schema: ToolRuntimeSchema): ToolRun
       ...(schema.settingsLayout ?? {}),
       sections: schema.settingsLayout?.sections ?? []
     },
+    executionSteps: schema.executionSteps ?? [],
     settings: schema.settings ?? [],
     actions: schema.actions ?? [],
     inputs: schema.inputs ?? [],
@@ -220,7 +226,7 @@ const flowNoteColorOptions = [
 const flowBasicTools: FlowTool[] = [
   {
     id: "basic-excel-export",
-    programIcon: "excel",
+    programIcon: "download",
     name: "Excel 내보내기",
     description: "앞 노드의 결과값을 Excel 표 형식으로 정리합니다.",
     inputs: [{ id: "objects", label: "객체", type: "object", iconName: "objectData" }],
@@ -371,6 +377,8 @@ const customSubmenusStorageKey = "mcp-registry:custom-submenus";
 const submenuMetaStorageKey = "mcp-registry:submenu-meta";
 const customToolsStorageKey = "mcp-registry:custom-tools";
 const deletedGithubToolPathsStorageKey = "mcp-registry:deleted-github-tool-paths";
+const deletedGithubFlowPathsStorageKey = "mcp-registry:deleted-github-flow-paths";
+const appliedSkillLearningIdsStorageKey = "mcp-registry:applied-skill-learning-ids";
 const accountUsersStorageKey = "mcp-registry:account-users";
 const accountPolicyStorageKey = "mcp-registry:account-policy";
 
@@ -432,6 +440,11 @@ const githubToolSource = {
   repo: "AI_PROGRAM",
   path: "tools"
 };
+const githubFlowSource = {
+  owner: "kdg200121-hash",
+  repo: "AI_PROGRAM",
+  path: "flows"
+};
 const githubToolPathPrefix = `github:${githubToolSource.owner}/${githubToolSource.repo}/${githubToolSource.path}/`;
 let tabCounter = 0;
 
@@ -460,6 +473,7 @@ interface CustomToolItem {
   isToolLike: boolean;
   riskWarnings: string[];
   toolSchema?: ToolRuntimeSchema;
+  learningLog?: unknown;
   sourcePath?: string;
   installedPath?: string;
   reviewUrl?: string;
@@ -481,6 +495,7 @@ interface CustomToolVersion {
   isToolLike: boolean;
   riskWarnings: string[];
   toolSchema?: ToolRuntimeSchema;
+  learningLog?: unknown;
 }
 
 type CustomToolSortField = "section" | "name" | "version" | "author" | "usageCount";
@@ -493,6 +508,17 @@ const customToolFilterOptions: Array<{ filter: CustomToolFilter; label: string; 
 type SortDirection = "desc" | "asc";
 type CustomToolFormMode = "new" | "update";
 type MarketDialogTab = "tools" | "flows";
+type ManagementTab = "members" | "tools" | "flows" | "learning";
+type AdminToolManagementTab = "all" | "pending";
+type AdminToolSortField =
+  | "section"
+  | "name"
+  | "version"
+  | "author"
+  | "createdAt"
+  | "approvalStatus"
+  | "reviewState";
+type AdminFlowSortField = "name" | "version" | "author" | "nodeCount" | "sourcePath";
 type AccountUserSortField = "githubId" | "nickname" | "status" | "license" | "joinedAt";
 
 interface CustomToolDraft {
@@ -508,6 +534,7 @@ interface CustomToolDraft {
   isToolLike: boolean;
   riskWarnings: string[];
   toolSchema?: ToolRuntimeSchema;
+  learningLog?: unknown;
   toolWarning: string;
   error: string;
 }
@@ -562,6 +589,7 @@ function createCustomToolDraft(): CustomToolDraft {
     isToolLike: true,
     riskWarnings: [],
     toolSchema: undefined,
+    learningLog: undefined,
     toolWarning: "",
     error: ""
   };
@@ -605,6 +633,7 @@ type ContextMenuState =
       y: number;
     }
   | { type: "customTool"; toolId: string; x: number; y: number }
+  | { type: "sharedFlow"; flowId: string; x: number; y: number }
   | { type: "tab"; tabId: string; x: number; y: number };
 
 type SidebarSource = TabSidebarSource;
@@ -620,6 +649,7 @@ interface WorkflowOpenRequest {
   requestId: number;
   graph: StoredFlowGraph;
   flowId?: string;
+  flowName?: string;
   source?: "shared" | "saved";
 }
 
@@ -627,6 +657,11 @@ interface WorkflowCreateRequest {
   requestId: number;
   submenuSource: "menu" | "favorite" | "recent";
 }
+
+type WorkflowPendingExit =
+  | { type: "home" }
+  | { type: "open"; request: WorkflowOpenRequest }
+  | { type: "create" };
 
 interface WorkflowDetailsUpdateRequest {
   requestId: number;
@@ -796,6 +831,7 @@ function loadCustomTools(): CustomToolItem[] {
           tool.toolSchema && typeof tool.toolSchema === "object"
             ? (tool.toolSchema as ToolRuntimeSchema)
             : undefined,
+        learningLog: tool.learningLog,
         sourcePath: tool.sourcePath ? String(tool.sourcePath) : undefined,
         installedPath: tool.installedPath ? String(tool.installedPath) : undefined,
         reviewUrl: tool.reviewUrl ? String(tool.reviewUrl) : undefined,
@@ -827,7 +863,8 @@ function loadCustomTools(): CustomToolItem[] {
                     ? (version.toolSchema as ToolRuntimeSchema)
                     : tool.toolSchema && typeof tool.toolSchema === "object"
                       ? (tool.toolSchema as ToolRuntimeSchema)
-                      : undefined
+                      : undefined,
+                learningLog: version.learningLog ?? tool.learningLog
               }))
           : undefined
       }));
@@ -841,6 +878,26 @@ function loadDeletedGithubToolPaths() {
     const raw = window.localStorage.getItem(deletedGithubToolPathsStorageKey);
     const paths = raw ? (JSON.parse(raw) as string[]) : [];
     return paths.filter((path): path is string => typeof path === "string" && path.startsWith("github:"));
+  } catch {
+    return [];
+  }
+}
+
+function loadDeletedGithubFlowPaths() {
+  try {
+    const raw = window.localStorage.getItem(deletedGithubFlowPathsStorageKey);
+    const paths = raw ? (JSON.parse(raw) as string[]) : [];
+    return paths.filter((path): path is string => typeof path === "string" && path.startsWith("github:"));
+  } catch {
+    return [];
+  }
+}
+
+function loadAppliedSkillLearningIds() {
+  try {
+    const raw = window.localStorage.getItem(appliedSkillLearningIdsStorageKey);
+    const ids = raw ? (JSON.parse(raw) as unknown[]) : [];
+    return ids.filter((id): id is string => typeof id === "string");
   } catch {
     return [];
   }
@@ -1285,8 +1342,10 @@ export function App() {
   const tabStripRef = useRef<HTMLDivElement>(null);
   const openTabsRef = useRef<HTMLDivElement>(null);
   const storageWritesReadyRef = useRef(false);
+  const hasAutoCheckedMcpOnStartupRef = useRef(false);
   const [selectedId, setSelectedId] = useState<string>("");
   const [serverDraft, setServerDraft] = useState<ServerDraft>(() => createServerDraft("cad"));
+  const [isRegistryLoaded, setIsRegistryLoaded] = useState(() => !window.mcpRegistry);
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [registryError, setRegistryError] = useState("");
   const [autoAddMessage, setAutoAddMessage] = useState("");
@@ -1313,6 +1372,7 @@ export function App() {
   const [isMyToolManagerDialogOpen, setIsMyToolManagerDialogOpen] = useState(false);
   const [isCustomToolFormOpen, setIsCustomToolFormOpen] = useState(false);
   const [marketDialogTab, setMarketDialogTab] = useState<MarketDialogTab>("tools");
+  const [managementTab, setManagementTab] = useState<ManagementTab>("members");
   const [customToolDialogScope, setCustomToolDialogScope] = useState<SidebarSectionId | "all">(
     "servers"
   );
@@ -1327,12 +1387,6 @@ export function App() {
   const [activeSettingsSection, setActiveSettingsSection] =
     useState<SettingsSectionId>("servers");
   const [colorMode, setColorMode] = useState<ColorMode>("light");
-  const [openAiSettingsStatus, setOpenAiSettingsStatus] =
-    useState<OpenAiSettingsStatus | null>(null);
-  const [openAiApiKeyDraft, setOpenAiApiKeyDraft] = useState("");
-  const [openAiModelDraft, setOpenAiModelDraft] = useState(openAiToolRunnerDefaultModel);
-  const [openAiSettingsMessage, setOpenAiSettingsMessage] = useState("");
-  const [isOpenAiSettingsBusy, setIsOpenAiSettingsBusy] = useState(false);
   const [favoriteSectionIds, setFavoriteSectionIds] = useState<SidebarSectionId[]>(() =>
     loadFavoriteSections()
   );
@@ -1360,6 +1414,16 @@ export function App() {
     field: AccountUserSortField;
     direction: SortDirection;
   } | null>(null);
+  const [adminToolManagementTab, setAdminToolManagementTab] =
+    useState<AdminToolManagementTab>("all");
+  const [adminToolSort, setAdminToolSort] = useState<{
+    field: AdminToolSortField;
+    direction: SortDirection;
+  } | null>(null);
+  const [adminFlowSort, setAdminFlowSort] = useState<{
+    field: AdminFlowSortField;
+    direction: SortDirection;
+  } | null>(null);
   const [authDialogMode, setAuthDialogMode] = useState<AuthDialogMode>("login");
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
   const [authDraft, setAuthDraft] = useState({ githubId: githubToolSource.owner, nickname: "" });
@@ -1370,10 +1434,19 @@ export function App() {
   const [customToolPathError, setCustomToolPathError] = useState("");
   const [githubToolStatus, setGithubToolStatus] = useState("");
   const [isGithubToolSyncing, setIsGithubToolSyncing] = useState(false);
+  const [sharedFlowStatus, setSharedFlowStatus] = useState("");
+  const [isSharedFlowSyncing, setIsSharedFlowSyncing] = useState(false);
+  const [appliedSkillLearningIds, setAppliedSkillLearningIds] = useState<string[]>(() =>
+    loadAppliedSkillLearningIds()
+  );
+  const [skillUpdateDraft, setSkillUpdateDraft] = useState("");
   const [customToolSearch, setCustomToolSearch] = useState("");
   const [customToolFilter, setCustomToolFilter] = useState<CustomToolFilter>("all");
   const [deletedGithubToolPaths, setDeletedGithubToolPaths] = useState<string[]>(() =>
     loadDeletedGithubToolPaths()
+  );
+  const [deletedGithubFlowPaths, setDeletedGithubFlowPaths] = useState<string[]>(() =>
+    loadDeletedGithubFlowPaths()
   );
   const [expandedCustomToolIds, setExpandedCustomToolIds] = useState<string[]>([]);
   const [pendingDeleteCustomToolId, setPendingDeleteCustomToolId] = useState<string | null>(null);
@@ -1596,6 +1669,19 @@ export function App() {
   }, [customTools]);
 
   useEffect(() => {
+    if (accountPolicy.toolRegistrationMode !== "open") {
+      return;
+    }
+    setCustomTools((items) =>
+      items.some((tool) => tool.approvalStatus === "pending")
+        ? items.map((tool) =>
+            tool.approvalStatus === "pending" ? { ...tool, approvalStatus: "approved" } : tool
+          )
+        : items
+    );
+  }, [accountPolicy.toolRegistrationMode]);
+
+  useEffect(() => {
     if (!storageWritesReadyRef.current) {
       return;
     }
@@ -1616,6 +1702,26 @@ export function App() {
     if (!storageWritesReadyRef.current) {
       return;
     }
+    window.localStorage.setItem(
+      deletedGithubFlowPathsStorageKey,
+      JSON.stringify(deletedGithubFlowPaths)
+    );
+  }, [deletedGithubFlowPaths]);
+
+  useEffect(() => {
+    if (!storageWritesReadyRef.current) {
+      return;
+    }
+    window.localStorage.setItem(
+      appliedSkillLearningIdsStorageKey,
+      JSON.stringify(appliedSkillLearningIds)
+    );
+  }, [appliedSkillLearningIds]);
+
+  useEffect(() => {
+    if (!storageWritesReadyRef.current) {
+      return;
+    }
     window.localStorage.setItem(accountUsersStorageKey, JSON.stringify(accountUsers));
   }, [accountUsers]);
 
@@ -1629,6 +1735,12 @@ export function App() {
   const isCurrentAdmin = githubUser?.githubId === githubToolSource.owner;
   const currentAccountUser = accountUsers.find((user) => user.githubId === githubUser?.githubId);
   const currentUserNickname = currentAccountUser?.nickname || githubUser?.nickname || "";
+  const isNicknameTakenByOtherUser = (nickname: string, githubId?: string) =>
+    accountUsers.some(
+      (user) =>
+        user.nickname.trim().toLowerCase() === nickname.trim().toLowerCase() &&
+        user.githubId !== githubId
+    );
 
   useEffect(() => {
     if (!githubUser || !isCustomToolFormOpen) {
@@ -1890,10 +2002,13 @@ export function App() {
       return;
     }
 
-    void api.loadRegistry().then((next) => {
-      setRegistry(next);
-      setSelectedId(next.servers[0]?.id ?? "");
-    });
+    void api
+      .loadRegistry()
+      .then((next) => {
+        setRegistry(next);
+        setSelectedId(next.servers[0]?.id ?? "");
+      })
+      .finally(() => setIsRegistryLoaded(true));
   }, []);
 
   const applyProcessResult = (result: ServerProcessResult) => {
@@ -1914,80 +2029,6 @@ export function App() {
       applyProcessResult(await api.getSnapshot());
     } catch (error) {
       setProcessActionMessage((error as Error).message);
-    }
-  };
-
-  const refreshOpenAiSettings = async () => {
-    const api = window.openAiSettings;
-    if (!api) {
-      setOpenAiSettingsMessage("데스크톱 앱에서만 AI 연결 설정을 저장할 수 있습니다.");
-      return;
-    }
-
-    try {
-      const status = await api.get();
-      setOpenAiSettingsStatus(status);
-      setOpenAiModelDraft(status.model || openAiToolRunnerDefaultModel);
-    } catch (error) {
-      setOpenAiSettingsMessage(
-        error instanceof Error ? error.message : "AI 연결 설정을 불러오지 못했습니다."
-      );
-    }
-  };
-
-  const saveOpenAiSettings = async () => {
-    const api = window.openAiSettings;
-    if (!api) {
-      setOpenAiSettingsMessage("데스크톱 앱에서만 AI 연결 설정을 저장할 수 있습니다.");
-      return;
-    }
-
-    if (!openAiApiKeyDraft.trim() && !openAiSettingsStatus?.configured) {
-      setOpenAiSettingsMessage("OpenAI API 키를 입력해주세요.");
-      return;
-    }
-
-    setIsOpenAiSettingsBusy(true);
-    setOpenAiSettingsMessage("");
-    try {
-      const status = await api.save({
-        apiKey: openAiApiKeyDraft.trim() || undefined,
-        model: openAiModelDraft.trim() || openAiToolRunnerDefaultModel
-      });
-      setOpenAiSettingsStatus(status);
-      setOpenAiModelDraft(status.model || openAiToolRunnerDefaultModel);
-      setOpenAiApiKeyDraft("");
-      setOpenAiSettingsMessage("AI 연결 설정을 저장했습니다.");
-    } catch (error) {
-      setOpenAiSettingsMessage(
-        error instanceof Error ? error.message : "AI 연결 설정을 저장하지 못했습니다."
-      );
-    } finally {
-      setIsOpenAiSettingsBusy(false);
-    }
-  };
-
-  const clearOpenAiSettings = async () => {
-    const api = window.openAiSettings;
-    if (!api) {
-      setOpenAiSettingsMessage("데스크톱 앱에서만 AI 연결 설정을 삭제할 수 있습니다.");
-      return;
-    }
-
-    setIsOpenAiSettingsBusy(true);
-    setOpenAiSettingsMessage("");
-    try {
-      const status = await api.clear();
-      setOpenAiSettingsStatus(status);
-      setOpenAiModelDraft(status.model || openAiToolRunnerDefaultModel);
-      setOpenAiApiKeyDraft("");
-      setOpenAiSettingsMessage("저장된 API 키를 삭제했습니다.");
-    } catch (error) {
-      setOpenAiSettingsMessage(
-        error instanceof Error ? error.message : "저장된 API 키를 삭제하지 못했습니다."
-      );
-    } finally {
-      setIsOpenAiSettingsBusy(false);
     }
   };
 
@@ -2053,12 +2094,6 @@ export function App() {
       setSelectedId(visibleServers[0].id);
     }
   }, [activeSettingsSection, isRegistryDialogOpen, registry.servers, selectedId, visibleServers]);
-
-  useEffect(() => {
-    if (isRegistryDialogOpen && activeSettingsSection === "ai") {
-      void refreshOpenAiSettings();
-    }
-  }, [activeSettingsSection, isRegistryDialogOpen]);
 
   const selected = useMemo<McpServerRecord | undefined>(
     () => visibleServers.find((server) => server.id === selectedId),
@@ -2237,11 +2272,11 @@ export function App() {
           ? sharedFlowCatalog.find((item) => item.id === workflowFlowMenu.flowId)
           : workflowSavedFlowsForMenu.find((item) => item.id === workflowFlowMenu.flowId);
       if (flow) {
+        const override = submenuMeta[key];
         return {
           id: submenuId,
-          label: flow.name,
-          description: flow.description,
-          ...submenuMeta[key]
+          label: override?.label ?? flow.name,
+          description: override?.description ?? flow.description
         };
       }
     }
@@ -2251,23 +2286,25 @@ export function App() {
         (tool) => `share-${tool.name}` === submenuId
       );
       if (shareTool) {
+        const override = submenuMeta[key];
         return {
           id: submenuId,
-          label: shareTool.name,
-          description: shareTool.description,
-          ...submenuMeta[key]
+          label: override?.label ?? shareTool.name,
+          description: override?.description ?? shareTool.description,
+          settingsSchema: shareTool.settingsSchema
         };
       }
     }
 
     const customTool = customTools.find((tool) => tool.id === submenuId);
     if (customTool) {
+      const override = submenuMeta[key];
       return {
         id: submenuId,
-        label: customTool.name,
-        description: customTool.description || `${customTool.author} · v${customTool.version}`,
-        settingsSchema: customTool.toolSchema,
-        ...submenuMeta[key]
+        label: override?.label ?? customTool.name,
+        description:
+          override?.description ?? (customTool.description || `${customTool.author} · v${customTool.version}`),
+        settingsSchema: customTool.toolSchema
       };
     }
 
@@ -2286,7 +2323,8 @@ export function App() {
 
     return {
       ...base,
-      ...override
+      label: override?.label ?? base.label,
+      description: override?.description ?? base.description
     };
   };
 
@@ -2316,7 +2354,8 @@ export function App() {
       ...getToolsForWorkspace(workspaceForSection(sectionId)).map((tool) => ({
         id: `share-${tool.name}`,
         label: tool.name,
-        description: tool.description
+        description: tool.description,
+        settingsSchema: tool.settingsSchema
       })),
       ...customTools
         .filter((tool) => tool.sectionId === sectionId && tool.registered)
@@ -2374,6 +2413,7 @@ export function App() {
         requestId: Date.now(),
         graph: cloneStoredFlowGraph(flow.graph),
         flowId: flow.id,
+        flowName: flow.name,
         source: workflowFlowMenu.source
       });
       return;
@@ -2494,6 +2534,15 @@ export function App() {
     try {
       const result = await window.githubAuth.pollLogin(authDevice.deviceCode, nickname || undefined);
       if (result.status === "ok") {
+        if (isNicknameTakenByOtherUser(result.profile.nickname, result.profile.githubId)) {
+          setAuthDraft({
+            githubId: result.profile.githubId,
+            nickname: result.profile.nickname
+          });
+          setAuthDialogMode("profile");
+          setAuthMessage("이미 다른 계정에서 사용하는 닉네임입니다. 다른 닉네임으로 저장해주세요.");
+          return;
+        }
         setGithubUser(result.profile);
         setAuthDraft({
           githubId: result.profile.githubId,
@@ -2520,6 +2569,10 @@ export function App() {
   const saveGitHubProfile = async () => {
     const nickname = authDraft.nickname.trim();
     if (!githubUser || !nickname) {
+      return;
+    }
+    if (isNicknameTakenByOtherUser(nickname, githubUser.githubId)) {
+      setAuthMessage("이미 다른 계정에서 사용하는 닉네임입니다. 다른 닉네임을 입력해주세요.");
       return;
     }
 
@@ -2603,7 +2656,11 @@ export function App() {
     setCustomToolDialogScope(scope);
     setMarketDialogTab(tab);
     setIsCustomToolDialogOpen(true);
-    void syncCustomToolsFromGitHub();
+    if (tab === "flows") {
+      void syncSharedFlowsFromGitHub();
+    } else {
+      void syncCustomToolsFromGitHub();
+    }
     void refreshToolReviewStates();
   };
 
@@ -2619,12 +2676,134 @@ export function App() {
     setIsCustomToolFormOpen(true);
   };
 
-  const registerSharedFlow = (flow: SavedCustomFlow) => {
-    setSharedFlows((items) => upsertSharedFlow(items, flow));
+  const registerSharedFlow = async (flow: SavedCustomFlow) => {
+    if (!githubUser) {
+      openAuthDialog("login");
+      return;
+    }
+    if (!window.customFlows?.publishGithubFlow) {
+      setSharedFlowStatus("현재 환경에서는 GitHub Flow 공유를 사용할 수 없습니다.");
+      return;
+    }
+
+    setIsSharedFlowSyncing(true);
+    setSharedFlowStatus("GitHub flows 폴더에 Flow를 등록하는 중입니다.");
+    try {
+      const result = await window.customFlows.publishGithubFlow(flow, githubFlowSource, {
+        requireReview: !isCurrentAdmin
+      });
+      setSharedFlows((items) =>
+        upsertSharedFlowByIdentity(items, {
+          ...flow,
+          author: currentUserNickname || githubUser.githubId,
+          version: flow.version ?? "1.0.0",
+          sourcePath: result.path
+        })
+      );
+      setSharedFlowStatus(
+        result.kind === "direct"
+          ? "GitHub flows 폴더에 바로 등록했습니다."
+          : `GitHub 공유 PR #${result.pullRequestNumber}을 만들었습니다.`
+      );
+      pushAppNotification({
+        title: "Share Flow 등록",
+        message:
+          result.kind === "direct"
+            ? `${flow.name} 플로우를 Share Flow에 등록했습니다.`
+            : `${flow.name} 플로우 공유 PR을 만들었습니다.`
+      });
+    } catch (error) {
+      setSharedFlowStatus(error instanceof Error ? error.message : "GitHub Flow 공유에 실패했습니다.");
+    } finally {
+      setIsSharedFlowSyncing(false);
+    }
+  };
+
+  function isSharedFlowOwnedByCurrentUser(flow: SavedCustomFlow) {
+    const author = (flow.author ?? "").trim().toLowerCase();
+    return [currentUserNickname, githubUser?.githubId]
+      .filter((value): value is string => Boolean(value))
+      .some((value) => value.trim().toLowerCase() === author);
+  }
+
+  function canUnregisterSharedFlow(flow: SavedCustomFlow) {
+    return isSharedFlowOwnedByCurrentUser(flow);
+  }
+
+  function canManageSharedFlow(flow: SavedCustomFlow) {
+    return isCurrentAdmin || isSharedFlowOwnedByCurrentUser(flow);
+  }
+
+  const unregisterSharedFlow = async (
+    flow: SavedCustomFlow,
+    options: { allowAdmin?: boolean } = {}
+  ) => {
+    const allowed = options.allowAdmin ? canManageSharedFlow(flow) : canUnregisterSharedFlow(flow);
+    if (!allowed) {
+      return;
+    }
+
+    setSharedFlows((items) => removeSharedFlowByIdentity(items, flow));
+    if (flow.sourcePath?.startsWith("github:")) {
+      setDeletedGithubFlowPaths((paths) =>
+        paths.includes(flow.sourcePath ?? "") ? paths : [...paths, flow.sourcePath ?? ""]
+      );
+    }
+    setSharedFlowStatus("");
+
+    if (flow.sourcePath?.startsWith("github:") && window.customFlows?.deleteGithubFlow) {
+      setIsSharedFlowSyncing(true);
+      try {
+        const result = await window.customFlows.deleteGithubFlow(flow.sourcePath);
+        if (result.kind === "pull_request") {
+          setSharedFlowStatus(`GitHub Flow 등록 해제 PR #${result.pullRequestNumber}을 만들었습니다.`);
+        }
+      } catch (error) {
+        setSharedFlowStatus(
+          error instanceof Error
+            ? error.message
+            : "GitHub 원본 Flow 등록 해제에 실패했습니다."
+        );
+      } finally {
+        setIsSharedFlowSyncing(false);
+      }
+    }
+
     pushAppNotification({
-      title: "Share Flow 등록",
-      message: `${flow.name} 플로우를 Share Flow에 추가했습니다.`
+      title: "Share Flow 등록 해제",
+      message: `${flow.name} 공유 등록을 해제했습니다.`
     });
+  };
+
+  const requestDeleteSharedFlow = (flowId: string) => {
+    const flow = listSavedFlows(sharedFlows).find((item) => item.id === flowId);
+    if (!flow || !canManageSharedFlow(flow)) {
+      return;
+    }
+
+    void unregisterSharedFlow(flow, { allowAdmin: true });
+  };
+
+  const syncSharedFlowsFromGitHub = async () => {
+    if (!window.customFlows?.listGithubFlows) {
+      setSharedFlowStatus("현재 환경에서는 GitHub 공유 플로우 목록을 읽을 수 없습니다.");
+      return;
+    }
+
+    setIsSharedFlowSyncing(true);
+    setSharedFlowStatus("GitHub flows 폴더를 확인하는 중입니다.");
+    try {
+      const flows = await window.customFlows.listGithubFlows(githubFlowSource);
+      const visibleFlows = flows.filter(
+        (flow) => !deletedGithubFlowPaths.includes(flow.sourcePath ?? "")
+      );
+      setSharedFlows(visibleFlows);
+      setSharedFlowStatus(visibleFlows.length > 0 ? "" : "GitHub flows 폴더에 공유 Flow가 없습니다.");
+    } catch {
+      setSharedFlowStatus("GitHub 공유 Flow 목록을 읽지 못했습니다. 저장소 공개 여부와 flows 폴더를 확인해주세요.");
+    } finally {
+      setIsSharedFlowSyncing(false);
+    }
   };
 
   const syncCustomToolsFromGitHub = async () => {
@@ -2674,7 +2853,8 @@ export function App() {
             installedPath: tool.path,
             isToolLike: tool.isToolLike,
             riskWarnings: tool.riskWarnings,
-            toolSchema: tool.toolSchema
+            toolSchema: tool.toolSchema,
+            learningLog: tool.learningLog
           });
           groupedTools.set(groupKey, group);
         });
@@ -2704,6 +2884,7 @@ export function App() {
               isToolLike: activeVersion.isToolLike,
               riskWarnings: activeVersion.riskWarnings,
               toolSchema: activeVersion.toolSchema,
+              learningLog: activeVersion.learningLog,
               sourcePath: activeVersion.sourcePath,
               installedPath: activeVersion.installedPath,
               reviewUrl: existing?.reviewUrl,
@@ -2842,7 +3023,8 @@ export function App() {
           installedPath: tool.path,
           isToolLike: tool.isToolLike,
           riskWarnings: tool.riskWarnings,
-          toolSchema: tool.toolSchema
+          toolSchema: tool.toolSchema,
+          learningLog: tool.learningLog
         });
         groupedTools.set(groupKey, group);
       });
@@ -2873,6 +3055,7 @@ export function App() {
             isToolLike: activeVersion.isToolLike,
             riskWarnings: activeVersion.riskWarnings,
             toolSchema: activeVersion.toolSchema,
+            learningLog: activeVersion.learningLog,
             usageCount: 0,
             pinned: existing?.pinned ?? false,
             registered: existing?.registered ?? false,
@@ -2902,6 +3085,7 @@ export function App() {
       isToolLike: selectedFile.isToolLike,
       riskWarnings: selectedFile.riskWarnings,
       toolSchema: selectedFile.toolSchema,
+      learningLog: selectedFile.learningLog,
       toolWarning: selectedFile.isToolLike
         ? ""
         : "이 MD 파일은 툴 문서 형태가 아닐 수 있습니다. 그래도 등록은 가능합니다.",
@@ -2921,6 +3105,7 @@ export function App() {
       isToolLike: tool?.isToolLike ?? draft.isToolLike,
       riskWarnings: tool?.riskWarnings ?? draft.riskWarnings,
       toolSchema: tool?.toolSchema ?? draft.toolSchema,
+      learningLog: tool?.learningLog ?? draft.learningLog,
       toolWarning:
         tool && !tool.isToolLike
           ? "이 MD 파일은 툴 문서 형태가 아닐 수 있습니다. 그래도 등록은 가능합니다."
@@ -3114,6 +3299,7 @@ export function App() {
                 isToolLike: customToolDraft.isToolLike,
                 riskWarnings: customToolDraft.riskWarnings,
                 toolSchema: customToolDraft.toolSchema,
+                learningLog: customToolDraft.learningLog,
                 sourcePath: customToolDraft.filePath,
                 installedPath,
                 reviewUrl,
@@ -3132,7 +3318,8 @@ export function App() {
                     reviewState,
                     isToolLike: customToolDraft.isToolLike,
                     riskWarnings: customToolDraft.riskWarnings,
-                    toolSchema: customToolDraft.toolSchema
+                    toolSchema: customToolDraft.toolSchema,
+                    learningLog: customToolDraft.learningLog
                   }
                 ]
               }
@@ -3161,6 +3348,7 @@ export function App() {
           isToolLike: customToolDraft.isToolLike,
           riskWarnings: customToolDraft.riskWarnings,
           toolSchema: customToolDraft.toolSchema,
+          learningLog: customToolDraft.learningLog,
           sourcePath: customToolDraft.filePath,
           installedPath,
           reviewUrl,
@@ -3299,6 +3487,7 @@ export function App() {
           isToolLike: version.isToolLike,
           riskWarnings: version.riskWarnings,
           toolSchema: version.toolSchema,
+          learningLog: version.learningLog,
           sourcePath: version.sourcePath,
           installedPath: version.installedPath
         };
@@ -3549,6 +3738,21 @@ export function App() {
     setDragOverSubmenu(null);
   };
 
+  const moveSubmenuToEnd = (targetSectionId: SidebarSectionId) => {
+    if (!draggedSubmenu || draggedSubmenu.sectionId !== targetSectionId) {
+      return;
+    }
+
+    setSubmenuOrder((current) => {
+      const currentOrder = getOrderedSubmenuItems(targetSectionId)
+        .map((item) => item.id)
+        .filter((id) => id !== "add" && id !== draggedSubmenu.submenuId);
+      return { ...current, [targetSectionId]: [...currentOrder, draggedSubmenu.submenuId] };
+    });
+    setDraggedSubmenu(null);
+    setDragOverSubmenu(null);
+  };
+
   const moveSidebarSection = (targetSectionId: SidebarSectionId, position: TabDropPosition) => {
     if (!draggedSectionId || draggedSectionId === targetSectionId) {
       return;
@@ -3638,39 +3842,72 @@ export function App() {
     setIsCheckingMcpStatus(true);
     setAutoAddMessage("MCP 서버 상태를 점검하는 중입니다.");
 
-    const statusById = new Map<string, McpServerRecord["status"]>();
-    await Promise.all(
-      registry.servers.map(async (server) => {
-        if (server.connectionType === "stdio") {
-          const processState = processSnapshot.processes.find(
-            (process) => process.serverId === server.id
-          );
-          statusById.set(server.id, processState?.status === "running" ? "running" : "stopped");
-          return;
-        }
-
-        const urls = mcpHealthCheckUrls(server);
-        for (const url of urls) {
-          try {
-            const controller = new AbortController();
-            const timerId = window.setTimeout(() => controller.abort(), 1400);
-            const response = await fetch(url, {
-              method: "GET",
-              signal: controller.signal,
-              cache: "no-store"
-            });
+    const api = window.mcpProcesses;
+    const waitForMcpBridgeStartup = () =>
+      new Promise<void>((resolve) => window.setTimeout(resolve, 450));
+    const checkHttpServerHealth = async (server: McpServerRecord) => {
+      const urls = mcpHealthCheckUrls(server);
+      for (const url of urls) {
+        let timerId: number | undefined;
+        try {
+          const controller = new AbortController();
+          timerId = window.setTimeout(() => controller.abort(), 1400);
+          const response = await fetch(url, {
+            method: "GET",
+            signal: controller.signal,
+            cache: "no-store"
+          });
+          if (response.ok || response.status === 404 || response.status === 405) {
+            return true;
+          }
+        } catch {
+          // Try next known endpoint.
+        } finally {
+          if (timerId !== undefined) {
             window.clearTimeout(timerId);
-            if (response.ok || response.status === 404 || response.status === 405) {
-              statusById.set(server.id, "running");
-              return;
-            }
-          } catch {
-            // Try next known endpoint.
           }
         }
-        statusById.set(server.id, "error");
-      })
-    );
+      }
+
+      return false;
+    };
+
+    const statusById = new Map<string, McpServerRecord["status"]>();
+    for (const server of registry.servers) {
+      if (server.connectionType === "stdio") {
+        const processState = processSnapshot.processes.find(
+          (process) => process.serverId === server.id
+        );
+        statusById.set(server.id, processState?.status === "running" ? "running" : "stopped");
+        continue;
+      }
+
+      if (await checkHttpServerHealth(server)) {
+        statusById.set(server.id, "running");
+        continue;
+      }
+
+      if (server.launchCommand.trim() && api) {
+        try {
+          const result = await api.startServer(server.id);
+          applyProcessResult(result);
+          for (let attempt = 0; attempt < 8; attempt += 1) {
+            await waitForMcpBridgeStartup();
+            if (!(await checkHttpServerHealth(server))) {
+              continue;
+            }
+            statusById.set(server.id, "running");
+            break;
+          }
+        } catch {
+          // If starting fails, fall through to error status for launchable servers.
+        }
+      }
+
+      if (!statusById.has(server.id)) {
+        statusById.set(server.id, server.launchCommand.trim() ? "error" : "stopped");
+      }
+    }
 
     const nextRegistry = {
       ...registry,
@@ -3685,6 +3922,14 @@ export function App() {
     setAutoAddMessage(`상태 점검 완료: 연결 ${running}개 / 오류 ${failed}개`);
     setIsCheckingMcpStatus(false);
   };
+
+  useEffect(() => {
+    if (!isRegistryLoaded || hasAutoCheckedMcpOnStartupRef.current || registry.servers.length === 0) {
+      return;
+    }
+    hasAutoCheckedMcpOnStartupRef.current = true;
+    void checkRegisteredMcpServers();
+  }, [isRegistryLoaded, registry.servers.length]);
 
   const showSidebarContextMenu = (
     event: MouseEvent,
@@ -3934,8 +4179,46 @@ export function App() {
           </div>
         );
       })}
+      {draggedSubmenu?.sectionId === section.id ? (
+        <div
+          className={
+            dragOverSubmenu?.sectionId === section.id && dragOverSubmenu.submenuId === "__end__"
+              ? "submenuEndDropZone active"
+              : "submenuEndDropZone"
+          }
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            event.dataTransfer.dropEffect = "move";
+            setDragOverSubmenu({
+              sectionId: section.id,
+              submenuId: "__end__",
+              position: "after"
+            });
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            moveSubmenuToEnd(section.id);
+          }}
+        />
+      ) : null}
     </div>
   );
+
+  const sharedFlowCatalog = useMemo(() => {
+    const seen = new Set<string>();
+    return [...sampleSharedFlows, ...listSavedFlows(sharedFlows)].filter((flow) => {
+      if (deletedGithubFlowPaths.includes(flow.sourcePath ?? "")) {
+        return false;
+      }
+      if (seen.has(flow.id)) {
+        return false;
+      }
+      seen.add(flow.id);
+      return true;
+    });
+  }, [deletedGithubFlowPaths, sharedFlows]);
 
   const activeSubmenuInfo = activeSubmenuKey ? parseSubmenuKey(activeSubmenuKey) : null;
   const activeSubmenuItem = activeSubmenuInfo
@@ -4042,16 +4325,6 @@ export function App() {
       ? "Market"
       : `${sidebarLabel(customToolDialogScope)} Custom Tools`;
   const isMarketDialog = customToolDialogScope === "all";
-  const sharedFlowCatalog = useMemo(() => {
-    const seen = new Set<string>();
-    return [...sampleSharedFlows, ...listSavedFlows(sharedFlows)].filter((flow) => {
-      if (seen.has(flow.id)) {
-        return false;
-      }
-      seen.add(flow.id);
-      return true;
-    });
-  }, [sharedFlows]);
   const myCustomTools = customTools.filter((tool) => isCustomToolOwnedByCurrentUser(tool)).sort(compareCustomTools);
   const showCompactCustomToolColumns = isCompact;
 
@@ -4153,7 +4426,148 @@ export function App() {
   };
 
   const visibleAccountUsers = [...accountUsers].sort(compareAccountUsers);
-  const pendingReviewTools = customTools.filter((tool) => tool.approvalStatus === "pending");
+  const getAdminToolApprovalLabel = (tool: CustomToolItem) => {
+    if (tool.approvalStatus === "pending") {
+      return "승인 대기";
+    }
+    if (tool.approvalStatus === "rejected") {
+      return "거절";
+    }
+    return "승인됨";
+  };
+
+  const adminToolSortValue = (tool: CustomToolItem, field: AdminToolSortField) => {
+    if (field === "section") {
+      return sidebarLabel(tool.sectionId);
+    }
+    if (field === "createdAt") {
+      return tool.createdAt ? new Date(tool.createdAt).getTime() : 0;
+    }
+    if (field === "approvalStatus") {
+      return getAdminToolApprovalLabel(tool);
+    }
+    if (field === "reviewState") {
+      return tool.reviewState ?? (tool.reviewUrl ? "open" : "shared");
+    }
+    return tool[field];
+  };
+
+  const compareAdminTools = (left: CustomToolItem, right: CustomToolItem) => {
+    if (!adminToolSort) {
+      const approvalDiff =
+        Number(right.approvalStatus === "pending") - Number(left.approvalStatus === "pending");
+      return approvalDiff || left.name.localeCompare(right.name, "ko", { numeric: true });
+    }
+
+    const direction = adminToolSort.direction === "desc" ? -1 : 1;
+    const leftValue = adminToolSortValue(left, adminToolSort.field);
+    const rightValue = adminToolSortValue(right, adminToolSort.field);
+
+    if (typeof leftValue === "number" && typeof rightValue === "number") {
+      return (leftValue - rightValue) * direction;
+    }
+
+    return String(leftValue).localeCompare(String(rightValue), "ko", { numeric: true }) * direction;
+  };
+
+  const visibleManagementTools = customTools
+    .filter((tool) => adminToolManagementTab === "all" || tool.approvalStatus === "pending")
+    .sort(compareAdminTools);
+  const managementSharedFlows = listSavedFlows(sharedFlows).filter(
+    (flow) => !deletedGithubFlowPaths.includes(flow.sourcePath ?? "")
+  );
+
+  const adminFlowSortValue = (flow: SavedCustomFlow, field: AdminFlowSortField) => {
+    if (field === "nodeCount") {
+      return flow.graph.nodes.length;
+    }
+    return field === "sourcePath" ? flow.sourcePath ?? "" : flow[field] ?? "";
+  };
+
+  const compareAdminFlows = (left: SavedCustomFlow, right: SavedCustomFlow) => {
+    if (!adminFlowSort) {
+      return left.name.localeCompare(right.name, "ko", { numeric: true });
+    }
+
+    const direction = adminFlowSort.direction === "desc" ? -1 : 1;
+    const leftValue = adminFlowSortValue(left, adminFlowSort.field);
+    const rightValue = adminFlowSortValue(right, adminFlowSort.field);
+
+    if (typeof leftValue === "number" && typeof rightValue === "number") {
+      return (leftValue - rightValue) * direction;
+    }
+
+    return String(leftValue).localeCompare(String(rightValue), "ko", { numeric: true }) * direction;
+  };
+
+  const visibleManagementFlows = managementSharedFlows.sort(compareAdminFlows);
+
+  const toggleAdminToolSort = (field: AdminToolSortField) => {
+    setAdminToolSort((current) => {
+      if (!current || current.field !== field) {
+        return { field, direction: "desc" };
+      }
+      if (current.direction === "desc") {
+        return { field, direction: "asc" };
+      }
+      return null;
+    });
+  };
+
+  const toggleAdminFlowSort = (field: AdminFlowSortField) => {
+    setAdminFlowSort((current) => {
+      if (!current || current.field !== field) {
+        return { field, direction: "desc" };
+      }
+      if (current.direction === "desc") {
+        return { field, direction: "asc" };
+      }
+      return null;
+    });
+  };
+
+  const renderAdminToolSortHeader = (field: AdminToolSortField, label: string) => (
+    <button className="sortHeaderButton accountSortHeaderButton" type="button" onClick={() => toggleAdminToolSort(field)}>
+      <span>{label}</span>
+      {adminToolSort?.field === field ? (
+        <span className="sortArrow">{adminToolSort.direction === "desc" ? "↓" : "↑"}</span>
+      ) : null}
+    </button>
+  );
+
+  const renderAdminFlowSortHeader = (field: AdminFlowSortField, label: string) => (
+    <button className="sortHeaderButton accountSortHeaderButton" type="button" onClick={() => toggleAdminFlowSort(field)}>
+      <span>{label}</span>
+      {adminFlowSort?.field === field ? (
+        <span className="sortArrow">{adminFlowSort.direction === "desc" ? "↓" : "↑"}</span>
+      ) : null}
+    </button>
+  );
+
+  const skillLearningEntries = collectToolLearningEntries(customTools, appliedSkillLearningIds);
+  const pendingSkillLearningEntries = skillLearningEntries.filter(
+    (entry) => entry.status === "pending"
+  );
+  const appliedSkillLearningEntries = skillLearningEntries.filter(
+    (entry) => entry.status === "applied"
+  );
+
+  const markSkillLearningEntryApplied = (entryId: string) => {
+    setAppliedSkillLearningIds((ids) =>
+      ids.includes(entryId) ? ids : [...ids, entryId]
+    );
+  };
+
+  const buildSkillUpdateDraftPreview = () => {
+    const draft = buildSkillUpdateDraft(skillLearningEntries);
+    setSkillUpdateDraft(draft);
+    if (pendingSkillLearningEntries.length > 0) {
+      pushAppNotification({
+        title: "스킬 업데이트 초안",
+        message: "미반영 학습 데이터를 바탕으로 검토용 초안을 만들었습니다."
+      });
+    }
+  };
 
   const toggleAccountUserSort = (field: AccountUserSortField) => {
     setAccountUserSort((current) => {
@@ -4360,6 +4774,17 @@ export function App() {
                 </span>
               </button>
             ))}
+            <div
+              className={isTabEndDragOver ? "tabEndDropZone active" : "tabEndDropZone"}
+              aria-hidden="true"
+              onDragEnter={markTabEndDragOver}
+              onDragOver={markTabEndDragOver}
+              onDragLeave={() => setIsTabEndDragOver(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                moveOpenTabToEnd();
+              }}
+            />
           </div>
           <div className="tabControlSlot">
             {hiddenTabIds.length === 0 ? (
@@ -4480,17 +4905,6 @@ export function App() {
             </div>
           ) : null}
         </div>
-        <div
-          className={isTabEndDragOver ? "tabEndDropZone active" : "tabEndDropZone"}
-          aria-hidden="true"
-          onDragEnter={markTabEndDragOver}
-          onDragOver={markTabEndDragOver}
-          onDragLeave={() => setIsTabEndDragOver(false)}
-          onDrop={(event) => {
-            event.preventDefault();
-            moveOpenTabToEnd();
-          }}
-        />
         <div className="topUtility">
           <button className="compactButton" onClick={toggleCompactMode}>
             {isCompact ? "Full view" : "Player view"}
@@ -4992,16 +5406,6 @@ export function App() {
                   submenuKey: makeSubmenuKey("workflow", workflowMenuFlowId("saved", flow.id))
                 });
               }}
-              onSaveSubflowTool={(tool) => {
-                setCustomTools((items) => [
-                  tool,
-                  ...items.filter((item) => item.id !== tool.id)
-                ]);
-                pushAppNotification({
-                  title: "Custom Flow 툴 저장",
-                  message: `${tool.name} 그룹을 다시 사용할 수 있는 커스텀 툴로 저장했습니다.`
-                });
-              }}
             />
           </WorkflowErrorBoundary>
         ) : null}
@@ -5458,98 +5862,6 @@ export function App() {
                           </div>
                     </section>
                   </>
-                ) : activeSettingsSection === "ai" ? (
-                  <section className="dialogPanel accountSettingsPanel aiSettingsPanel">
-                    <div className="panelHeader">
-                      <h2>AI 연결</h2>
-                      <span className="panelHeaderNote">
-                        실행 버튼에서 OpenAI API를 직접 호출할 수 있도록 이 컴퓨터의 API 키와 모델을 설정합니다.
-                      </span>
-                    </div>
-                    <div className="accountInfoGrid aiInfoGrid">
-                      <div className="accountInfoCard">
-                        <strong>
-                          {openAiSettingsStatus?.configured ? "연결 준비됨" : "API 키 필요"}
-                        </strong>
-                        <span>
-                          {openAiSettingsStatus?.source === "stored"
-                            ? "설정창에 저장된 API 키를 사용합니다."
-                            : openAiSettingsStatus?.source === "environment"
-                              ? "환경 변수 API 키를 사용합니다."
-                              : "API 키를 저장하면 툴 실행 시 AI 계획을 생성합니다."}
-                        </span>
-                      </div>
-                      <div className="accountInfoCard">
-                        <strong>{openAiSettingsStatus?.model ?? openAiModelDraft}</strong>
-                        <span>사용 모델</span>
-                      </div>
-                      <div className="accountInfoCard">
-                        <strong>
-                          {openAiSettingsStatus?.encryptionAvailable === false
-                            ? "암호화 불가"
-                            : "암호화 저장"}
-                        </strong>
-                        <span>
-                          {openAiSettingsStatus?.updatedAt
-                            ? `마지막 저장: ${new Date(openAiSettingsStatus.updatedAt).toLocaleString()}`
-                            : "API 키 값은 화면에 다시 표시하지 않습니다."}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="openAiSettingsForm">
-                      <label className="field">
-                        <span>OpenAI API 키</span>
-                        <input
-                          autoComplete="off"
-                          placeholder={
-                            openAiSettingsStatus?.configured
-                              ? "새 키를 입력하면 기존 키를 교체합니다."
-                              : "sk-..."
-                          }
-                          type="password"
-                          value={openAiApiKeyDraft}
-                          onChange={(event) => setOpenAiApiKeyDraft(event.target.value)}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>모델</span>
-                        <input
-                          placeholder={openAiToolRunnerDefaultModel}
-                          value={openAiModelDraft}
-                          onChange={(event) => setOpenAiModelDraft(event.target.value)}
-                        />
-                      </label>
-                      {openAiSettingsMessage ? (
-                        <p className="openAiSettingsMessage">{openAiSettingsMessage}</p>
-                      ) : null}
-                      <div className="accountSettingsActions">
-                        <button
-                          className="secondaryAction"
-                          disabled={isOpenAiSettingsBusy}
-                          type="button"
-                          onClick={() => void saveOpenAiSettings()}
-                        >
-                          저장
-                        </button>
-                        <button
-                          className="secondaryAction"
-                          disabled={isOpenAiSettingsBusy}
-                          type="button"
-                          onClick={() => void refreshOpenAiSettings()}
-                        >
-                          새로고침
-                        </button>
-                        <button
-                          className="secondaryAction dangerAction"
-                          disabled={isOpenAiSettingsBusy || openAiSettingsStatus?.source !== "stored"}
-                          type="button"
-                          onClick={() => void clearOpenAiSettings()}
-                        >
-                          저장된 키 삭제
-                        </button>
-                      </div>
-                    </div>
-                  </section>
                 ) : activeSettingsSection === "display" ? (
                   <section className="dialogPanel displayModePanel">
                     <div className="panelHeader">
@@ -5628,6 +5940,25 @@ export function App() {
                       </div>
                     ) : (
                       <>
+                        <div className="managementTabs" role="tablist" aria-label="관리 분류">
+                          {[
+                            { id: "members" as const, label: "회원 관리" },
+                            { id: "tools" as const, label: "툴 관리" },
+                            { id: "flows" as const, label: "플로우 관리" },
+                            { id: "learning" as const, label: "스킬 데이터" }
+                          ].map((tab) => (
+                            <button
+                              key={tab.id}
+                              className={managementTab === tab.id ? "active" : ""}
+                              type="button"
+                              onClick={() => setManagementTab(tab.id)}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                        {managementTab === "members" ? (
+                        <>
                         <div className="adminPolicyGrid">
                           <div className="adminPolicyCard">
                             <strong>회원가입 방식</strong>
@@ -5763,11 +6094,14 @@ export function App() {
                             </tbody>
                           </table>
                         </div>
+                        </>
+                        ) : null}
+                        {managementTab === "tools" ? (
                         <div className="accountUserList pendingToolList">
                           <div className="panelHeader compactPanelHeader">
-                            <h2>승인 대기 툴</h2>
+                            <h2>툴 관리</h2>
                             <span className="panelHeaderNote">
-                              앱 승인 대기 또는 GitHub PR 대기 중인 툴입니다.
+                              전체 툴과 승인 대기 툴을 나눠서 확인하고 관리합니다.
                             </span>
                             <div className="panelHeaderActions">
                               <button
@@ -5781,20 +6115,36 @@ export function App() {
                               </button>
                             </div>
                           </div>
+                          <div className="managementSubTabs" role="tablist" aria-label="툴 관리 분류">
+                            {[
+                              { id: "all" as const, label: "모든 툴" },
+                              { id: "pending" as const, label: "승인 대기 툴" }
+                            ].map((tab) => (
+                              <button
+                                key={tab.id}
+                                className={adminToolManagementTab === tab.id ? "active" : ""}
+                                type="button"
+                                onClick={() => setAdminToolManagementTab(tab.id)}
+                              >
+                                {tab.label}
+                              </button>
+                            ))}
+                          </div>
                           <table>
                             <thead>
                               <tr>
-                                <th>툴</th>
-                                <th>버전</th>
-                                <th>제작자</th>
-                                <th>등록일</th>
-                                <th>앱 승인</th>
-                                <th>GitHub</th>
+                                <th>{renderAdminToolSortHeader("name", "툴")}</th>
+                                <th>{renderAdminToolSortHeader("section", "프로그램")}</th>
+                                <th>{renderAdminToolSortHeader("version", "버전")}</th>
+                                <th>{renderAdminToolSortHeader("author", "제작자")}</th>
+                                <th>{renderAdminToolSortHeader("createdAt", "등록일")}</th>
+                                <th>{renderAdminToolSortHeader("approvalStatus", "앱 승인")}</th>
+                                <th>{renderAdminToolSortHeader("reviewState", "GitHub")}</th>
                                 <th>관리</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {pendingReviewTools.map((tool) => (
+                              {visibleManagementTools.map((tool) => (
                                 <tr
                                   key={tool.id}
                                   onContextMenu={(event) => {
@@ -5808,10 +6158,11 @@ export function App() {
                                   }}
                                 >
                                   <td>{tool.name}</td>
+                                  <td>{sidebarLabel(tool.sectionId)}</td>
                                   <td>{tool.version}</td>
                                   <td>{tool.author}</td>
                                   <td>{formatToolCreatedDate(tool.createdAt)}</td>
-                                  <td>{tool.approvalStatus === "pending" ? "승인 대기" : "승인됨"}</td>
+                                  <td>{getAdminToolApprovalLabel(tool)}</td>
                                   <td>{tool.reviewUrl ? toolReviewLabel(tool) : "공유 완료"}</td>
                                   <td>
                                     <div className="accountTableActions">
@@ -5834,20 +6185,119 @@ export function App() {
                                           PR 보기
                                         </a>
                                       ) : null}
+                                      {canDeleteCustomTool(tool) ? (
+                                        <button
+                                          className="tableActionButton unregisterAction"
+                                          type="button"
+                                          onClick={() => requestDeleteCustomTool(tool.id)}
+                                        >
+                                          삭제
+                                        </button>
+                                      ) : null}
                                     </div>
                                   </td>
                                 </tr>
                               ))}
-                              {pendingReviewTools.length === 0 ? (
+                              {visibleManagementTools.length === 0 ? (
                                 <tr>
-                                  <td className="emptyTableCell" colSpan={7}>
-                                    승인 대기 중인 툴이 없습니다.
+                                  <td className="emptyTableCell" colSpan={8}>
+                                    표시할 툴이 없습니다.
                                   </td>
                                 </tr>
                               ) : null}
                             </tbody>
                           </table>
                         </div>
+                        ) : null}
+                        {managementTab === "flows" ? (
+                        <div className="accountUserList flowManagementList">
+                          <div className="panelHeader compactPanelHeader">
+                            <h2>Share Flow 목록</h2>
+                            <span className="panelHeaderNote">
+                              GitHub flows 폴더에서 불러온 공유 플로우를 확인합니다.
+                            </span>
+                            <div className="panelHeaderActions">
+                              <button
+                                className="secondaryAction iconOnlyAction"
+                                type="button"
+                                aria-label="Flow 새로고침"
+                                title="Flow 새로고침"
+                                onClick={() => void syncSharedFlowsFromGitHub()}
+                                disabled={isSharedFlowSyncing}
+                              >
+                                <RefreshIcon />
+                              </button>
+                            </div>
+                          </div>
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>{renderAdminFlowSortHeader("name", "Flow")}</th>
+                                <th>{renderAdminFlowSortHeader("version", "버전")}</th>
+                                <th>{renderAdminFlowSortHeader("author", "제작자")}</th>
+                                <th>{renderAdminFlowSortHeader("nodeCount", "노드")}</th>
+                                <th>{renderAdminFlowSortHeader("sourcePath", "출처")}</th>
+                                <th>관리</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {visibleManagementFlows.map((flow) => (
+                                <tr
+                                  key={flow.id}
+                                  onContextMenu={(event) => {
+                                    event.preventDefault();
+                                    setContextMenu({
+                                      type: "sharedFlow",
+                                      flowId: flow.id,
+                                      x: event.clientX,
+                                      y: event.clientY
+                                    });
+                                  }}
+                                >
+                                  <td>{flow.name}</td>
+                                  <td>{flow.version ?? "1.0.0"}</td>
+                                  <td>{flow.author ?? "MCP Registry"}</td>
+                                  <td>{flow.graph.nodes.length}</td>
+                                  <td>{flow.sourcePath ?? "GitHub Flow"}</td>
+                                  <td>
+                                    <div className="accountTableActions">
+                                      {canManageSharedFlow(flow) ? (
+                                        <button
+                                          className="tableActionButton unregisterAction"
+                                          type="button"
+                                          onClick={() => requestDeleteSharedFlow(flow.id)}
+                                        >
+                                          삭제
+                                        </button>
+                                      ) : (
+                                        <button className="tableActionButton" type="button" disabled>
+                                          권한 없음
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                              {visibleManagementFlows.length === 0 ? (
+                                <tr>
+                                  <td className="emptyTableCell" colSpan={6}>
+                                    공유 Flow가 없습니다.
+                                  </td>
+                                </tr>
+                              ) : null}
+                            </tbody>
+                          </table>
+                        </div>
+                        ) : null}
+                        {managementTab === "learning" ? (
+                          <SkillLearningDashboard
+                            appliedEntries={appliedSkillLearningEntries}
+                            draft={skillUpdateDraft}
+                            onBuildDraft={buildSkillUpdateDraftPreview}
+                            onMarkApplied={markSkillLearningEntryApplied}
+                            pendingEntries={pendingSkillLearningEntries}
+                          />
+                        ) : null}
                       </>
                     )}
                   </section>
@@ -5920,7 +6370,7 @@ export function App() {
                 </span>
               </div>
               <div className="dialogHeaderActions">
-                {!isMarketDialog || marketDialogTab === "tools" ? (
+                {!isMarketDialog ? (
                   <>
                     <button
                       className="secondaryAction registerToolButton"
@@ -5979,13 +6429,35 @@ export function App() {
               {!isMarketDialog || marketDialogTab === "tools" ? (
                 <>
               <div className="customToolToolbar">
-                <div className="customToolToolbarRow">
+                <div className={isMarketDialog ? "customToolToolbarRow marketToolsToolbarRow" : "customToolToolbarRow"}>
                   <input
                     value={customToolSearch}
                     onChange={(event) => setCustomToolSearch(event.target.value)}
                     placeholder="툴 이름, 버전, 제작자 검색"
                     aria-label="커스텀 툴 검색"
                   />
+                  {isMarketDialog ? (
+                    <>
+                      <button
+                        className="secondaryAction registerToolButton"
+                        type="button"
+                        aria-label="툴 등록"
+                        title="툴 등록"
+                        onClick={openCustomToolForm}
+                      >
+                        <span className="dialogHeaderButtonLabel">툴 등록</span>
+                      </button>
+                      <button
+                        className="secondaryAction registerToolButton"
+                        type="button"
+                        aria-label="내 툴 관리"
+                        title="내 툴 관리"
+                        onClick={() => setIsMyToolManagerDialogOpen(true)}
+                      >
+                        <span className="dialogHeaderButtonLabel">내 툴 관리</span>
+                      </button>
+                    </>
+                  ) : null}
                   <button
                     className="secondaryAction githubRefreshButton"
                     type="button"
@@ -6050,18 +6522,6 @@ export function App() {
                         {customToolDialogScope === "all" ? <td>{sidebarLabel(tool.sectionId)}</td> : null}
                         <td>
                           <span className="customToolNameCell">
-                            <span>{tool.name}</span>
-                            {tool.approvalStatus === "pending" ? (
-                              <span className="toolApprovalBadge">승인 대기</span>
-                            ) : null}
-                            {tool.approvalStatus === "rejected" ? (
-                              <span className="toolApprovalBadge rejected">거절됨</span>
-                            ) : null}
-                            {tool.reviewUrl || tool.reviewState === "merged" ? (
-                              <span className={`toolApprovalBadge prBadge ${tool.reviewState ?? "open"}`}>
-                                {toolReviewLabel(tool)}
-                              </span>
-                            ) : null}
                             {tool.riskWarnings.length > 0 ? (
                               <button
                                 className="toolRiskBadge"
@@ -6075,6 +6535,18 @@ export function App() {
                               >
                                 주의
                               </button>
+                            ) : null}
+                            <span className="customToolNameText">{tool.name}</span>
+                            {tool.approvalStatus === "pending" ? (
+                              <span className="toolApprovalBadge">승인 대기</span>
+                            ) : null}
+                            {tool.approvalStatus === "rejected" ? (
+                              <span className="toolApprovalBadge rejected">거절됨</span>
+                            ) : null}
+                            {tool.reviewUrl || tool.reviewState === "merged" ? (
+                              <span className={`toolApprovalBadge prBadge ${tool.reviewState ?? "open"}`}>
+                                {toolReviewLabel(tool)}
+                              </span>
                             ) : null}
                           </span>
                         </td>
@@ -6179,9 +6651,14 @@ export function App() {
                 </>
               ) : (
                 <MarketFlowPanel
+                  isSharedFlowSyncing={isSharedFlowSyncing}
+                  onRefreshSharedFlows={() => void syncSharedFlowsFromGitHub()}
                   sharedFlows={sharedFlowCatalog}
+                  sharedFlowStatus={sharedFlowStatus}
                   savedFlows={workflowSavedFlowsForMenu}
                   onRegisterSharedFlow={registerSharedFlow}
+                  onUnregisterSharedFlow={(flow) => void unregisterSharedFlow(flow)}
+                  canUnregisterSharedFlow={canUnregisterSharedFlow}
                 />
               )}
               </div>
@@ -6559,6 +7036,24 @@ export function App() {
                   삭제
                 </button>
               ) : null}
+            </>
+          ) : contextMenu.type === "sharedFlow" ? (
+            <>
+              {managementSharedFlows.find(
+                (flow) => flow.id === contextMenu.flowId && canManageSharedFlow(flow)
+              ) ? (
+                <button
+                  className="danger"
+                  onClick={() => {
+                    requestDeleteSharedFlow(contextMenu.flowId);
+                    setContextMenu(null);
+                  }}
+                >
+                  삭제
+                </button>
+              ) : (
+                <button disabled>삭제 권한 없음</button>
+              )}
             </>
           ) : (
             <>
@@ -7024,7 +7519,21 @@ function SubmenuPage({
   submenu: SubmenuItem;
 }) {
   const [settingValues, setSettingValues] = useState<Record<string, ToolSettingValue>>({});
-  const principleSteps = operationPrincipleSteps(menuLabel, submenu);
+  const executionSteps = useMemo(
+    () =>
+      executionStepsForTool(
+        menuLabel,
+        submenu.label,
+        submenu.settingsSchema,
+        submenu.description
+      ),
+    [menuLabel, submenu.description, submenu.label, submenu.settingsSchema]
+  );
+  const [activeStepId, setActiveStepId] = useState(() => activeExecutionStepId(executionSteps));
+  const activeStep = executionSteps.find((step) => step.id === activeStepId) ?? executionSteps[0];
+  const activeStepSchema = submenu.settingsSchema && activeStep
+    ? schemaForExecutionStep(submenu.settingsSchema, activeStep)
+    : submenu.settingsSchema;
   const settingPresetControls = useStandaloneToolPresets(
     submenu.id,
     submenu.label,
@@ -7038,36 +7547,45 @@ function SubmenuPage({
     );
   }, [submenu.id, submenu.settingsSchema]);
 
+  useEffect(() => {
+    if (!executionSteps.some((step) => step.id === activeStepId)) {
+      setActiveStepId(activeExecutionStepId(executionSteps));
+    }
+  }, [activeStepId, executionSteps]);
+
   return (
     <section className="sectionView submenuPage">
       <div className="submenuLayout">
         <section className="panel submenuWorkPanel">
-          <div className="panelHeader">
+          <div className="panelHeader executionStepHeader">
             <div>
-              <h2>작동 원리</h2>
+              <h2>실행 단계</h2>
               <span className="panelHeaderNote">
-                {submenu.label} 툴이 {menuLabel} 작업에서 움직이는 흐름입니다.
+                {submenu.label} 툴을 단계별로 확인하고 실행합니다.
               </span>
             </div>
+            <ToolRiskBadges schema={submenu.settingsSchema} />
           </div>
-          <ToolRiskSummary schema={submenu.settingsSchema} />
-          <div className="principleList">
-            {principleSteps.map((step) => (
-              <div key={step.title}>
-                <strong>{step.title}</strong>
-                <span>{step.description}</span>
-              </div>
-            ))}
+          <ExecutionStepSelector
+            steps={executionSteps}
+            activeStepId={activeStep?.id ?? ""}
+            onSelect={setActiveStepId}
+          />
+          <div className="executionStepSummary">
+            <strong>{activeStep?.label ?? "실행 단계"}</strong>
+            <span>{activeStep?.description ?? submenu.description}</span>
           </div>
         </section>
 
         <section className="panel submenuConfigPanel">
           <div className="panelHeader">
             <div>
-              <h2>설정</h2>
-              <span className="panelHeaderNote">툴 실행 전에 필요한 기준값을 입력합니다.</span>
+              <h2>{activeStep?.label ?? "단계 설정"}</h2>
+              <span className="panelHeaderNote">
+                {activeStep?.description ?? "현재 단계에 필요한 값을 확인합니다."}
+              </span>
             </div>
-            {submenu.settingsSchema ? (
+            {submenu.settingsSchema && activeStep?.section ? (
               <SettingPresetControls
                 presets={settingPresetControls.presets}
                 values={settingValues}
@@ -7080,10 +7598,10 @@ function SubmenuPage({
               />
             ) : null}
           </div>
-          {submenu.settingsSchema ? (
+          {activeStepSchema ? (
             <div className="toolPageSchemaSettings">
               <FlowNodeSchemaSettings
-                schema={submenu.settingsSchema}
+                schema={activeStepSchema}
                 values={settingValues}
                 onChange={(field, value) =>
                   setSettingValues((values) => ({
@@ -7229,7 +7747,7 @@ function HomeDashboard({
           <div className="homeListItem homeToolSaveItem">
             <div>
               <strong>프로그램 MCP 등록</strong>
-              <span>/등록 명령으로 MCP 브리지를 만들고 Settings &gt; AI 연결의 API 키 설정까지 확인합니다.</span>
+              <span>/등록 명령으로 프로그램 MCP 브리지를 만들고 Settings &gt; MCP 서버에서 연결 상태를 확인합니다.</span>
             </div>
             <button
               className="secondaryAction homeDownloadButton"
@@ -7718,6 +8236,55 @@ function ToolRiskSummary({ schema }: { schema?: ToolRuntimeSchema }) {
   );
 }
 
+function ToolRiskBadges({ schema }: { schema?: ToolRuntimeSchema }) {
+  if (!schema) {
+    return null;
+  }
+  const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
+
+  return (
+    <div className="executionStepMetaBadges" aria-label="툴 실행 조건">
+      <span className={`schemaRiskPill risk-${safeSchema.risk}`}>{toolRiskLabels[safeSchema.risk]}</span>
+      <span className="schemaRiskPill">{schemaRequiredServerLabel(safeSchema)}</span>
+    </div>
+  );
+}
+
+function ExecutionStepSelector({
+  steps,
+  activeStepId,
+  onSelect
+}: {
+  steps: ToolExecutionStep[];
+  activeStepId: string;
+  onSelect: (stepId: string) => void;
+}) {
+  return (
+    <div className="executionStepSelector" role="tablist" aria-label="실행 단계">
+      {steps.map((step, index) => (
+        <button
+          className={[
+            "executionStepButton",
+            activeStepId === step.id ? "active" : "",
+            activeStepId === step.id ? "activeCurrent" : "",
+            step.state
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          key={step.id}
+          onClick={() => onSelect(step.id)}
+          role="tab"
+          type="button"
+        >
+          <strong>{index + 1}</strong>
+          <span>{step.label}</span>
+          <small>{step.description}</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function isTitleBlockCandidateSchema(schema: ToolRuntimeSchema) {
   const text = [
     ...schema.settings.flatMap((field) => [field.id, field.label, field.description]),
@@ -7803,6 +8370,88 @@ function operationPrincipleSteps(menuLabel: string, submenu: SubmenuItem) {
     submenu.settingsSchema,
     submenu.description
   );
+}
+
+function executionStepsForTool(
+  menuLabel: string,
+  toolLabel: string,
+  schemaInput?: ToolRuntimeSchema,
+  fallbackDescription?: string
+): ToolExecutionStep[] {
+  const schema = schemaInput ? normalizeToolRuntimeSchemaForRender(schemaInput) : undefined;
+  if (schema?.executionSteps?.length) {
+    return schema.executionSteps;
+  }
+
+  if (schema?.settingsLayout.mode === "steps" && schema.settingsLayout.sections.length > 0) {
+    const sectionSteps = schema.settingsLayout.sections.map((section, index) => ({
+      id: section.id,
+      label: section.label,
+      description:
+        index === 0
+          ? "이 단계에서 필요한 설정값을 입력하거나 수정합니다."
+          : `${section.label} 기준을 확인하고 다음 단계로 넘깁니다.`,
+      section: section.id,
+      state: index === 0 ? "active" : "waiting"
+    } satisfies ToolExecutionStep));
+    const actionSteps = schema.actions.map((action) => ({
+      id: `action-${action.id}`,
+      label: action.label,
+      description: action.description || "입력값을 기준으로 실행합니다.",
+      actionId: action.id,
+      state: action.requiresPreview ? "waiting" : "active"
+    } satisfies ToolExecutionStep));
+    return [...sectionSteps, ...actionSteps];
+  }
+
+  const principleSteps = operationPrincipleStepsForTool(
+    menuLabel,
+    toolLabel,
+    schema,
+    fallbackDescription
+  );
+  const labels = schema?.actions.length
+    ? ["설정 입력", schema.actions[0]?.label ?? "미리보기", schema.actions[1]?.label ?? "결과 확인"]
+    : ["설정 입력", "실행 흐름", "결과 확인"];
+
+  return principleSteps.map((step, index) => ({
+    id: `step-${index + 1}`,
+    label: labels[index] ?? step.title,
+    description: step.description,
+    section: index === 0 ? schema?.settingsLayout.sections[0]?.id : undefined,
+    actionId: index > 0 ? schema?.actions[index - 1]?.id : undefined,
+    state: index === 0 ? "active" : "waiting"
+  }));
+}
+
+function activeExecutionStepId(steps: ToolExecutionStep[]) {
+  return steps.find((step) => step.state === "active")?.id ?? steps[0]?.id ?? "";
+}
+
+function schemaForExecutionStep(schema: ToolRuntimeSchema, step: ToolExecutionStep) {
+  const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
+  const defaultSectionId = safeSchema.settingsLayout.sections[0]?.id ?? "basic";
+  const sectionId = step.section;
+  const section =
+    sectionId && safeSchema.settingsLayout.sections.find((item) => item.id === sectionId);
+  const settings = sectionId
+    ? safeSchema.settings.filter((field) => (field.section ?? defaultSectionId) === sectionId)
+    : step.actionId
+      ? []
+      : safeSchema.settings;
+  const actions = step.actionId
+    ? safeSchema.actions.filter((action) => action.id === step.actionId)
+    : safeSchema.actions.filter((action) => action.runtimeAction === step.id || action.id === step.id);
+
+  return {
+    ...safeSchema,
+    settings,
+    actions,
+    settingsLayout: {
+      ...safeSchema.settingsLayout,
+      sections: section ? [section] : safeSchema.settingsLayout.sections
+    }
+  };
 }
 
 const issueToneLabels: Record<ToolRuntimeIssue["severity"], string> = {
@@ -7926,12 +8575,6 @@ function ToolExecutionActions({
   const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
   const actions = safeSchema.actions;
   const previewRows = previewGenerated ? buildToolPreviewSummary(safeSchema, values) : [];
-  const visibleSettingCount = safeSchema.settings.filter((field) => !field.hidden).length;
-  const fileListField = safeSchema.settings.find(
-    (field) => field.type === "repeatable-list" && field.itemType === "file"
-  );
-  const fileListValue = fileListField && values ? values[fileListField.id] : undefined;
-  const fileCount = Array.isArray(fileListValue) ? fileListValue.length : 0;
   const usesTitleBlockCandidates = isTitleBlockCandidateSchema(safeSchema);
   const candidateOptions = usesTitleBlockCandidates ? titleBlockCandidates : [];
   const selectedCandidateId = valueAsText(values?.[titleBlockCandidateValueKey]);
@@ -7978,23 +8621,6 @@ function ToolExecutionActions({
         <span>실행</span>
         <small>입력값을 확인하고 미리보기 후 실행합니다.</small>
       </header>
-      <div className="schemaWorkflowSteps" aria-label="실행 단계">
-        <div className="schemaWorkflowStep complete">
-          <strong>1</strong>
-          <span>입력</span>
-          <small>{fileListField ? `${fileCount}개 파일` : `${visibleSettingCount}개 항목`}</small>
-        </div>
-        <div className={previewGenerated ? "schemaWorkflowStep complete" : "schemaWorkflowStep active"}>
-          <strong>2</strong>
-          <span>미리보기</span>
-          <small>{previewGenerated ? "미리보기 완료" : "대기"}</small>
-        </div>
-        <div className={previewGenerated ? "schemaWorkflowStep active" : "schemaWorkflowStep"}>
-          <strong>3</strong>
-          <span>실행</span>
-          <small>{previewGenerated ? "확인 가능" : "미리보기 필요"}</small>
-        </div>
-      </div>
       <div className="schemaActionButtons">
         {actions.map((action) => {
           const blockedByPreview = action.requiresPreview && !previewGenerated;
@@ -8520,23 +9146,6 @@ function FlowNodeSchemaSettings({
         onRuntimeValueChange={onRuntimeValueChange}
       />
 
-      {showPresetControls ? (
-      <section className="schemaSettingsSection schemaPresetSection">
-        <header>
-          <span>저장한 설정</span>
-          <SettingPresetControls
-            presets={presets}
-            values={values}
-            onSavePreset={onSavePreset}
-            onLoadPreset={onLoadPreset}
-            onDeletePreset={onDeletePreset}
-            onRenamePreset={onRenamePreset}
-            showCurrentNote={false}
-          />
-        </header>
-      </section>
-      ) : null}
-
       {sections.map((section, sectionIndex) => {
         const fields = fieldsBySection.get(section.id) ?? [];
         if (fields.length === 0) {
@@ -8546,24 +9155,38 @@ function FlowNodeSchemaSettings({
 
         return (
           <section className="schemaSettingsSection" key={section.id}>
-            <button
-              className="schemaSectionToggle"
-              onClick={() =>
-                setOpenSectionIds((current) =>
-                  current.includes(section.id)
-                    ? current.filter((id) => id !== section.id)
-                    : [...current, section.id]
-                )
-              }
-              type="button"
-            >
-              <span>
-                {isOpen ? "▴" : "▾"}
-                {safeSchema.settingsLayout.mode === "steps" ? `${sectionIndex + 1}. ` : ""}
-                {section.label}
-              </span>
-              {section.defaultOpen === false ? <small>고급</small> : null}
-            </button>
+            <header className="schemaSectionHeader">
+              <button
+                className="schemaSectionToggle"
+                onClick={() =>
+                  setOpenSectionIds((current) =>
+                    current.includes(section.id)
+                      ? current.filter((id) => id !== section.id)
+                      : [...current, section.id]
+                  )
+                }
+                type="button"
+              >
+                <span>
+                  {isOpen ? "▴" : "▾"}
+                  {safeSchema.settingsLayout.mode === "steps" ? `${sectionIndex + 1}. ` : ""}
+                  {section.label}
+                </span>
+                {section.defaultOpen === false ? <small>고급</small> : null}
+              </button>
+              {showPresetControls && sectionIndex === 0 ? (
+                <SettingPresetControls
+                  presets={presets}
+                  values={values}
+                  onSavePreset={onSavePreset}
+                  onLoadPreset={onLoadPreset}
+                  onDeletePreset={onDeletePreset}
+                  onRenamePreset={onRenamePreset}
+                  showCurrentNote={false}
+                  inline
+                />
+              ) : null}
+            </header>
             {isOpen ? (
               <div className="schemaSettingsFields">
                 {fields.map((field) => (
@@ -9108,96 +9731,283 @@ function FlowNodeResultPreview({ record }: { record?: FlowRunRecord }) {
   );
 }
 
+function SkillLearningDashboard({
+  appliedEntries,
+  draft,
+  onBuildDraft,
+  onMarkApplied,
+  pendingEntries
+}: {
+  appliedEntries: ToolLearningLogEntry[];
+  draft: string;
+  onBuildDraft: () => void;
+  onMarkApplied: (entryId: string) => void;
+  pendingEntries: ToolLearningLogEntry[];
+}) {
+  return (
+    <div className="accountUserList skillLearningDashboard">
+      <div className="panelHeader compactPanelHeader">
+        <h2>스킬 데이터</h2>
+        <span className="panelHeaderNote">
+          MD 툴의 learningLog를 모아 /save, /make 스킬 보완 후보를 검토합니다.
+        </span>
+        <div className="panelHeaderActions">
+          <button className="secondaryAction" type="button" onClick={onBuildDraft}>
+            스킬 업데이트 초안
+          </button>
+        </div>
+      </div>
+      <div className="skillLearningSummary">
+        <div>
+          <strong>{pendingEntries.length}</strong>
+          <span>미반영</span>
+        </div>
+        <div>
+          <strong>{appliedEntries.length}</strong>
+          <span>반영됨</span>
+        </div>
+      </div>
+      <div className="skillLearningColumns">
+        <section>
+          <strong>미반영 항목</strong>
+          {pendingEntries.length > 0 ? (
+            pendingEntries.map((entry) => (
+              <article className="skillLearningCard" key={entry.id}>
+                <div>
+                  <strong>{entry.title}</strong>
+                  <span>{entry.summary}</span>
+                  {entry.recommendation ? <small>{entry.recommendation}</small> : null}
+                  <em>
+                    {entry.toolName} v{entry.version} · {entry.author}
+                  </em>
+                </div>
+                <button type="button" onClick={() => onMarkApplied(entry.id)}>
+                  반영 처리
+                </button>
+              </article>
+            ))
+          ) : (
+            <p className="emptyState compactEmptyState centeredEmptyState">
+              미반영 학습 데이터가 없습니다.
+            </p>
+          )}
+        </section>
+        <section>
+          <strong>반영됨</strong>
+          {appliedEntries.length > 0 ? (
+            appliedEntries.map((entry) => (
+              <article className="skillLearningCard applied" key={entry.id}>
+                <div>
+                  <strong>{entry.title}</strong>
+                  <span>{entry.summary}</span>
+                  <em>
+                    {entry.toolName} v{entry.version}
+                  </em>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="emptyState compactEmptyState centeredEmptyState">
+              아직 반영 처리한 항목이 없습니다.
+            </p>
+          )}
+        </section>
+      </div>
+      {draft ? <textarea className="skillUpdateDraft" readOnly value={draft} /> : null}
+    </div>
+  );
+}
+
 function startSavedFlowDrag(event: DragEvent<HTMLElement>, flow: SavedCustomFlow) {
   event.dataTransfer.effectAllowed = "copy";
   event.dataTransfer.setData("application/x-custom-flow", serializeSavedFlowForDrag(flow));
 }
 
 function flowCardMeta(flow: SavedCustomFlow) {
-  return `노드 ${flow.graph.nodes.length} / 연결 ${flow.graph.connections.length}`;
+  const author = flow.author ?? "MCP Registry";
+  const version = flow.version ?? "1.0.0";
+  return `v${version} · ${author} · 노드 ${flow.graph.nodes.length} / 연결 ${flow.graph.connections.length}`;
 }
 
 function MarketFlowPanel({
+  isSharedFlowSyncing,
+  onRefreshSharedFlows,
   sharedFlows,
+  sharedFlowStatus,
   savedFlows,
-  onRegisterSharedFlow
+  onRegisterSharedFlow,
+  onUnregisterSharedFlow,
+  canUnregisterSharedFlow
 }: {
+  isSharedFlowSyncing: boolean;
+  onRefreshSharedFlows: () => void;
   sharedFlows: SavedCustomFlow[];
+  sharedFlowStatus: string;
   savedFlows: SavedCustomFlow[];
   onRegisterSharedFlow: (flow: SavedCustomFlow) => void;
+  onUnregisterSharedFlow: (flow: SavedCustomFlow) => void;
+  canUnregisterSharedFlow: (flow: SavedCustomFlow) => boolean;
 }) {
-  const sharedFlowIds = new Set(sharedFlows.map((flow) => flow.id));
+  const [flowSearch, setFlowSearch] = useState("");
+  const normalizedSearch = flowSearch.trim().toLocaleLowerCase();
+  const matchesFlowSearch = (flow: SavedCustomFlow) =>
+    !normalizedSearch ||
+    [flow.name, flow.description, flow.version ?? "", flow.author ?? ""]
+      .join(" ")
+      .toLocaleLowerCase()
+      .includes(normalizedSearch);
+  const visibleSharedFlows = sharedFlows.filter(matchesFlowSearch);
+  const visibleSavedFlows = savedFlows.filter(matchesFlowSearch);
 
   return (
     <div className="marketFlowPanel">
+      <div className="customToolToolbar marketFlowToolbar">
+        <div className="customToolToolbarRow">
+          <input
+            value={flowSearch}
+            onChange={(event) => setFlowSearch(event.target.value)}
+            placeholder="Flow 이름, 버전, 제작자 검색"
+            aria-label="Flow 검색"
+          />
+          <button
+            className="secondaryAction githubRefreshButton"
+            type="button"
+            onClick={onRefreshSharedFlows}
+            disabled={isSharedFlowSyncing}
+          >
+            {isSharedFlowSyncing ? "확인 중" : "새로고침"}
+          </button>
+        </div>
+        {sharedFlowStatus ? (
+          <div className={isSharedFlowSyncing ? "githubToolStatus syncing" : "githubToolStatus"}>
+            {sharedFlowStatus}
+          </div>
+        ) : null}
+      </div>
       <section className="marketFlowSection">
         <header>
-          <strong>Shared Flows</strong>
-          <span>공유하도록 등록된 Flow입니다. 캔버스로 드래그하면 그룹으로 추가됩니다.</span>
+          <div>
+            <strong>Shared Flows</strong>
+            <span>공유하도록 등록된 Flow입니다. 캔버스로 드래그하면 그룹으로 추가됩니다.</span>
+          </div>
         </header>
-        <div className="marketFlowList">
-          {sharedFlows.length > 0 ? (
-            sharedFlows.map((flow) => (
-              <article
-                className="marketFlowCard"
+        <table className="customToolTable marketFlowTable">
+          <thead>
+            <tr>
+              <th>Flow 이름</th>
+              <th>버전</th>
+              <th>제작자</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleSharedFlows.map((flow) => (
+              <tr
                 draggable
                 key={flow.id}
                 onDragStart={(event) => startSavedFlowDrag(event, flow)}
               >
-                <div>
-                  <strong>{flow.name}</strong>
-                  <span>{flow.description}</span>
-                  <small>{flowCardMeta(flow)}</small>
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="emptyState compactEmptyState centeredEmptyState">
-              공유된 Flow가 없습니다. 아래 My Flow에서 공유할 항목을 등록하세요.
-            </p>
-          )}
-        </div>
+                <td>
+                  <span className="customToolNameCell">
+                    <span>{flow.name}</span>
+                  </span>
+                  <small className="flowTableDescription">{flow.description}</small>
+                </td>
+                <td>{flow.version ?? "1.0.0"}</td>
+                <td>{flow.author ?? "MCP Registry"}</td>
+                <td>
+                  <button
+                    className={
+                      canUnregisterSharedFlow(flow)
+                        ? "tableActionButton unregisterAction"
+                        : "tableActionButton"
+                    }
+                    type="button"
+                    disabled={!canUnregisterSharedFlow(flow)}
+                    onClick={() => onUnregisterSharedFlow(flow)}
+                  >
+                    {canUnregisterSharedFlow(flow) ? "등록 해제" : "공유됨"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {visibleSharedFlows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="emptyTableCell">
+                  표시할 공유 Flow가 없습니다.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
       </section>
       <section className="marketFlowSection">
         <header>
-          <strong>My Flow</strong>
-          <span>이 컴퓨터에 저장된 Flow 중 공유할 항목을 등록합니다.</span>
+          <div>
+            <strong>My Flow</strong>
+            <span>이 컴퓨터에 저장된 Flow 중 공유할 항목을 등록합니다.</span>
+          </div>
         </header>
-        <div className="marketFlowList">
-          {savedFlows.length > 0 ? (
-            savedFlows.map((flow) => {
-              const registered = sharedFlowIds.has(flow.id);
+        <table className="customToolTable marketFlowTable">
+          <thead>
+            <tr>
+              <th>Flow 이름</th>
+              <th>버전</th>
+              <th>제작자</th>
+              <th>등록</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleSavedFlows.map((flow) => {
+              const registered = isFlowRegistered(sharedFlows, flow);
+              const canUnregister = canUnregisterSharedFlow(flow);
               return (
-                <article
-                  className={registered ? "marketFlowCard registered" : "marketFlowCard"}
+                <tr
+                  className={registered ? "registeredToolRow" : ""}
                   draggable
                   key={flow.id}
                   onDragStart={(event) => startSavedFlowDrag(event, flow)}
                 >
-                  <div>
-                    <strong>{flow.name}</strong>
-                    <span>{flow.description}</span>
-                    <small>{flowCardMeta(flow)}</small>
-                  </div>
-                  <button
-                    className={
-                      registered ? "tableActionButton" : "tableActionButton registerAction"
-                    }
-                    type="button"
-                    disabled={registered}
-                    onClick={() => onRegisterSharedFlow(flow)}
-                  >
-                    {registered ? "등록됨" : "등록"}
-                  </button>
-                </article>
+                  <td>
+                    <span className="customToolNameCell">
+                      <span>{flow.name}</span>
+                    </span>
+                    <small className="flowTableDescription">{flow.description}</small>
+                  </td>
+                  <td>{flow.version ?? "1.0.0"}</td>
+                  <td>{flow.author ?? "MCP Registry"}</td>
+                  <td>
+                    <button
+                      className={
+                        registered
+                          ? canUnregister
+                            ? "tableActionButton unregisterAction"
+                            : "tableActionButton"
+                          : "tableActionButton registerAction"
+                      }
+                      type="button"
+                      disabled={registered && !canUnregister}
+                      onClick={() =>
+                        registered && canUnregister
+                          ? onUnregisterSharedFlow(flow)
+                          : onRegisterSharedFlow(flow)
+                      }
+                    >
+                      {registered ? (canUnregister ? "등록 해제" : "등록됨") : "등록"}
+                    </button>
+                  </td>
+                </tr>
               );
-            })
-          ) : (
-            <p className="emptyState compactEmptyState centeredEmptyState">
-              저장된 My Flow가 없습니다. Custom Flow에서 먼저 저장하세요.
-            </p>
-          )}
-        </div>
+            })}
+            {visibleSavedFlows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="emptyTableCell">
+                  저장된 My Flow가 없습니다. Custom Flow에서 먼저 저장하세요.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
       </section>
     </div>
   );
@@ -9416,8 +10226,7 @@ function WorkflowView({
   onOpenFlowMarket,
   onNotify,
   onSavedFlowsChange,
-  onSavedFlowOpened,
-  onSaveSubflowTool
+  onSavedFlowOpened
 }: {
   createRequest?: WorkflowCreateRequest | null;
   homeRequestId?: number;
@@ -9429,7 +10238,6 @@ function WorkflowView({
   onNotify?: (notification: AppNotificationInput) => void;
   onSavedFlowsChange?: (flows: SavedCustomFlow[]) => void;
   onSavedFlowOpened?: (flow: SavedCustomFlow, source: "menu" | "favorite" | "recent") => void;
-  onSaveSubflowTool?: (tool: CustomToolItem) => void;
 }) {
   const flowCanvasRef = useRef<HTMLDivElement | null>(null);
   const lastMiddleClickAtRef = useRef(0);
@@ -9517,9 +10325,12 @@ function WorkflowView({
   const [savedFlows, setSavedFlows] = useState<SavedCustomFlow[]>(() => loadSavedFlows());
   const [workflowMode, setWorkflowMode] = useState<"home" | "editor">("home");
   const [editingSavedFlowId, setEditingSavedFlowId] = useState("");
+  const [editingFlowName, setEditingFlowName] = useState("새 Custom Flow");
   const [editingSavedFlowBaseline, setEditingSavedFlowBaseline] = useState<StoredFlowGraph | null>(null);
   const [deleteFlowRequest, setDeleteFlowRequest] = useState<SavedCustomFlow | null>(null);
   const [isLeaveFlowConfirmOpen, setIsLeaveFlowConfirmOpen] = useState(false);
+  const [pendingWorkflowExit, setPendingWorkflowExit] = useState<WorkflowPendingExit | null>(null);
+  const [groupFlowSaveRequestId, setGroupFlowSaveRequestId] = useState("");
   const [pendingFlowSettingChange, setPendingFlowSettingChange] = useState<{
     nodeId: string;
     field: ToolSettingField;
@@ -9670,6 +10481,19 @@ function WorkflowView({
     setWorkflowMode("editor");
   };
 
+  const applyWorkflowOpenRequest = (request: WorkflowOpenRequest) => {
+    const nextGraph = cloneStoredFlowGraph(request.graph);
+    loadFlowGraphIntoEditor(nextGraph);
+    setEditingFlowName(request.flowName || "새 Custom Flow");
+    if (request.source === "saved" && request.flowId) {
+      setEditingSavedFlowId(request.flowId);
+      setEditingSavedFlowBaseline(cloneStoredFlowGraph(nextGraph));
+    } else {
+      setEditingSavedFlowId("");
+      setEditingSavedFlowBaseline(cloneStoredFlowGraph(nextGraph));
+    }
+  };
+
   const hasUnsavedSavedFlowChanges = () =>
     Boolean(
       editingSavedFlowId &&
@@ -9692,7 +10516,7 @@ function WorkflowView({
   };
 
   const hasUnsavedFlowChanges = () =>
-    hasUnsavedSavedFlowChanges() || hasUnsavedNewFlowContent();
+    workflowMode === "editor" && (hasUnsavedSavedFlowChanges() || hasUnsavedNewFlowContent());
 
   const saveEditingSavedFlow = () => {
     if (!editingSavedFlowId) {
@@ -9703,15 +10527,53 @@ function WorkflowView({
     setEditingSavedFlowBaseline(cloneStoredFlowGraph(nextGraph));
   };
 
+  const saveNewFlowBeforeLeaving = () => {
+    const flow = createSavedFlow(
+      editingFlowName || "새 Custom Flow",
+      currentStoredFlowGraph(),
+      Date.now(),
+      "저장된 Custom Flow입니다.",
+      { version: "1.0.0", author: "Custom Flow" }
+    );
+    setSavedFlows((flows) => [flow, ...flows]);
+    setEditingSavedFlowId(flow.id);
+    setEditingFlowName(flow.name);
+    setEditingSavedFlowBaseline(cloneStoredFlowGraph(flow.graph));
+    return flow;
+  };
+
   const leaveWorkflowEditor = () => {
     setWorkflowMode("home");
     setEditingSavedFlowId("");
+    setEditingFlowName("새 Custom Flow");
     setEditingSavedFlowBaseline(null);
+    setIsLeaveFlowConfirmOpen(false);
+    setPendingWorkflowExit(null);
+  };
+
+  const applyPendingWorkflowExit = () => {
+    const target = pendingWorkflowExit ?? { type: "home" };
+    setPendingWorkflowExit(null);
+    setIsLeaveFlowConfirmOpen(false);
+    if (target.type === "open") {
+      applyWorkflowOpenRequest(target.request);
+      return;
+    }
+    if (target.type === "create") {
+      createNewFlow();
+      return;
+    }
+    leaveWorkflowEditor();
+  };
+
+  const cancelPendingWorkflowExit = () => {
+    setPendingWorkflowExit(null);
     setIsLeaveFlowConfirmOpen(false);
   };
 
   const requestWorkflowHome = () => {
     if (hasUnsavedFlowChanges()) {
+      setPendingWorkflowExit({ type: "home" });
       setIsLeaveFlowConfirmOpen(true);
       return;
     }
@@ -9729,12 +10591,19 @@ function WorkflowView({
     };
     loadFlowGraphIntoEditor(graph);
     setEditingSavedFlowId("");
+    setEditingFlowName("새 Custom Flow");
     setEditingSavedFlowBaseline(null);
     window.localStorage.removeItem(customFlowGraphStorageKey);
   };
 
   useEffect(() => {
     if (!createRequest) {
+      return;
+    }
+    if (hasUnsavedFlowChanges()) {
+      setPendingWorkflowExit({ type: "create" });
+      setIsLeaveFlowConfirmOpen(true);
+      onCreateRequestConsumed?.();
       return;
     }
     createNewFlow();
@@ -9745,15 +10614,12 @@ function WorkflowView({
     if (!openRequest) {
       return;
     }
-    const nextGraph = cloneStoredFlowGraph(openRequest.graph);
-    loadFlowGraphIntoEditor(nextGraph);
-    if (openRequest.source === "saved" && openRequest.flowId) {
-      setEditingSavedFlowId(openRequest.flowId);
-      setEditingSavedFlowBaseline(cloneStoredFlowGraph(nextGraph));
-    } else {
-      setEditingSavedFlowId("");
-      setEditingSavedFlowBaseline(null);
+    if (hasUnsavedFlowChanges()) {
+      setPendingWorkflowExit({ type: "open", request: openRequest });
+      setIsLeaveFlowConfirmOpen(true);
+      return;
     }
+    applyWorkflowOpenRequest(openRequest);
   }, [openRequest?.requestId]);
 
   useEffect(() => {
@@ -9795,8 +10661,32 @@ function WorkflowView({
     const flow = createSavedFlow(name, currentStoredFlowGraph());
     setSavedFlows((flows) => [flow, ...flows]);
     setEditingSavedFlowId(flow.id);
+    setEditingFlowName(flow.name);
     setEditingSavedFlowBaseline(cloneStoredFlowGraph(flow.graph));
     onSavedFlowOpened?.(flow, "menu");
+    onNotify?.({
+      title: "저장되었습니다",
+      message: "",
+      variant: "save-toast",
+      autoDismissMs: 2200
+    });
+  };
+
+  const saveAndLeaveWorkflowEditor = () => {
+    if (editingSavedFlowId) {
+      saveEditingSavedFlow();
+      applyPendingWorkflowExit();
+      onNotify?.({
+        title: "저장되었습니다",
+        message: "",
+        variant: "save-toast",
+        autoDismissMs: 2200
+      });
+      return;
+    }
+
+    saveNewFlowBeforeLeaving();
+    applyPendingWorkflowExit();
     onNotify?.({
       title: "저장되었습니다",
       message: "",
@@ -9809,6 +10699,7 @@ function WorkflowView({
     const nextGraph = cloneStoredFlowGraph(flow.graph);
     loadFlowGraphIntoEditor(nextGraph);
     setEditingSavedFlowId("");
+    setEditingFlowName(flow.name);
     setEditingSavedFlowBaseline(cloneStoredFlowGraph(nextGraph));
   };
 
@@ -9816,6 +10707,7 @@ function WorkflowView({
     const nextGraph = cloneStoredFlowGraph(flow.graph);
     loadFlowGraphIntoEditor(nextGraph);
     setEditingSavedFlowId(flow.id);
+    setEditingFlowName(flow.name);
     setEditingSavedFlowBaseline(cloneStoredFlowGraph(nextGraph));
   };
 
@@ -10052,10 +10944,10 @@ function WorkflowView({
 
     const bounds = nodes.map(flowNodeBounds);
     return {
-      left: Math.min(...bounds.map((bound) => bound.left)) - 24,
-      top: Math.min(...bounds.map((bound) => bound.top)) - 38,
-      right: Math.max(...bounds.map((bound) => bound.right)) + 24,
-      bottom: Math.max(...bounds.map((bound) => bound.bottom)) + 24
+      left: Math.min(...bounds.map((bound) => bound.left)) - 34,
+      top: Math.min(...bounds.map((bound) => bound.top)) - 92,
+      right: Math.max(...bounds.map((bound) => bound.right)) + 34,
+      bottom: Math.max(...bounds.map((bound) => bound.bottom)) + 32
     };
   };
 
@@ -10079,51 +10971,49 @@ function WorkflowView({
     ]);
   }
 
-  function saveFlowGroupAsCustomTool(groupId: string) {
+  function saveFlowGroupToMyFlow(groupId: string) {
     const group = flowGroups.find((item) => item.id === groupId);
-    if (!group || group.nodeIds.length === 0 || !onSaveSubflowTool) {
+    if (!group || group.nodeIds.length === 0) {
       return;
     }
 
-    const toolSchema = buildFlowGroupToolSchema(group, flowNodes, flowConnections);
     const groupNodes = flowNodes.filter((node) => group.nodeIds.includes(node.nodeId));
-    const createdAt = Date.now();
-    const riskWarnings =
-      toolSchema.risk === "safe" || toolSchema.risk === "read"
-        ? []
-        : [`${toolRiskLabels[toolSchema.risk]} 작업이 포함되어 있습니다.`];
-    const tool: CustomToolItem = {
-      id: `custom-flow-${group.id}`,
-      sectionId: "workflow",
-      name: group.name || "Custom Flow 툴",
-      description: `${groupNodes.length}개 노드를 묶은 Custom Flow 서브플로우입니다.`,
-      version: "1.0.0",
-      author: "Custom Flow",
-      usageCount: 0,
-      pinned: false,
-      registered: true,
-      approvalStatus: "approved",
-      isToolLike: true,
-      riskWarnings,
-      toolSchema,
-      sourcePath: `custom-flow://${group.id}`,
-      installedPath: `custom-flow://${group.id}`,
-      versions: [
-        {
-          id: `custom-flow-${group.id}-${createdAt}`,
-          version: "1.0.0",
-          author: "Custom Flow",
-          description: `${groupNodes.length}개 노드를 묶은 Custom Flow 서브플로우입니다.`,
-          sourcePath: `custom-flow://${group.id}`,
-          installedPath: `custom-flow://${group.id}`,
-          isToolLike: true,
-          riskWarnings,
-          toolSchema
-        }
-      ]
+    const groupNodeIds = new Set(group.nodeIds);
+    const graph: StoredFlowGraph = {
+      nodes: groupNodes,
+      connections: flowConnections.filter(
+        (connection) => groupNodeIds.has(connection.fromNodeId) && groupNodeIds.has(connection.toNodeId)
+      ),
+      groups: [{ ...group, nodeIds: [...group.nodeIds] }],
+      notes: [],
+      scale: 1,
+      pan: { x: 0, y: 0 }
     };
+    const flow = createSavedFlow(
+      group.name || "그룹 Flow",
+      graph,
+      Date.now(),
+      `${groupNodes.length}개 노드를 묶은 Custom Flow입니다.`,
+      { version: "1.0.0", author: "Custom Flow" }
+    );
 
-    onSaveSubflowTool(tool);
+    setSavedFlows((flows) => [flow, ...flows]);
+    onNotify?.({
+      title: "MY Flow 저장",
+      message: `${flow.name} 그룹을 MY Flow에 저장했습니다.`
+    });
+  }
+
+  function requestSaveFlowGroupToMyFlow(groupId: string) {
+    setGroupFlowSaveRequestId(groupId);
+  }
+
+  function confirmSaveFlowGroupToMyFlow() {
+    if (!groupFlowSaveRequestId) {
+      return;
+    }
+    saveFlowGroupToMyFlow(groupFlowSaveRequestId);
+    setGroupFlowSaveRequestId("");
   }
 
   function removeFlowNodesFromGroups(nodeIds: string[]) {
@@ -12252,6 +13142,9 @@ function WorkflowView({
   ).slice(0, 6);
   const isFlowToolbarActive =
     isBasicToolsOpen || isHistoryMenuOpen || isFlowRunMenuOpen || isFlowSearchOpen;
+  const groupFlowSaveRequest = groupFlowSaveRequestId
+    ? flowGroups.find((group) => group.id === groupFlowSaveRequestId) ?? null
+    : null;
 
   if (workflowMode === "home") {
     return (
@@ -12454,12 +13347,12 @@ function WorkflowView({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    saveFlowGroupAsCustomTool(group.id);
+                    requestSaveFlowGroupToMyFlow(group.id);
                   }}
                   onPointerDown={(event) => event.stopPropagation()}
-                  title="이 그룹을 커스텀 플로우 툴로 저장"
+                  title="이 그룹을 MY Flow로 저장"
                 >
-                  툴 저장
+                  Flow 저장
                 </button>
                 <div
                   className="flowGroupColorMenu"
@@ -12626,7 +13519,82 @@ function WorkflowView({
           ))}
           {flowNodes.map((node) => {
               const isExpanded = expandedNodeIds.includes(node.nodeId);
-              const activeDetailTab = flowNodeDetailTabs[node.nodeId] ?? "content";
+              const activeDetailTab = flowNodeDetailTabs[node.nodeId] ?? "settings";
+              const nodeExecutionSteps =
+                node.id === "basic-active-file"
+                  ? [
+                      {
+                        id: "active-file-input",
+                        label: "프로그램 선택",
+                        description: "현재 열려 있는 CAD, Revit, Excel 파일을 선택합니다.",
+                        state: "active" as const
+                      },
+                      {
+                        id: "active-file-check",
+                        label: "파일 확인",
+                        description: "새로고침으로 실제 활성 파일명을 확인합니다.",
+                        state: "waiting" as const
+                      },
+                      {
+                        id: "active-file-output",
+                        label: "전달",
+                        description: "선택한 파일 정보를 다음 노드로 넘깁니다.",
+                        state: "waiting" as const
+                      }
+                    ]
+                  : node.id === "basic-path-select"
+                    ? [
+                        {
+                          id: "path-input",
+                          label: "경로 입력",
+                          description: "파일 탐색기에서 사용할 파일을 선택합니다.",
+                          state: "active" as const
+                        },
+                        {
+                          id: "path-check",
+                          label: "경로 확인",
+                          description: "선택한 파일명과 경로를 확인합니다.",
+                          state: "waiting" as const
+                        },
+                        {
+                          id: "path-output",
+                          label: "전달",
+                          description: "선택한 경로를 다음 노드로 넘깁니다.",
+                          state: "waiting" as const
+                        }
+                      ]
+                    : node.id === "basic-custom-prompt"
+                      ? [
+                          {
+                            id: "prompt-input",
+                            label: "프롬프트 입력",
+                            description: "대상 노드에 추가할 지시문을 입력합니다.",
+                            state: "active" as const
+                          },
+                          {
+                            id: "prompt-attach",
+                            label: "노드에 붙이기",
+                            description: "다른 노드 아래에 붙이면 실행 시 프롬프트가 더해집니다.",
+                            state: node.attachedToNodeId ? "complete" as const : "waiting" as const
+                          },
+                          {
+                            id: "prompt-run",
+                            label: "실행 반영",
+                            description: "대상 노드가 실행될 때 프롬프트 내용을 함께 사용합니다.",
+                            state: "waiting" as const
+                          }
+                        ]
+                      : executionStepsForTool(
+                          String(node.programIcon).toUpperCase(),
+                          node.name,
+                          node.settingsSchema,
+                          node.description
+                        );
+              const detailTabSteps = [
+                { tab: "settings" as FlowNodeDetailTab, step: nodeExecutionSteps[0] },
+                { tab: "content" as FlowNodeDetailTab, step: nodeExecutionSteps[1] },
+                { tab: "result" as FlowNodeDetailTab, step: nodeExecutionSteps[2] }
+              ];
               const nodePalette = isBasicFlowNode(node)
                 ? flowBasicNodePalette
                 : flowPaletteForType(flowTypeForNode(node));
@@ -12947,51 +13915,112 @@ function WorkflowView({
                     {isExpanded ? (
                       <div className="flowNodeDetails">
                         <div className="flowNodeDetailTabs" role="tablist" aria-label={`${node.name} 상세`}>
-                          <button
-                            className={activeDetailTab === "content" ? "selected" : ""}
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setFlowNodeDetailTabs((tabs) => ({
-                                ...tabs,
-                                [node.nodeId]: "content"
-                              }));
-                            }}
-                          >
-                            {node.id === "basic-active-file" ? "프로그램" : "작동 원리"}
-                          </button>
-                          <button
-                            className={activeDetailTab === "settings" ? "selected" : ""}
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setFlowNodeDetailTabs((tabs) => ({
-                                ...tabs,
-                                [node.nodeId]: "settings"
-                              }));
-                            }}
-                          >
-                            설정
-                          </button>
-                          <button
-                            className={activeDetailTab === "result" ? "selected" : ""}
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setFlowNodeDetailTabs((tabs) => ({
-                                ...tabs,
-                                [node.nodeId]: "result"
-                              }));
-                            }}
-                          >
-                            결과
-                          </button>
+                          {detailTabSteps.map(({ tab, step }, index) => (
+                            <button
+                              className={activeDetailTab === tab ? "selected" : ""}
+                              key={tab}
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setFlowNodeDetailTabs((tabs) => ({
+                                  ...tabs,
+                                  [node.nodeId]: tab
+                                }));
+                              }}
+                            >
+                              {index + 1}. {step?.label ?? (index === 2 ? "결과 확인" : "실행 단계")}
+                            </button>
+                          ))}
                         </div>
                         {activeDetailTab === "settings" ? (
                           <div className="flowNodeSettingsPanel">
-                            {node.settingsSchema?.settings.length ? (
+                            {node.id === "basic-path-select" ? (
+                              <div className="flowPathPicker">
+                                <strong>선택한 경로</strong>
+                                <p>{node.pathSelection?.path ?? "아직 선택한 파일이 없습니다."}</p>
+                                <label className="flowFilePickButton">
+                                  파일 선택
+                                  <input
+                                    type="file"
+                                    onChange={(event) =>
+                                      updateFlowNodePathSelection(
+                                        node.nodeId,
+                                        event.currentTarget.files?.[0] ?? null
+                                      )
+                                    }
+                                    onPointerDown={(event) => event.stopPropagation()}
+                                  />
+                                </label>
+                              </div>
+                            ) : node.id === "basic-active-file" ? (
+                              <div className="flowActiveFilePicker">
+                                <div className="flowActiveFileHeader">
+                                  <strong>프로그램</strong>
+                                  <button
+                                    type="button"
+                                    onClick={() => void refreshDetectedActiveFiles()}
+                                    onPointerDown={(event) => event.stopPropagation()}
+                                    disabled={isRefreshingActiveFiles}
+                                  >
+                                    {isRefreshingActiveFiles ? "확인 중" : "새로고침"}
+                                  </button>
+                                </div>
+                                <div className="flowActiveFileList">
+                                  {activeFileOptions.map((option) => {
+                                    const selected = (node.activeFileSelections ?? []).some(
+                                      (selection) => selection.id === option.id
+                                    );
+                                    return (
+                                      <label className="flowActiveFileOption" key={option.id}>
+                                        <input
+                                          type="checkbox"
+                                          checked={selected}
+                                          onChange={() => toggleFlowNodeActiveFile(node.nodeId, option)}
+                                          onPointerDown={(event) => event.stopPropagation()}
+                                        />
+                                        <AppIcon name={option.program} />
+                                        <span>
+                                          <b>{option.label}</b>
+                                          <small>{option.path}</small>
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                                {(node.activeFileSelections ?? []).length > 0 ? (
+                                  <p>
+                                    선택됨: {(node.activeFileSelections ?? []).map((file) => file.label).join(", ")}
+                                  </p>
+                                ) : (
+                                  <p>사용할 프로그램을 선택하세요. 새로고침하면 연결된 MCP 서버에서 현재 파일명을 확인합니다.</p>
+                                )}
+                                {activeFileRefreshMessage ? (
+                                  <p className="flowActiveFileRefreshMessage">{activeFileRefreshMessage}</p>
+                                ) : null}
+                              </div>
+                            ) : node.id === "basic-custom-prompt" ? (
+                              <label className="flowPromptEditor">
+                                <strong>프롬프트</strong>
+                                <textarea
+                                  value={node.promptText ?? ""}
+                                  onChange={(event) =>
+                                    updateFlowNodePromptText(node.nodeId, event.target.value)
+                                  }
+                                  onPointerDown={(event) => event.stopPropagation()}
+                                  placeholder="이 노드가 붙은 대상 노드를 실행할 때 추가할 문장을 입력합니다."
+                                />
+                              </label>
+                            ) : node.settingsSchema?.settings.length ? (
                               <FlowNodeSchemaSettings
-                                schema={node.settingsSchema}
+                                schema={schemaForExecutionStep(
+                                  node.settingsSchema,
+                                  nodeExecutionSteps[0] ?? {
+                                    id: "settings",
+                                    label: "설정 입력",
+                                    description: "",
+                                    state: "active"
+                                  }
+                                )}
                                 values={node.settingsValues}
                                 onChange={(field, value) =>
                                   updateFlowNodeSettingValue(node.nodeId, field, value)
@@ -13045,100 +14074,15 @@ function WorkflowView({
                           </div>
                         ) : activeDetailTab === "result" ? (
                           <FlowNodeResultPreview record={flowRunRecordByNodeId.get(node.nodeId)} />
-                        ) : node.id === "basic-result-preview" ? (
-                          <div className="flowNodePreview">
-                            <strong>결과값</strong>
-                            <p>아직 실행 결과가 없습니다. 실행 후 이 영역에 결과가 표시됩니다.</p>
-                          </div>
-                        ) : node.id === "basic-path-select" ? (
-                          <div className="flowPathPicker">
-                            <strong>선택한 경로</strong>
-                            <p>{node.pathSelection?.path ?? "아직 선택한 파일이 없습니다."}</p>
-                            <label className="flowFilePickButton">
-                              파일 선택
-                              <input
-                                type="file"
-                                onChange={(event) =>
-                                  updateFlowNodePathSelection(
-                                    node.nodeId,
-                                    event.currentTarget.files?.[0] ?? null
-                                  )
-                                }
-                                onPointerDown={(event) => event.stopPropagation()}
-                              />
-                            </label>
-                          </div>
-                        ) : node.id === "basic-active-file" ? (
-                          <div className="flowActiveFilePicker">
-                            <div className="flowActiveFileHeader">
-                              <strong>프로그램</strong>
-                              <button
-                                type="button"
-                                onClick={() => void refreshDetectedActiveFiles()}
-                                onPointerDown={(event) => event.stopPropagation()}
-                                disabled={isRefreshingActiveFiles}
-                              >
-                                {isRefreshingActiveFiles ? "확인 중" : "새로고침"}
-                              </button>
-                            </div>
-                            <div className="flowActiveFileList">
-                              {activeFileOptions.map((option) => {
-                                const selected = (node.activeFileSelections ?? []).some(
-                                  (selection) => selection.id === option.id
-                                );
-                                return (
-                                  <label className="flowActiveFileOption" key={option.id}>
-                                    <input
-                                      type="checkbox"
-                                      checked={selected}
-                                      onChange={() => toggleFlowNodeActiveFile(node.nodeId, option)}
-                                      onPointerDown={(event) => event.stopPropagation()}
-                                    />
-                                    <AppIcon name={option.program} />
-                                    <span>
-                                      <b>{option.label}</b>
-                                      <small>{option.path}</small>
-                                    </span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                            {(node.activeFileSelections ?? []).length > 0 ? (
-                              <p>
-                                선택됨: {(node.activeFileSelections ?? []).map((file) => file.label).join(", ")}
-                              </p>
-                            ) : (
-                              <p>사용할 프로그램을 선택하세요. 새로고침하면 연결된 MCP 서버에서 현재 파일명을 확인합니다.</p>
-                            )}
-                            {activeFileRefreshMessage ? (
-                              <p className="flowActiveFileRefreshMessage">{activeFileRefreshMessage}</p>
-                            ) : null}
-                          </div>
-                        ) : node.id === "basic-custom-prompt" ? (
-                          <label className="flowPromptEditor">
-                            <strong>프롬프트</strong>
-                            <textarea
-                              value={node.promptText ?? ""}
-                              onChange={(event) =>
-                                updateFlowNodePromptText(node.nodeId, event.target.value)
-                              }
-                              onPointerDown={(event) => event.stopPropagation()}
-                              placeholder="이 노드가 붙은 대상 노드를 실행할 때 추가할 문장을 입력합니다."
-                            />
-                          </label>
                         ) : (
                           <>
-                            <strong>작동 원리</strong>
+                            <strong>실행 흐름</strong>
                             <ToolRiskSummary schema={node.settingsSchema} />
+                            <p>{detailTabSteps[1]?.step?.description ?? node.description}</p>
                             <div className="flowNodePrincipleList">
-                              {operationPrincipleStepsForTool(
-                                String(node.programIcon).toUpperCase(),
-                                node.name,
-                                node.settingsSchema,
-                                node.description
-                              ).map((step) => (
-                                <div key={step.title}>
-                                  <span>{step.title}</span>
+                              {nodeExecutionSteps.map((step, index) => (
+                                <div key={step.id}>
+                                  <span>{index + 1}. {step.label}</span>
                                   <small>{step.description}</small>
                                 </div>
                               ))}
@@ -13675,7 +14619,7 @@ function WorkflowView({
           <div
             className="flowConfirmBackdrop"
             role="presentation"
-            onMouseDown={() => setIsLeaveFlowConfirmOpen(false)}
+            onMouseDown={cancelPendingWorkflowExit}
           >
             <section
               className="flowConfirmDialog"
@@ -13687,14 +14631,40 @@ function WorkflowView({
               <strong id="leaveFlowDialogTitle">저장되지 않은 변경</strong>
               <p>현재 Custom Flow에 저장되지 않은 변경이 있습니다. 저장하지 않고 나갈까요?</p>
               <div className="flowConfirmActions">
-                <button type="button" onClick={() => setIsLeaveFlowConfirmOpen(false)}>
+                <button type="button" onClick={cancelPendingWorkflowExit}>
                   취소
                 </button>
-                <button type="button" onClick={saveCurrentFlowToLibrary}>
+                <button type="button" onClick={saveAndLeaveWorkflowEditor}>
                   저장
                 </button>
-                <button className="danger" type="button" onClick={leaveWorkflowEditor}>
+                <button className="danger" type="button" onClick={applyPendingWorkflowExit}>
                   저장하지 않고 나가기
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+        {groupFlowSaveRequest ? (
+          <div
+            className="flowConfirmBackdrop"
+            role="presentation"
+            onMouseDown={() => setGroupFlowSaveRequestId("")}
+          >
+            <section
+              className="flowConfirmDialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="groupFlowSaveDialogTitle"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <strong id="groupFlowSaveDialogTitle">MY Flow 저장</strong>
+              <p>{groupFlowSaveRequest.name || "선택한 그룹"}을 MY Flow에 저장할까요?</p>
+              <div className="flowConfirmActions">
+                <button type="button" onClick={() => setGroupFlowSaveRequestId("")}>
+                  아니오
+                </button>
+                <button type="button" onClick={confirmSaveFlowGroupToMyFlow}>
+                  네
                 </button>
               </div>
             </section>

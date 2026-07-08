@@ -85,11 +85,11 @@ logs
 - 반복되는 카드/패널 상단 제목 영역은 `packages/desktop/src/panelHeader.tsx`의 `PanelHeader`를 우선 사용합니다.
 - 메인페이지 툴 카드에는 `등록됨`, `공유`, `MCP 미연결` 같은 상태 뱃지를 표시하지 않습니다. 현재 메뉴에 필요한 MCP 서버가 running 상태가 아니면 툴 카드는 회색 비활성 상태가 되고 hover 문구로 이유를 보여줍니다.
 - MD 파일이 툴 문서 형태로 보이지 않으면 등록은 허용하되, 등록 폼에 경고를 표시하고 메인페이지 카드 배경을 경고색으로 구분합니다. 해당 툴을 실행할 때도 확인창을 한 번 띄웁니다.
-- MD 파일 내용에서 객체/요소 삭제 또는 생성 후보 동작이 감지되면 Custom Tools / More Tools 리스트의 툴 이름 옆에 `주의` 배지가 표시됩니다. 배지를 클릭하면 감지 이유가 펼쳐지고, 메인페이지에서 실행할 때도 확인창이 표시됩니다.
+- MD 파일 내용에서 객체/요소 삭제 또는 생성 후보 동작이 감지되면 Custom Tools / Market 리스트의 툴 이름 옆에 `주의` 배지가 표시됩니다. 배지를 클릭하면 감지 이유가 펼쳐지고, 메인페이지에서 실행할 때도 확인창이 표시됩니다.
 - 소메뉴는 `Share Tools`, `Custom Tools` 분류명이 아니라 실제 툴 이름을 표시합니다. 소메뉴명과 설명은 소메뉴 페이지에서 바로 수정 가능하며 localStorage에 저장됩니다.
-- Custom Tools 창은 메뉴별 커스텀 툴과 전체 More Tools를 모두 지원합니다.
-- Custom Tools / More Tools 창에는 별도 GitHub 버튼을 표시하지 않습니다.
-- Custom Tools / More Tools 창을 열면 GitHub 저장소 `kdg200121-hash/AI_PROGRAM`의 `tools/` 폴더에서 `.md/.markdown` 툴 목록을 자동으로 읽어옵니다.
+- Custom Tools 창은 메뉴별 커스텀 툴을 지원하고, 전체 공유 툴/Flow 관리는 Market 창에서 처리합니다.
+- Custom Tools / Market 창에는 별도 GitHub 버튼을 표시하지 않습니다.
+- Custom Tools / Market 창을 열면 GitHub 저장소 `kdg200121-hash/AI_PROGRAM`의 `tools/` 폴더에서 `.md/.markdown` 툴 목록을 자동으로 읽어옵니다.
 - GitHub에서 가져온 툴은 MD frontmatter의 `author`를 우선 사용하고, 없으면 저장소 owner인 `kdg200121-hash`를 제작자로 표시합니다.
 - `tools/` 폴더에 아직 MD 툴이 없으면 창 상단에 등록된 MD 툴이 없다는 상태 메시지만 표시됩니다.
 - 기존 localStorage에 남아 있던 로컬 MD 동기화 툴은 더 이상 목록에 표시하지 않습니다. `sourcePath` 또는 `installedPath`가 `github:kdg200121-hash/AI_PROGRAM/tools/`로 시작하는 항목만 로드합니다.
@@ -109,7 +109,7 @@ logs
 - 관리 화면의 회원 목록에서는 승인 대기 계정 승인, 라이선스 활성화/비활성화, 일반 계정 삭제를 할 수 있습니다. 관리자 계정은 삭제하거나 라이선스를 비활성화할 수 없습니다.
 - 관리 화면의 회원 목록에는 가입일이 표시되며, 계정/닉네임/상태/라이선스/가입일 타이틀을 클릭해 내림차순/오름차순/기본 순서로 정렬할 수 있습니다.
 - 회원가입 승인제에서 승인 대기 계정은 `Settings > 관리 > 회원 목록`에 표시됩니다.
-- 툴 등록 승인제에서 일반 사용자가 추가한 커스텀 툴은 `승인 대기` 배지와 함께 Custom Tools / More Tools 목록에 표시되고, 관리자 승인 후 등록/해제 버튼을 사용할 수 있습니다.
+- 툴 등록 승인제에서 일반 사용자가 추가한 커스텀 툴은 `승인 대기` 배지와 함께 Custom Tools / Market 목록에 표시되고, 관리자 승인 후 등록/해제 버튼을 사용할 수 있습니다.
 - 현재 계정 정책과 회원 목록은 앱 localStorage 기반입니다. 다른 컴퓨터까지 중앙에서 강제하려면 GitHub 저장소 또는 별도 서버에 정책/회원 목록을 동기화하는 후속 구현이 필요합니다.
 - Home의 `Other Tools` 카드는 `채팅을 TOOL로 저장` 안내와 다운로드 아이콘 버튼을 표시합니다. 버튼을 누르면 앱에 포함된 `save-tool` Codex 스킬이 현재 사용자 `~/.codex/skills/save-tool`에 설치되어, `/save 툴이름` 명령으로 해당 채팅을 로컬 MD TOOL 초안으로 저장할 수 있습니다.
 - `save-tool` 설치 원본은 `packages/desktop/assets/skills/save-tool`에 있으며, Windows 패키징 시 release 앱 리소스에 같이 포함됩니다.
@@ -120,8 +120,8 @@ logs
 - 등록 방식이 `자유 등록`이고 위험 감지가 없는 안전한 툴이면 GitHub `tools/` 폴더에 직접 commit을 시도합니다. 저장소 push 권한이 없으면 자동으로 PR 생성 방식으로 전환됩니다.
 - 등록 방식이 `승인제`이거나 위험 감지된 툴이면 GitHub PR을 생성하고, 관리자 머지 후 공유 목록에 반영됩니다.
 - 위험 감지된 툴은 자유 등록이어도 앱 내부 승인 대기 상태로 저장됩니다.
-- Custom Tools / More Tools 목록에서 PR이 있는 항목은 `승인 대기`, `머지됨`, `닫힘` 상태 배지와 `GitHub PR 보기` 링크를 표시합니다.
-- Custom Tools / More Tools를 열거나 새로고침하면 PR 번호가 있는 툴의 GitHub PR 상태를 갱신합니다.
+- Custom Tools / Market 목록에서 PR이 있는 항목은 `승인 대기`, `머지됨`, `닫힘` 상태 배지와 `GitHub PR 보기` 링크를 표시합니다.
+- Custom Tools / Market을 열거나 새로고침하면 PR 번호가 있는 툴의 GitHub PR 상태를 갱신합니다.
 - Settings > 관리에는 `승인 대기 툴` 목록이 있으며 앱 승인, PR 보기, PR 상태 새로고침을 할 수 있습니다.
 - 툴 등록 폼은 `.md/.markdown` 파일 선택 후 MD 미리보기와 위험 감지 결과를 표시합니다.
 - Codex 사용자 스킬 `save-tool`은 현재 Windows 사용자 홈의 `.codex\skills\save-tool`에 설치됩니다. 사용자가 `/save 툴이름`을 요청하면 GitHub 업로드 없이 로컬 `tool-drafts/툴이름.md` 초안을 만드는 용도입니다.
@@ -129,11 +129,11 @@ logs
 - GitHub Releases latest를 확인해 현재 앱 버전보다 새 릴리스가 있으면 하단 알림을 표시합니다. 실제 자동 업데이트 설치는 아직 연결되지 않았습니다.
 - `packages/desktop/src/toolSharingPolicy.ts`는 공유 승인 정책과 버전 비교를 담당합니다. `App.tsx`가 커져 있으므로 이후 컴포넌트 분리는 `ToolMarketDialog`, `SettingsManagementPanel`, `TabStrip` 순서로 진행하는 것이 좋습니다.
 - Custom Tools는 즐겨찾기 대신 상단고정(`pinned`) 상태를 사용합니다. 단, 메인페이지와 소메뉴에는 목록에서 `등록`한 커스텀 툴만 표시됩니다.
-- Custom Tools / More Tools 목록은 검색과 컬럼 정렬을 지원하지만, 표시 그룹 순서는 항상 등록한 툴, 고정한 툴, 일반 툴 순서를 우선합니다. 행을 클릭하면 등록 시 입력한 설명이 아래로 펼쳐집니다.
+- Custom Tools / Market 목록은 검색과 컬럼 정렬을 지원하지만, 표시 그룹 순서는 항상 등록한 툴, 고정한 툴, 일반 툴 순서를 우선합니다. 행을 클릭하면 등록 시 입력한 설명이 아래로 펼쳐집니다.
 - Share Tools 카드도 Custom Tools처럼 툴 이름 아래에 버전/제작자 메타를 표시합니다. 현재 기존 공유 툴은 기본 `v1.0.0 - MCP Registry`로 표시합니다.
 - 좌측 메뉴에서 메뉴를 즐겨찾기하면 원래 메뉴 목록에서는 숨겨지고, 즐겨찾기 해제 시 다시 메뉴 목록에 나타납니다.
-- Custom Tools / More Tools의 사용횟수 컬럼은 유지되어 있지만, 현재는 실제 MCP 실행 이벤트가 아직 연결되지 않았기 때문에 0으로 표시됩니다. 단순히 툴 페이지를 여는 동작으로는 증가하지 않습니다.
-- Player view에서는 Custom Tools / More Tools 표의 제작자, 사용횟수 컬럼을 숨겨 좁은 창에서도 가로 스크롤 없이 보이도록 했습니다.
+- Custom Tools / Market의 사용횟수 컬럼은 유지되어 있지만, 현재는 실제 MCP 실행 이벤트가 아직 연결되지 않았기 때문에 0으로 표시됩니다. 단순히 툴 페이지를 여는 동작으로는 증가하지 않습니다.
+- Player view에서는 Custom Tools / Market 표의 제작자, 사용횟수 컬럼을 숨겨 좁은 창에서도 가로 스크롤 없이 보이도록 했습니다.
 - Custom Flow는 본문 전체를 노드 캔버스로 사용합니다. 마우스 휠은 커서 위치 기준 줌, 마우스 휠 버튼 드래그는 패닝, 노드 헤더 드래그는 이동, 화살표 버튼은 노드 펼침/접힘입니다. 패닝 중에는 캔버스 커서가 `grabbing`으로 바뀝니다.
 - Custom Flow 연결은 포트 단위로 저장됩니다. 입력/출력 포트에는 CAD/Revit/Excel/Object 같은 타입과 아이콘이 있고, 타입이 맞지 않는 연결은 점선 경고선으로 표시됩니다.
 - Custom Flow 노드, 연결선, 줌 배율, 패닝 위치는 localStorage `mcp-registry:custom-flow-graph`에 저장됩니다.
@@ -166,7 +166,7 @@ logs
 - Custom Flow 메모를 우클릭하면 `복제`, `삭제` 메뉴가 나타납니다. 텍스트 편집 중인 메모를 확실히 삭제하려면 우클릭 메뉴 삭제 또는 `Ctrl+Delete`를 사용합니다.
 - Custom Flow 메모/노드 우클릭 메뉴는 좁은 창에서도 화면 밖으로 잘리지 않도록 위치를 자동 보정합니다. 메모 제목 입력칸이나 본문 textarea 안에서 우클릭해도 같은 `복제`/`삭제` 메뉴가 열립니다.
 - Custom Flow 그룹 헤더에서는 그룹 이름과 배경색을 바로 수정할 수 있습니다. 그룹 색상은 현재 색상 점을 클릭하면 팔레트가 펼쳐지는 방식입니다. 그룹 이름, 색상, 포함 노드 정보는 localStorage `mcp-registry:custom-flow-graph`의 `groups`에 저장됩니다.
-- Custom Flow 그룹 헤더에는 `툴 저장` 버튼이 있습니다. 이 버튼은 그룹 내부 노드의 입력/출력, 필요 MCP 서버, 예정 명령을 읽어 Custom Flow 기반 커스텀 툴 schema로 저장합니다. 저장한 그룹 툴을 팔레트에서 다시 불러오는 UX는 아직 다음 단계입니다.
+- Custom Flow 그룹 헤더에는 `Flow 저장` 버튼이 있습니다. 이 버튼은 그룹 내부 노드와 연결을 `MY Flow`에 저장합니다. 저장한 Flow는 다른 캔버스에서 메뉴/카드 선택 또는 드래그로 그룹 형태로 삽입할 수 있습니다.
 - Custom Flow에서 노드를 그룹 박스 안으로 드래그하면 그룹이 추가 대상처럼 강조되고, 그 상태에서 놓으면 해당 그룹에 포함됩니다. `그룹에서 제거`를 누르면 선택 노드는 그룹 소속에서 빠지고 그룹 바깥쪽으로 이동해 결과가 눈에 보입니다.
 - Custom Flow 오른쪽 위 도구막대의 `기본도구` 버튼은 기본 보조 도구 창을 엽니다. 창은 `툴`과 `연결값 도구` 탭으로 나뉩니다.
 - Custom Flow 오른쪽 위 도구막대는 검색, 뒤로가기, 되돌릴 위치 선택, 앞으로가기, 실행, 실행 설정 화살표, 기본도구 순서로 표시됩니다. 기본도구 버튼은 흐름 점검 아이콘 바로 왼쪽에 붙어 보이도록 오른쪽 끝에 정렬합니다. 실행 설정은 톱니바퀴가 아니라 실행 버튼 옆 작은 화살표입니다.
@@ -176,7 +176,7 @@ logs
 - `결과 미리보기` 노드는 출력 포트가 없고, 펼쳤을 때 실행 결과를 노드 내부에 표시할 미리보기 영역을 가집니다.
 - `활성 파일` 노드는 입력 포트 없이 현재 열려 있는 파일 값을 출력하는 보조 노드로 표시합니다.
 - `프롬프트` 노드는 입력/출력 포트가 없고, 선으로 연결하지 않습니다. 노드 아래쪽으로 드래그해 다른 노드에 붙이면 해당 대상 노드 실행 시 프롬프트 문장을 추가하는 용도로 저장됩니다.
-- Custom Flow 실행은 아직 실제 MCP/AI 실행 엔진 연결 전 UI 단계입니다. 일괄 실행을 누르면 모든 노드가 동시에 초록색이 되는 것이 아니라, 순서대로 한 노드씩 파란색 실행 테두리로 지나갑니다. 흐름 점검에서 오류/경고가 있는 노드는 해당 노드에 별도 배지와 테두리가 표시됩니다.
+- Custom Flow 실행은 아직 실제 MCP 실행 엔진 연결 전 UI 단계입니다. 일괄 실행을 누르면 모든 노드가 동시에 초록색이 되는 것이 아니라, 순서대로 한 노드씩 파란색 실행 테두리로 지나갑니다. 흐름 점검에서 오류/경고가 있는 노드는 해당 노드에 별도 배지와 테두리가 표시됩니다.
 - 기본도구의 `연결값 도구` 탭 항목은 Input 또는 Output 포트 영역에 드롭하면 커스텀 포트를 추가합니다. `텍스트`는 공용이고, `경로`/`활성파일`은 input, `결과`는 output 전용으로 표시합니다.
 - `연결값 도구`에는 텍스트, 숫자, 좌표, 객체, 테이블, 파일, 폴더, 참/거짓, 활성파일, 선택 요소, 결과, 로그, 오류, 리포트가 있습니다. 가능한 항목은 공용 포트로 두고, 선택 요소/활성파일은 input, 결과/로그/오류/리포트는 output 전용으로 표시합니다.
 - 출력 포트를 선택해 연결 대기 상태가 되면 입력 포트가 초록색 또는 붉은색으로 미리 강조됩니다. 초록색은 타입 호환, 붉은색은 연결은 가능하지만 타입 경고가 생길 수 있다는 의미입니다.
@@ -186,7 +186,7 @@ logs
 - Custom Flow 마우스 휠 줌 범위는 28%~180%입니다.
 - 메모 제목/본문 입력 중 `Esc`를 누르면 입력 focus를 해제하고 열린 메뉴/색상 팔레트를 닫습니다. 입력칸이 아닌 캔버스, 노드, 그룹을 클릭해도 현재 입력칸 focus가 해제됩니다.
 - Custom Flow의 포트/노드/저장/드래그 직렬화 모델은 `packages/desktop/src/customFlowModel.ts`로 분리되어 있습니다. UI 렌더링은 아직 `App.tsx`의 `WorkflowView`에 남아 있습니다.
-- MD 툴 frontmatter의 `settings`, `inputs`, `outputs`, `requiredServers`, `mcpCommands`, `preflightChecks`, `resultSchema`, `failurePolicy`는 `packages/desktop/src/toolSettingsSchema.ts`에서 파싱합니다. Custom Tools / More Tools에서 읽은 schema는 Custom Flow 노드로 전달되고, 노드의 `설정` 탭에서 자동 설정창으로 표시됩니다.
+- MD 툴 frontmatter의 `settings`, `inputs`, `outputs`, `requiredServers`, `mcpCommands`, `preflightChecks`, `resultSchema`, `failurePolicy`는 `packages/desktop/src/toolSettingsSchema.ts`에서 파싱합니다. Custom Tools / Market에서 읽은 schema는 Custom Flow 노드로 전달되고, 노드의 `설정` 탭에서 자동 설정창으로 표시됩니다.
 - schema의 정의 오류, 필수 설정값 누락, 예정 MCP 명령 파라미터 해석은 `packages/desktop/src/toolRuntimeValidation.ts`가 담당합니다. Custom Tool 등록창에서는 설정창 미리보기/검증/테스트 실행 요약을 보여주고, Custom Flow 검증은 노드별 필수 설정 누락을 흐름 점검에 포함합니다.
 - Custom Flow 기본 CAD/Excel/Revit 노드에는 `mcpCommands.status: planned` 명령 계획이 들어 있습니다. 실제 MCP 호출 엔진을 붙일 때는 `buildToolExecutionPlan(schema, node.settingsValues)` 결과의 `commands`를 서버 호출 큐로 넘기면 됩니다.
 - Custom Flow 실행 범위, 실행 로그, 노드별 미리보기, 그룹 툴 schema 생성 로직은 `packages/desktop/src/customFlowRunModel.ts`에 있습니다. 실제 MCP 실행 엔진을 붙일 때는 이 모델의 `buildFlowRunRecords`가 만드는 예상 결과를 실제 실행 응답으로 대체하면 됩니다.
@@ -206,9 +206,9 @@ logs
 - Custom Flow 캔버스 툴바에는 Home/메인 이동 버튼이 없습니다. 저장은 디스크 아이콘, 노드 검색은 돋보기 아이콘 버튼입니다.
 - Custom Flow 노드 상세 탭은 `작동 원리`, `설정`, `결과` 3개가 한 줄에 표시되는 것이 현재 기준입니다.
 - 툴 업데이트는 처음 등록한 제작자만 가능합니다. 현재 로그인한 닉네임 또는 GitHub ID가 기존 툴의 `author`와 일치해야 버전 업데이트가 진행됩니다.
-- More Tools/Custom Tools에서 로컬 원본 파일 삭제는 사용자가 승인한 툴 폴더와 앱/프로젝트 `tools` 폴더 안에서만 허용됩니다. 임의 경로 삭제는 계속 막아야 합니다.
+- Market/Custom Tools에서 로컬 원본 파일 삭제는 사용자가 승인한 툴 폴더와 앱/프로젝트 `tools` 폴더 안에서만 허용됩니다. 임의 경로 삭제는 계속 막아야 합니다.
 - 툴 삭제 시 이미 존재하지 않는 로컬 원본 파일은 성공 처리합니다. localStorage에 오래된 sourcePath/installedPath가 남아 있을 수 있으므로, 존재 여부 확인을 허용 루트 검사보다 먼저 수행하는 구조를 유지해야 합니다.
-- More Tools/Custom Tools 필터는 `툴 이름` 테이블 헤더 옆 작은 아이콘 버튼 기준입니다. 다시 큰 필터 줄로 되돌리면 목록 영역이 좁아져 사용자가 싫어했던 상태가 됩니다.
+- Market/Custom Tools 필터는 `툴 이름` 테이블 헤더 옆 작은 아이콘 버튼 기준입니다. 다시 큰 필터 줄로 되돌리면 목록 영역이 좁아져 사용자가 싫어했던 상태가 됩니다.
 - Player view에서 툴을 선택하면 탭을 새로 열지 않고 클릭한 툴 카드 바로 아래에서 그 자리 확장 방식으로 실행 패널이 펼쳐집니다. 이 패널은 버튼 한 줄과 설정값 입력 영역을 기준으로 유지해야 합니다.
 - Custom Flow 메인 화면은 다른 메인 페이지와 같은 카드 기준을 사용합니다. 공유 플로우/내 플로우 헤더는 제목과 설명을 같은 세로 그룹으로 묶고, 카드 선택은 클릭으로 열기, 내 플로우 복제/삭제는 우클릭 메뉴 기준입니다.
 - Custom Flow 메인 화면의 Share Flow는 `내 플로우로 가져오기` 버튼을 쓰지 않습니다. Share Flow 카드를 클릭하면 바로 캔버스로 열고, 저장할 때 새 My Flow로 저장하는 흐름이 기준입니다.
@@ -216,17 +216,16 @@ logs
 - Custom Flow 기본 도구 창의 `툴`/`연결값 도구` 탭은 스크롤 중에도 상단에 고정합니다. 연결값 도구는 프로그램 필터와 공용/입력/출력 필터를 함께 지원합니다.
 - Custom Flow `연결값 도구` 필터는 기본 접힘 상태가 기준입니다. 도구 목록이 좁아 보이지 않도록 현재 필터 요약만 보이고, 사용자가 눌렀을 때만 작은 필터 칩을 펼칩니다.
 - 기본 전체 창 크기는 1440x900입니다. 사용자가 캔버스 작업 공간이 작다고 했기 때문에 임의로 다시 줄이지 마세요.
-- Settings에는 `AI 연결` 탭이 있습니다. OpenAI API 키는 Electron main process에서만 다루고 userData `openai-settings.json`에 `safeStorage`로 암호화 저장합니다. 렌더러, localStorage, Git, 툴 MD, 로그에는 키 원문을 남기지 마세요.
-- OpenAI 실행 키 우선순위는 앱 저장 키, `AI_PROGRAM_OPENAI_API_KEY`/`OPENAI_API_KEY` 환경 변수 순서입니다. 모델은 앱 저장값, `AI_PROGRAM_OPENAI_MODEL`, 기본 `openAiToolRunnerDefaultModel` 순서로 결정합니다.
-- `/등록` 스킬은 MCP 서버 등록/검증뿐 아니라 `Settings > AI 연결`에서 API 키 상태를 확인하도록 안내합니다. 다른 컴퓨터에서는 앱의 Home > Other Tools 또는 Settings에서 `/등록` 스킬을 설치한 뒤 API 키를 설정하면 됩니다.
+- Settings에는 `AI 연결` 탭이 없습니다. 이 앱은 현재 OpenAI API 키를 저장하거나 직접 OpenAI로 툴 실행을 보내지 않고, 등록된 MCP 서버/명령 기준으로만 실행 통로를 둡니다.
+- `/등록` 스킬은 MCP 서버 등록/검증, 브리지 스캐폴드 생성, URL/포트/명령 목록 확인 기준으로 안내합니다. AI API 키 설정 안내를 다시 추가하지 마세요.
 - Custom Flow 입력/출력 포트 안쪽에는 타입 아이콘을 표시하지 않습니다. 포트 타입 구분은 포트 네모와 연결선 색상을 주된 신호로 사용합니다.
 - Custom Flow 연결선 좌표는 렌더링된 `.flowPortConnector` DOM의 실제 중심을 측정해 사용합니다. `customFlowModel.ts`의 `flowConnectionEndpoint`/`flowPortLocalY`는 측정값이 아직 없는 첫 렌더 시점의 fallback입니다.
 - 포트 행 높이, 노드 헤더 여백, compact/expanded 레이아웃을 바꿔도 연결선은 DOM 측정값을 따라가야 합니다. 다시 고정 숫자만으로 선 좌표를 맞추면 같은 중심 어긋남이 재발할 수 있습니다.
-- 다음 우선순위는 MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장하고, Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결하는 작업입니다.
+- 다음 우선순위는 실제 AutoCAD/Revit/Excel 브리지에서 안전한 읽기 명령 1개씩 검증한 뒤 Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결하는 작업입니다.
 - `App.tsx`는 여전히 큽니다. 이번에는 `MonitorView`, Process Monitor 타입, Custom Flow 검증 로직을 먼저 분리했습니다. 이후에는 `WorkflowView`, `ToolMarketDialog`, `TabStrip`, Settings 세부 패널 순서로 계속 분리하는 것이 좋습니다.
 - `node_modules` 안에 100MB 이상 Electron 실행 파일이 있으나 Git 제외 대상입니다.
 - Codex 채팅 기록은 GitHub로 넘어가지 않습니다. 중요한 내용은 `WORK_LOG.md`, `TODO.md`, `README_HANDOFF.md`에 남겨야 합니다.
-- 앱 내장 `/등록` 스킬(`program-mcp-registrar`)은 이제 MCP 등록값만 안내하지 않고, 브리지 스캐폴드 생성, AI Program 등록, URL/포트 확인, 명령 목록 확인, 안전한 읽기 테스트까지 진행하는 기준으로 작성되어 있습니다. 단, 실제 AutoCAD/Revit/Excel SDK 호출 브리지 템플릿은 아직 TODO로 남아 있으므로 스킬 실행 시 검증된 단계와 미검증 단계를 분리해서 보고해야 합니다.
+- 앱 내장 `/등록` 스킬(`program-mcp-registrar`)은 MCP 등록값만 안내하지 않고, 브리지 스캐폴드 생성, AI Program 등록, URL/포트 확인, 명령 목록 확인, 안전한 읽기 테스트까지 진행하는 기준으로 작성되어 있습니다. 단, 실제 AutoCAD/Revit/Excel SDK 호출 브리지 템플릿은 아직 TODO로 남아 있으므로 스킬 실행 시 검증된 단계와 미검증 단계를 분리해서 보고해야 합니다.
 - 삭제한 GitHub 원본 툴은 localStorage tombstone(`mcp-registry:deleted-github-tool-paths`)으로 다시 표시되지 않게 막습니다. 단, 원격 저장소에서 실제 파일 삭제가 실패하면 다른 컴퓨터에서는 해당 파일이 다시 보일 수 있으므로, 장기적으로는 관리자 삭제 PR/commit 흐름이 필요합니다.
 - Electron main과 보안 경로 검증 파일에 깨진 한글 문자열이 재발하지 않도록, 큰 수정 뒤에는 `rg -n '쨌|�|濡|寃|뚯|젣|꾩|媛|鍮|紐|醫|愼' packages/desktop/electron/main.ts packages/desktop/src packages/core/src packages/shared/src`를 확인하세요.
 - GitHub 로그인 scope는 `read:user repo`입니다. 기존 `public_repo` 토큰으로 로그인된 상태에서 툴 등록이 `git/refs` 404로 실패하면 앱에서 로그아웃 후 다시 GitHub 로그인을 해야 합니다.

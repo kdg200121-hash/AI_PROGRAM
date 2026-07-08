@@ -14,21 +14,28 @@ export interface SavedCustomFlow {
   graph: StoredFlowGraph;
   createdAt: number;
   updatedAt: number;
+  version?: string;
+  author?: string;
+  sourcePath?: string;
 }
 
 export function createSavedFlow(
   name: string,
   graph: StoredFlowGraph,
   now = Date.now(),
-  description = "Custom Flow 작업 흐름"
+  description = "Custom Flow 작업 흐름",
+  metadata: Partial<Pick<SavedCustomFlow, "version" | "author" | "sourcePath">> = {}
 ): SavedCustomFlow {
   return {
     id: `flow-${now}-${Math.random().toString(36).slice(2, 8)}`,
     name: name.trim() || "새 Custom Flow",
     description,
-    graph,
+    graph: cloneStoredFlowGraph(graph),
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    version: metadata.version,
+    author: metadata.author,
+    sourcePath: metadata.sourcePath
   };
 }
 
@@ -179,6 +186,31 @@ export function cloneStoredFlowGraph(graph: StoredFlowGraph): StoredFlowGraph {
   return JSON.parse(JSON.stringify(graph)) as StoredFlowGraph;
 }
 
+function normalizeSavedFlow(item: unknown): SavedCustomFlow | null {
+  if (!item || typeof item !== "object" || !("graph" in item)) {
+    return null;
+  }
+
+  const record = item as Partial<SavedCustomFlow>;
+  const id = String(record.id ?? "");
+  const name = String(record.name ?? "Custom Flow");
+  if (!id || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    description: String(record.description ?? "Custom Flow 작업 흐름"),
+    graph: record.graph as StoredFlowGraph,
+    createdAt: Number(record.createdAt ?? Date.now()),
+    updatedAt: Number(record.updatedAt ?? record.createdAt ?? Date.now()),
+    version: record.version ? String(record.version) : undefined,
+    author: record.author ? String(record.author) : undefined,
+    sourcePath: record.sourcePath ? String(record.sourcePath) : undefined
+  };
+}
+
 function parseSavedFlowList(raw: string | null): SavedCustomFlow[] {
   try {
     if (!raw) {
@@ -189,21 +221,7 @@ function parseSavedFlowList(raw: string | null): SavedCustomFlow[] {
       return [];
     }
 
-    return parsed
-      .map((item): SavedCustomFlow | null => {
-        if (!item || typeof item !== "object" || !item.graph) {
-          return null;
-        }
-        return {
-          id: String(item.id ?? ""),
-          name: String(item.name ?? "Custom Flow"),
-          description: String(item.description ?? "Custom Flow 작업 흐름"),
-          graph: item.graph as StoredFlowGraph,
-          createdAt: Number(item.createdAt ?? Date.now()),
-          updatedAt: Number(item.updatedAt ?? item.createdAt ?? Date.now())
-        };
-      })
-      .filter((item): item is SavedCustomFlow => Boolean(item?.id && item.name));
+    return parsed.map(normalizeSavedFlow).filter((item): item is SavedCustomFlow => Boolean(item));
   } catch {
     return [];
   }
@@ -225,6 +243,31 @@ export function saveSharedFlows(flows: SavedCustomFlow[], storage: Storage = win
   storage.setItem(sharedCustomFlowsStorageKey, JSON.stringify(flows));
 }
 
+function normalizeFlowIdentityPart(value: string | undefined, fallback: string) {
+  return (value?.trim() || fallback).toLocaleLowerCase();
+}
+
+export function flowRegistrationKey(flow: SavedCustomFlow) {
+  return [
+    normalizeFlowIdentityPart(flow.name, "custom-flow"),
+    normalizeFlowIdentityPart(flow.version, "1.0.0"),
+    normalizeFlowIdentityPart(flow.author, "mcp-registry")
+  ].join("|");
+}
+
+export function isFlowRegistered(sharedFlows: SavedCustomFlow[], flow: SavedCustomFlow) {
+  const key = flowRegistrationKey(flow);
+  return sharedFlows.some((item) => item.id === flow.id || flowRegistrationKey(item) === key);
+}
+
+export function removeSharedFlowByIdentity(
+  sharedFlows: SavedCustomFlow[],
+  flow: SavedCustomFlow
+) {
+  const key = flowRegistrationKey(flow);
+  return sharedFlows.filter((item) => item.id !== flow.id && flowRegistrationKey(item) !== key);
+}
+
 export function upsertSharedFlow(
   sharedFlows: SavedCustomFlow[],
   flow: SavedCustomFlow,
@@ -233,11 +276,30 @@ export function upsertSharedFlow(
   const sharedFlow: SavedCustomFlow = {
     ...flow,
     graph: cloneStoredFlowGraph(flow.graph),
+    version: flow.version ?? "1.0.0",
+    author: flow.author ?? "MCP Registry",
     updatedAt: now
   };
   const exists = sharedFlows.some((item) => item.id === flow.id);
   return exists
     ? sharedFlows.map((item) => (item.id === flow.id ? sharedFlow : item))
+    : [sharedFlow, ...sharedFlows];
+}
+
+export function upsertSharedFlowByIdentity(
+  sharedFlows: SavedCustomFlow[],
+  flow: SavedCustomFlow,
+  now = Date.now()
+) {
+  const sharedFlow = upsertSharedFlow([], flow, now)[0];
+  const key = flowRegistrationKey(sharedFlow);
+  const exists = sharedFlows.some(
+    (item) => item.id === sharedFlow.id || flowRegistrationKey(item) === key
+  );
+  return exists
+    ? sharedFlows.map((item) =>
+        item.id === sharedFlow.id || flowRegistrationKey(item) === key ? sharedFlow : item
+      )
     : [sharedFlow, ...sharedFlows];
 }
 
@@ -251,19 +313,7 @@ export function parseDraggedSavedFlow(raw: string): SavedCustomFlow | null {
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<SavedCustomFlow>;
-    if (!parsed.id || !parsed.name || !parsed.graph) {
-      return null;
-    }
-
-    return {
-      id: String(parsed.id),
-      name: String(parsed.name),
-      description: String(parsed.description ?? ""),
-      graph: parsed.graph as StoredFlowGraph,
-      createdAt: Number(parsed.createdAt ?? Date.now()),
-      updatedAt: Number(parsed.updatedAt ?? parsed.createdAt ?? Date.now())
-    };
+    return normalizeSavedFlow(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -282,15 +332,17 @@ function sampleGraph(): StoredFlowGraph {
 
 export const sampleSharedFlows: SavedCustomFlow[] = [
   createSavedFlow(
-    "CAD 객체 읽기 후 Excel 정리",
+    "CAD 객체 읽기 → Excel 정리",
     sampleGraph(),
     1,
-    "CAD 객체 정보를 읽어 Excel 보고서로 정리하는 샘플 플로우입니다."
+    "CAD 객체 정보를 읽어 Excel 보고서로 정리하는 샘플 플로우입니다.",
+    { version: "1.0.0", author: "MCP Registry" }
   ),
   createSavedFlow(
     "CAD 좌표 기반 Revit 배치",
     sampleGraph(),
     2,
-    "CAD 좌표와 객체 정보를 Revit 배치 작업으로 넘기는 샘플 플로우입니다."
+    "CAD 좌표와 객체 정보를 Revit 배치 작업으로 넘기는 샘플 플로우입니다.",
+    { version: "1.0.0", author: "MCP Registry" }
   )
 ];

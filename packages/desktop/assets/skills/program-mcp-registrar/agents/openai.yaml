@@ -1,4 +1,4 @@
 interface:
   display_name: "/등록 Program MCP"
-  short_description: "AutoCAD, Revit, Excel, Tekla 같은 프로그램 MCP 브리지를 생성, 등록, 연결, 검증하는 절차를 안내합니다."
-  default_prompt: "/등록 명령으로 대상 프로그램을 고르고, MCP 브리지가 없으면 스캐폴드 생성부터 AI Program 등록, URL/포트 확인, 명령 목록 확인, 안전한 테스트 명령 실행까지 단계별로 진행해줘."
+  short_description: "/등록 명령으로 Codex Bridge 연결을 먼저 확인하고, 연결되면 프로그램 MCP 등록과 검증을 진행합니다."
+  default_prompt: "/등록 실행 시 진행 흐름을 길게 설명하지 말고 Codex Bridge 상태를 먼저 확인해줘. 미설정/실패 상태면 자동 연결을 시도한다고 짧게 말한 뒤 저장된 명령, ~/.codex/plugins/.plugin-appserver/codex.exe, ~/.codex/.sandbox-bin/codex.exe, codex 순서로 테스트하고 성공한 경로를 저장해줘. 연결되면 바로 프로그램 MCP 선택/등록/연결 확인으로 넘어가고, 모두 실패할 때만 짧게 설정 방법을 안내해줘."

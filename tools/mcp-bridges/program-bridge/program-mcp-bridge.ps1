@@ -30,9 +30,15 @@ function Send-JsonResponse {
 function Read-RequestPath {
   param([System.Net.Sockets.TcpClient]$Client)
 
+  $Client.ReceiveTimeout = 1000
   $stream = $Client.GetStream()
+  $stream.ReadTimeout = 1000
   $buffer = New-Object byte[] 4096
-  $count = $stream.Read($buffer, 0, $buffer.Length)
+  try {
+    $count = $stream.Read($buffer, 0, $buffer.Length)
+  } catch {
+    return "/"
+  }
   if ($count -le 0) {
     return "/"
   }

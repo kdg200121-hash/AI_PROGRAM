@@ -2,17 +2,15 @@ import { describe, expect, it } from "vitest";
 import { colorModeOptions, settingsSections } from "./settingsDialog";
 
 describe("settingsSections", () => {
-  it("orders setup, AI, display, account, and admin controls", () => {
+  it("orders MCP server, display, account, and admin controls", () => {
     expect(settingsSections.map((section) => section.id)).toEqual([
       "servers",
-      "ai",
       "display",
       "account",
       "management"
     ]);
     expect(settingsSections.map((section) => section.label)).toEqual([
       "MCP 서버",
-      "AI 연결",
       "화면 모드",
       "계정 정보",
       "관리"

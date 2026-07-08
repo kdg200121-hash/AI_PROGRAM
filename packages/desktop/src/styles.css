@@ -396,15 +396,17 @@ button.primary:active {
 }
 
 .tabEndDropZone {
-  display: none;
+  display: block;
   align-self: stretch;
-  flex: 0 0 28px;
-  min-width: 28px;
+  flex: 1 0 44px;
+  min-width: 44px;
   border-left: 3px solid transparent;
+  border-radius: 6px;
 }
 
 .tabEndDropZone.active {
-  border-left-color: transparent;
+  border-left-color: #8bb7f0;
+  background: rgba(139, 183, 240, 0.1);
 }
 
 .workspaceTabsInner {
@@ -1146,6 +1148,20 @@ button.primary:active {
   bottom: -3px;
 }
 
+.submenuEndDropZone {
+  min-height: 34px;
+  border-radius: 8px;
+}
+
+.submenuEndDropZone.active::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin: 15px 6px 0 0;
+  border-radius: 999px;
+  background: #8bb7f0;
+}
+
 .submenuDragButton,
 .submenuButton {
   min-height: 28px;
@@ -1408,7 +1424,7 @@ button.primary:active {
 }
 
 .recentSubmenuHeader .sidebarLabel::before {
-  content: "최근 사용";
+  content: "理쒓렐 ?ъ슜";
   color: #8fa7c7;
   font-size: 11px;
   font-weight: 700;
@@ -2504,6 +2520,164 @@ tbody tr {
   line-height: 1.45;
 }
 
+.executionStepSelector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.executionStepHeader {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.executionStepMetaBadges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  width: fit-content;
+  max-width: 46%;
+  margin-left: auto;
+}
+
+.schemaRiskPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  width: fit-content;
+  padding: 0 9px;
+  border: 1px solid #cad8ea;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #526071;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.schemaRiskPill.risk-create {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.schemaRiskPill.risk-modify,
+.schemaRiskPill.risk-bulk-modify,
+.schemaRiskPill.risk-caution {
+  border-color: #f7c66f;
+  background: #fff7e6;
+  color: #9a5d00;
+}
+
+.schemaRiskPill.risk-delete {
+  border-color: #fca5a5;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.executionStepButton {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 9px;
+  align-items: center;
+  min-height: 76px;
+  padding: 11px;
+  border: 1px solid #d8e5f4;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #1f2a3d;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.executionStepButton strong {
+  grid-row: span 2;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
+.executionStepButton span {
+  min-width: 0;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.executionStepButton small {
+  min-width: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.executionStepButton:hover,
+.executionStepButton.active {
+  border-color: #9fc2ef;
+  background: #eef6ff;
+  box-shadow: 0 8px 18px rgba(45, 95, 159, 0.09);
+}
+
+.executionStepButton.active strong {
+  border: 2px solid #2563eb;
+  background: #ffffff;
+  color: #1d4ed8;
+}
+
+.executionStepButton.activeCurrent {
+  border-color: #2563eb;
+  background: #eaf3ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16), 0 10px 22px rgba(37, 99, 235, 0.13);
+}
+
+.executionStepButton.activeCurrent strong {
+  border-color: #1d4ed8;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.executionStepButton.complete strong {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.executionStepSummary {
+  display: grid;
+  gap: 5px;
+  margin: 0 12px 12px;
+  padding: 12px;
+  border: 1px solid #d9e6f3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.executionStepSummary strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.executionStepSummary span {
+  color: #50627a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .toolPageSchemaSettings {
   min-height: 0;
   padding: 12px;
@@ -2999,21 +3173,23 @@ tbody tr {
 .flowGroupHeader {
   position: absolute;
   left: 14px;
-  top: 7px;
-  display: inline-grid;
-  grid-template-columns: minmax(96px, auto) auto auto;
+  right: 14px;
+  top: 14px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
   align-items: center;
-  gap: 6px;
-  max-width: calc(100% - 28px);
-  padding: 4px 6px 4px 10px;
+  gap: 10px;
+  min-height: 38px;
+  padding: 6px 8px 6px 12px;
   border: 1px solid color-mix(in srgb, var(--flow-group-color, #3b82f6) 34%, transparent);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .flowGroupNameInput {
-  width: 132px;
+  width: 100%;
   min-width: 0;
+  min-height: 26px;
   border: 0;
   background: transparent;
   color: #2d5f9f;
@@ -3547,7 +3723,7 @@ tbody tr {
 }
 
 .flowNodeIssueBadge.error::before {
-  content: "×";
+  content: "횞";
   display: block;
   color: #fff;
   font-family: "Segoe UI Symbol", "Segoe UI", Arial, sans-serif;
@@ -4036,6 +4212,7 @@ tbody tr {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   min-height: 20px;
 }
 
@@ -4051,6 +4228,16 @@ tbody tr {
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.schemaSectionHeader .schemaSectionToggle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.schemaSectionHeader .schemaPresetControls {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .schemaSettingsSection header span {
@@ -4139,6 +4326,7 @@ tbody tr {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
   min-width: 0;
 }
@@ -4447,62 +4635,6 @@ tbody tr {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.schemaWorkflowSteps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.schemaWorkflowStep {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 2px 8px;
-  align-items: center;
-  border: 1px solid #dbe5f0;
-  border-radius: 8px;
-  background: #f8fbff;
-  padding: 8px;
-}
-
-.schemaWorkflowStep strong {
-  grid-row: span 2;
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 12px;
-}
-
-.schemaWorkflowStep span {
-  min-width: 0;
-  color: #18324f;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.schemaWorkflowStep small {
-  min-width: 0;
-  overflow: hidden;
-  color: #64748b;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.schemaWorkflowStep.active {
-  border-color: #93c5fd;
-  background: #eff6ff;
-}
-
-.schemaWorkflowStep.complete strong {
-  background: #dcfce7;
-  color: #15803d;
 }
 
 .schemaActionButtons button {
@@ -6403,6 +6535,7 @@ tbody tr {
   color: #a33b3b;
   font-size: 12px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .formWarning {
@@ -7413,6 +7546,14 @@ tbody tr {
   background: rgba(15, 23, 42, 0.28);
 }
 
+.appShell:not(.compactMode):not(.sidebarCollapsed) > .dialogBackdrop {
+  left: var(--sidebar-width, 248px);
+}
+
+.appShell.sidebarCollapsed > .dialogBackdrop {
+  left: 64px;
+}
+
 .nestedDialogBackdrop {
   z-index: 12;
   background: rgba(15, 23, 42, 0.36);
@@ -7434,12 +7575,16 @@ tbody tr {
 }
 
 .dialogHeader {
+  position: sticky;
+  top: 0;
+  z-index: 8;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   padding: 18px;
   border-bottom: 1px solid #edf1f6;
+  background: #fff;
 }
 
 .dialogHeader h2 {
@@ -7455,10 +7600,14 @@ tbody tr {
 }
 
 .dialogHeaderActions {
+  position: sticky;
+  top: 10px;
+  z-index: 9;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .dialogWindowButton {
@@ -7569,11 +7718,17 @@ tbody tr {
 
 .marketFlowPanel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(240px, 1fr) minmax(240px, 1fr);
   gap: 14px;
   padding: 14px;
   min-height: 100%;
   background: #eef6ff;
+}
+
+.marketFlowToolbar {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .marketFlowSection {
@@ -7586,12 +7741,20 @@ tbody tr {
 }
 
 .marketFlowSection > header {
-  display: grid;
-  gap: 5px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
   min-height: 72px;
   padding: 14px 16px;
   border-bottom: 1px solid #e4edf8;
   background: #f8fbff;
+}
+
+.marketFlowSection > header > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
 }
 
 .marketFlowSection > header strong {
@@ -7672,8 +7835,29 @@ tbody tr {
   font-weight: 800;
 }
 
+.marketFlowTable {
+  align-self: start;
+}
+
+.marketFlowTable tbody tr {
+  cursor: grab;
+}
+
+.marketFlowTable tbody tr:active {
+  cursor: grabbing;
+}
+
+.flowTableDescription {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .customToolFormDialog {
-  width: min(560px, 100%);
+  width: min(860px, calc(100vw - 56px));
 }
 
 .authDialog {
@@ -7935,6 +8119,10 @@ tbody tr {
   align-items: center;
 }
 
+.marketToolsToolbarRow {
+  grid-template-columns: minmax(180px, 1fr) auto auto auto;
+}
+
 .customToolFilterIconBar {
   display: flex;
   align-items: center;
@@ -8181,6 +8369,14 @@ tbody tr {
   align-items: center;
   gap: 7px;
   max-width: 100%;
+  vertical-align: middle;
+}
+
+.customToolNameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .toolRiskBadge {
@@ -8455,18 +8651,6 @@ button.toolRiskBadge:focus-visible {
   padding: 0 14px 14px;
 }
 
-.openAiSettingsForm {
-  display: grid;
-  gap: 12px;
-  padding: 0 14px 14px;
-}
-
-.openAiSettingsMessage {
-  margin: 0;
-  color: #3f5f86;
-  font-size: 12px;
-}
-
 .adminSegmentedControl {
   width: 100%;
   margin-top: 2px;
@@ -8475,6 +8659,160 @@ button.toolRiskBadge:focus-visible {
 .adminSegmentedControl button {
   min-height: 28px;
   font-size: 11px;
+}
+
+.managementTabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 0 14px;
+}
+
+.managementTabs button {
+  min-height: 30px;
+  padding: 0 12px;
+  border-color: #d6e1ef;
+  background: #fff;
+  color: #50647e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.managementTabs button.active {
+  border-color: #9fbfe8;
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
+.managementSubTabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf1f6;
+  background: #fbfcfe;
+}
+
+.managementSubTabs button {
+  min-height: 28px;
+  padding: 0 10px;
+  border-color: #d6e1ef;
+  background: #fff;
+  color: #50647e;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.managementSubTabs button.active {
+  border-color: #9fbfe8;
+  background: #eef5ff;
+  color: #1f4d82;
+}
+
+.skillLearningDashboard {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 12px;
+  overflow: visible;
+}
+
+.skillLearningSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 12px 0;
+}
+
+.skillLearningSummary div {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid #dbe7f5;
+  border-radius: 7px;
+  background: #f8fbff;
+}
+
+.skillLearningSummary strong {
+  color: #172033;
+  font-size: 20px;
+}
+
+.skillLearningSummary span {
+  color: #617086;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.skillLearningColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.skillLearningColumns section {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.skillLearningColumns section > strong {
+  color: #172033;
+  font-size: 13px;
+}
+
+.skillLearningCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid #dbe7f5;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.skillLearningCard.applied {
+  background: #f8fafc;
+}
+
+.skillLearningCard div {
+  display: grid;
+  gap: 4px;
+}
+
+.skillLearningCard strong {
+  color: #172033;
+  font-size: 12px;
+}
+
+.skillLearningCard span,
+.skillLearningCard small,
+.skillLearningCard em {
+  color: #617086;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.skillLearningCard em {
+  font-style: normal;
+  font-weight: 800;
+}
+
+.skillLearningCard button {
+  min-height: 28px;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.skillUpdateDraft {
+  min-height: 180px;
+  margin: 0 12px;
+  padding: 10px;
+  border: 1px solid #dbe7f5;
+  border-radius: 7px;
+  color: #233149;
+  font: 12px/1.55 Consolas, "Courier New", monospace;
+  resize: vertical;
 }
 
 .toolApprovalBadge.prBadge {
@@ -9444,7 +9782,6 @@ button.toolRiskBadge:focus-visible {
 .darkMode .schemaStructuredRow.fileListColumns > small,
 .darkMode .schemaFileAddButton,
 .darkMode .schemaActionButtons button,
-.darkMode .schemaWorkflowStep,
 .darkMode .schemaActionResult,
 .darkMode .schemaCandidatePanel,
 .darkMode .schemaCandidateList button,
@@ -9512,7 +9849,6 @@ button.toolRiskBadge:focus-visible {
 .darkMode .schemaTestCaseItem span,
 .darkMode .schemaActionHint,
 .darkMode .schemaActionResult p,
-.darkMode .schemaWorkflowStep small,
 .darkMode .schemaPreviewResultRow small {
   color: #aab5c5;
 }
@@ -9541,22 +9877,6 @@ button.toolRiskBadge:focus-visible {
   background: #14253c;
 }
 
-.darkMode .schemaWorkflowStep.active {
-  border-color: #2d5f98;
-  background: #102239;
-}
-
-.darkMode .schemaWorkflowStep strong {
-  background: #17375e;
-  color: #8ec5ff;
-}
-
-.darkMode .schemaWorkflowStep.complete strong {
-  background: #123822;
-  color: #8ee7a8;
-}
-
-.darkMode .schemaWorkflowStep span,
 .darkMode .schemaPreviewResultRow span {
   color: #d7dfeb;
 }
@@ -10212,10 +10532,6 @@ button.toolRiskBadge:focus-visible {
 .darkMode .accountLockedPanel span,
 .darkMode .licenseGatePanel span {
   color: #b8c0cb;
-}
-
-.darkMode .openAiSettingsMessage {
-  color: #9fb3cf;
 }
 
 .darkMode .accountUserList,

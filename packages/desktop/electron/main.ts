@@ -29,15 +29,6 @@ import {
   type ToolExecutionResult
 } from "../src/toolExecutionModel";
 import {
-  buildOpenAiToolExecutionBody,
-  extractOpenAiResponseText,
-  openAiToolRunnerDefaultModel
-} from "../src/openAiToolRunner";
-import {
-  resolveOpenAiSettingsStatus,
-  type OpenAiSettingsStatus
-} from "../src/openAiSettings";
-import {
   assertPathInsideAllowedRoots,
   normalizeAllowedPath
 } from "../src/filePathSecurity";
@@ -45,6 +36,12 @@ import {
   activeFileProbeUrls,
   extractDetectedActiveFiles
 } from "../src/activeFileDetection";
+import {
+  createGithubFlowDocument,
+  githubFlowFileName,
+  serializeGithubFlowDocument
+} from "../src/githubFlowShare";
+import type { SavedCustomFlow } from "../src/customFlowLibrary";
 import type { OpenDialogOptions } from "electron";
 import type { McpServerRecord, McpStatus, RegistryFile } from "@mcp-registry/shared";
 import type {
@@ -257,119 +254,6 @@ function decryptGitHubAccessToken(accessToken?: string) {
   } catch {
     return undefined;
   }
-}
-
-interface OpenAiSettingsFile {
-  apiKey?: string;
-  model?: string;
-  updatedAt?: string;
-}
-
-interface SaveOpenAiSettingsInput {
-  apiKey?: string;
-  model?: string;
-}
-
-function openAiSettingsPath() {
-  return join(app.getPath("userData"), "openai-settings.json");
-}
-
-function encryptOpenAiApiKey(apiKey?: string) {
-  if (!apiKey || apiKey.startsWith(encryptedTokenPrefix)) {
-    return apiKey;
-  }
-
-  if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error("OpenAI API 키를 안전하게 저장할 수 없습니다.");
-  }
-
-  return `${encryptedTokenPrefix}${safeStorage.encryptString(apiKey).toString("base64")}`;
-}
-
-function decryptOpenAiApiKey(apiKey?: string) {
-  if (!apiKey || !apiKey.startsWith(encryptedTokenPrefix)) {
-    return apiKey;
-  }
-
-  try {
-    return safeStorage.decryptString(Buffer.from(apiKey.slice(encryptedTokenPrefix.length), "base64"));
-  } catch {
-    return undefined;
-  }
-}
-
-async function loadOpenAiSettings(): Promise<OpenAiSettingsFile> {
-  try {
-    const settings = JSON.parse(await readFile(openAiSettingsPath(), "utf8")) as OpenAiSettingsFile;
-    if (settings.apiKey && !settings.apiKey.startsWith(encryptedTokenPrefix)) {
-      if (!safeStorage.isEncryptionAvailable()) {
-        const settingsWithoutUnsafeKey = {
-          ...settings,
-          apiKey: undefined
-        };
-        await saveOpenAiSettingsFile(settingsWithoutUnsafeKey);
-        return settingsWithoutUnsafeKey;
-      }
-
-      await saveOpenAiSettingsFile(settings);
-    }
-
-    return {
-      ...settings,
-      apiKey: decryptOpenAiApiKey(settings.apiKey)
-    };
-  } catch {
-    return {};
-  }
-}
-
-async function saveOpenAiSettingsFile(settings: OpenAiSettingsFile) {
-  await mkdir(app.getPath("userData"), { recursive: true });
-  const storedSettings = {
-    ...settings,
-    apiKey: encryptOpenAiApiKey(settings.apiKey)
-  };
-  await writeFile(openAiSettingsPath(), JSON.stringify(storedSettings, null, 2), "utf8");
-}
-
-function openAiEnvironmentApiKey() {
-  return process.env.AI_PROGRAM_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY ?? "";
-}
-
-function openAiEnvironmentModel() {
-  return process.env.AI_PROGRAM_OPENAI_MODEL ?? "";
-}
-
-async function openAiSettingsStatus(): Promise<OpenAiSettingsStatus> {
-  const settings = await loadOpenAiSettings();
-  return resolveOpenAiSettingsStatus({
-    storedApiKey: settings.apiKey,
-    environmentApiKey: openAiEnvironmentApiKey(),
-    storedModel: settings.model,
-    environmentModel: openAiEnvironmentModel(),
-    defaultModel: openAiToolRunnerDefaultModel,
-    encryptionAvailable: safeStorage.isEncryptionAvailable(),
-    updatedAt: settings.updatedAt
-  });
-}
-
-async function saveOpenAiSettings(input: SaveOpenAiSettingsInput) {
-  const existing = await loadOpenAiSettings();
-  const apiKey = input.apiKey?.trim() || existing.apiKey;
-  const model = input.model?.trim() || existing.model || openAiToolRunnerDefaultModel;
-
-  await saveOpenAiSettingsFile({
-    apiKey,
-    model,
-    updatedAt: new Date().toISOString()
-  });
-
-  return openAiSettingsStatus();
-}
-
-async function clearOpenAiSettings() {
-  await rm(openAiSettingsPath(), { force: true });
-  return openAiSettingsStatus();
 }
 
 async function loadGitHubAuthProfile(): Promise<GitHubAuthProfile | null> {
@@ -648,93 +532,6 @@ async function postJsonWithTimeout(url: string, body: unknown, timeoutMs = 10_00
   }
 }
 
-interface OpenAiToolRunnerResponse {
-  ok: boolean;
-  skipped?: boolean;
-  model?: string;
-  message: string;
-  outputText?: string;
-  raw?: unknown;
-}
-
-async function openAiApiKey() {
-  const settings = await loadOpenAiSettings();
-  return settings.apiKey ?? openAiEnvironmentApiKey();
-}
-
-async function openAiModel() {
-  const settings = await loadOpenAiSettings();
-  return settings.model?.trim() || openAiEnvironmentModel().trim() || openAiToolRunnerDefaultModel;
-}
-
-async function callOpenAiToolRunner(
-  request: ToolExecutionRequest,
-  timeoutMs = 30_000
-): Promise<OpenAiToolRunnerResponse> {
-  const apiKey = (await openAiApiKey()).trim();
-  if (!apiKey) {
-    return {
-      ok: false,
-      skipped: true,
-      message:
-        "OpenAI API 키가 설정되지 않았습니다. Settings > AI 연결에서 API 키를 저장하거나 AI_PROGRAM_OPENAI_API_KEY 또는 OPENAI_API_KEY 환경 변수를 설정해주세요."
-    };
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const model = await openAiModel();
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(buildOpenAiToolExecutionBody(request, model)),
-      signal: controller.signal
-    });
-
-    const raw = await response.json().catch(() => null);
-    if (!response.ok) {
-      const errorMessage =
-        raw && typeof raw === "object" && "error" in raw
-          ? JSON.stringify((raw as Record<string, unknown>).error)
-          : `HTTP ${response.status}`;
-      return {
-        ok: false,
-        model,
-        message: `OpenAI API 호출에 실패했습니다. ${errorMessage}`,
-        raw
-      };
-    }
-
-    const outputText = extractOpenAiResponseText(raw);
-    return {
-      ok: true,
-      model,
-      message: outputText
-        ? `OpenAI가 실행 계획을 생성했습니다. ${outputText.slice(0, 160)}`
-        : "OpenAI가 실행 계획을 생성했지만 텍스트 응답이 비어 있습니다.",
-      outputText,
-      raw
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      model,
-      message:
-        error instanceof Error && error.name === "AbortError"
-          ? "OpenAI API 호출 시간이 초과되었습니다."
-          : `OpenAI API 호출 중 오류가 발생했습니다. ${error instanceof Error ? error.message : String(error)}`
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 async function callRegisteredMcpCommand(
   server: McpServerRecord,
   command: ToolExecutionRequestCommand,
@@ -789,38 +586,11 @@ async function callRegisteredMcpCommand(
 async function runToolExecutionRequest(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
   const registry = await loadRegistry(registryPath());
   const runnableCommands = request.commands.filter((command) => command.status !== "manual");
-  const aiResponse = await callOpenAiToolRunner(request);
-
-  if (!aiResponse.ok && !aiResponse.skipped) {
-    return {
-      status: "error",
-      message: aiResponse.message,
-      raw: {
-        openAi: aiResponse.raw
-      }
-    };
-  }
 
   if (runnableCommands.length === 0) {
-    if (aiResponse.ok) {
-      return {
-        status: "needs-ai",
-        message:
-          "OpenAI 실행 계획을 받았습니다. 다만 이 툴에는 앱이 바로 호출할 MCP 명령이 없어 실제 실행은 아직 대기 상태입니다.",
-        raw: {
-          openAi: {
-            model: aiResponse.model,
-            outputText: aiResponse.outputText,
-            response: aiResponse.raw
-          }
-        }
-      };
-    }
     return {
       status: "needs-ai",
-      message: aiResponse.skipped
-        ? `이 툴에는 앱에서 바로 호출할 MCP 명령이 아직 없습니다. ${aiResponse.message}`
-        : "이 툴에는 앱에서 바로 호출할 MCP 명령이 아직 없습니다. AI Runner 연결이 필요합니다."
+      message: "이 툴에는 앱에서 바로 호출할 MCP 명령이 아직 없습니다. MD 툴의 실행 명령 또는 연결된 MCP 브리지를 확인해주세요."
     };
   }
 
@@ -844,44 +614,17 @@ async function runToolExecutionRequest(request: ToolExecutionRequest): Promise<T
       message:
         titleBlockCandidates.length > 0
           ? `${titleBlockCandidates.length}개의 도곽 후보를 CAD MCP에서 받았습니다.`
-          : aiResponse.ok
-            ? "OpenAI 실행 계획과 MCP 응답을 받았습니다. 결과를 확인하세요."
-            : "MCP 응답을 받았습니다. 결과를 확인하세요.",
+          : "MCP 응답을 받았습니다. 결과를 확인하세요.",
       raw: {
-        openAi: aiResponse.ok
-          ? {
-              model: aiResponse.model,
-              outputText: aiResponse.outputText,
-              response: aiResponse.raw
-            }
-          : null,
         mcp: raw
       },
       titleBlockCandidates
     };
   }
 
-  if (aiResponse.ok) {
-    return {
-      status: "needs-ai",
-      message:
-        "OpenAI 실행 계획은 받았지만 MCP 서버가 실행 요청에 응답하지 않았습니다. 연결된 CAD/Revit/Excel MCP 브리지를 확인해주세요.",
-      raw: {
-        openAi: {
-          model: aiResponse.model,
-          outputText: aiResponse.outputText,
-          response: aiResponse.raw
-        }
-      }
-    };
-  }
-
   return {
     status: "needs-ai",
-    message:
-      aiResponse.skipped
-        ? `MCP 서버가 실행 요청에 응답하지 않았습니다. ${aiResponse.message}`
-        : "MCP 서버가 실행 요청에 응답하지 않았습니다. CAD 도곽 후보는 앱이 임의로 만들지 않고, AI Runner 또는 CAD MCP 분석 응답이 연결되어야 표시됩니다."
+    message: "MCP 서버가 실행 요청에 응답하지 않았습니다. 연결된 CAD/Revit/Excel MCP 브리지를 확인해주세요."
   };
 }
 
@@ -959,6 +702,88 @@ async function githubRequest<T>(
   }
 
   return (await response.json()) as T;
+}
+
+function githubStatusFromError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  const match = message.match(/GitHub request failed: (\d+)/);
+  return match ? Number(match[1]) : 0;
+}
+
+async function getGitHubContentSha(
+  owner: string,
+  repo: string,
+  targetPath: string,
+  branch: string,
+  token: string
+) {
+  try {
+    const content = await githubRequest<{ sha: string }>(
+      `/repos/${owner}/${repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}?ref=${encodeURIComponent(branch)}`,
+      token
+    );
+    return content.sha;
+  } catch (error) {
+    if (githubStatusFromError(error) === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function deleteGitHubContentFile({
+  owner,
+  repo,
+  targetPath,
+  branch,
+  token,
+  message,
+  retry = true
+}: {
+  owner: string;
+  repo: string;
+  targetPath: string;
+  branch: string;
+  token: string;
+  message: string;
+  retry?: boolean;
+}) {
+  const sha = await getGitHubContentSha(owner, repo, targetPath, branch, token);
+  if (!sha) {
+    return "missing" as const;
+  }
+
+  try {
+    await githubRequest(
+      `/repos/${owner}/${repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}`,
+      token,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, sha, branch })
+      }
+    );
+    return "deleted" as const;
+  } catch (error) {
+    const status = githubStatusFromError(error);
+    if (status === 409 && retry) {
+      const freshSha = await getGitHubContentSha(owner, repo, targetPath, branch, token);
+      if (!freshSha) {
+        return "missing" as const;
+      }
+      await githubRequest(
+        `/repos/${owner}/${repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}`,
+        token,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, sha: freshSha, branch })
+        }
+      );
+      return "deleted" as const;
+    }
+    throw error;
+  }
 }
 
 async function githubPathExists(owner: string, repo: string, path: string, ref: string, token: string) {
@@ -1337,6 +1162,230 @@ async function publishMarkdownToolToGitHub(
   };
 }
 
+async function uniqueGitHubFlowPath(
+  owner: string,
+  repo: string,
+  directory: string,
+  branch: string,
+  flow: SavedCustomFlow,
+  token: string
+) {
+  const baseName = githubFlowFileName(flow).replace(/\.json$/i, "");
+  let candidate = `${directory.replace(/\/+$/g, "")}/${baseName}.json`;
+  let suffix = 2;
+  while (await githubPathExists(owner, repo, candidate, branch, token)) {
+    candidate = `${directory.replace(/\/+$/g, "")}/${baseName}_${suffix}.json`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+async function publishSavedFlowToGitHub(
+  flow: SavedCustomFlow,
+  source: GitHubToolSource,
+  options: GitHubPublishOptions
+) {
+  const profile = await loadGitHubAuthProfile();
+  if (!profile?.accessToken) {
+    throw new Error("GitHub 로그인이 필요합니다.");
+  }
+
+  const repo = await githubRequest<GitHubRepository>(
+    `/repos/${source.owner}/${source.repo}`,
+    profile.accessToken
+  );
+  const canPushToSource = repo.permissions?.push !== false;
+  const baseBranch = source.ref ?? repo.default_branch;
+  const baseRef = await githubRequest<GitHubReference>(
+    `/repos/${source.owner}/${source.repo}/git/ref/heads/${baseBranch}`,
+    profile.accessToken
+  );
+  const sharedFlow: SavedCustomFlow = {
+    ...flow,
+    version: flow.version ?? "1.0.0",
+    author: profile.nickname || profile.githubId
+  };
+  const content = serializeGithubFlowDocument(
+    createGithubFlowDocument(sharedFlow, sharedFlow.author)
+  );
+
+  if (!options.requireReview && canPushToSource) {
+    try {
+      const targetPath = await uniqueGitHubFlowPath(
+        source.owner,
+        source.repo,
+        source.path,
+        baseBranch,
+        sharedFlow,
+        profile.accessToken
+      );
+      await githubRequest(
+        `/repos/${source.owner}/${source.repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}`,
+        profile.accessToken,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: `Add flow ${sharedFlow.name} ${sharedFlow.version}`,
+            content: Buffer.from(content, "utf8").toString("base64"),
+            branch: baseBranch
+          })
+        }
+      );
+      return {
+        kind: "direct" as const,
+        path: `github:${source.owner}/${source.repo}/${targetPath}`,
+        branch: baseBranch,
+        pullRequestUrl: "",
+        pullRequestNumber: 0,
+        pullRequestState: "merged" as const
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (!message.includes("403") && !message.includes("404")) {
+        throw error;
+      }
+    }
+  }
+
+  if (profile.githubId === source.owner && !canPushToSource) {
+    throw new Error(githubWritePermissionMessage(source.owner, source.repo));
+  }
+
+  const fork =
+    profile.githubId === source.owner
+      ? ({ owner: { login: source.owner }, full_name: `${source.owner}/${source.repo}` } as GitHubFork)
+      : await githubRequest<GitHubFork>(
+          `/repos/${source.owner}/${source.repo}/forks`,
+          profile.accessToken,
+          { method: "POST" }
+        );
+  const forkOwner = fork.owner.login;
+  const branch = `flow/${safeFilePart(sharedFlow.name)}-${safeFilePart(sharedFlow.version ?? "1.0.0")}-${Date.now()}`;
+
+  if (forkOwner !== source.owner) {
+    await waitForGitHubRepository(forkOwner, source.repo, profile.accessToken);
+  }
+
+  const forkRepo = await waitForGitHubRepository(forkOwner, source.repo, profile.accessToken);
+  const forkBaseBranch = forkRepo.default_branch || baseBranch;
+  const forkBaseRef = await githubRequest<GitHubReference>(
+    `/repos/${forkOwner}/${source.repo}/git/ref/heads/${forkBaseBranch}`,
+    profile.accessToken
+  );
+  await createGitHubBranch(
+    forkOwner,
+    source.repo,
+    branch,
+    forkBaseRef.object.sha || baseRef.object.sha,
+    profile.accessToken
+  );
+
+  const targetPath = await uniqueGitHubFlowPath(
+    forkOwner,
+    source.repo,
+    source.path,
+    branch,
+    sharedFlow,
+    profile.accessToken
+  );
+  await githubRequest(
+    `/repos/${forkOwner}/${source.repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}`,
+    profile.accessToken,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Add flow ${sharedFlow.name} ${sharedFlow.version}`,
+        content: Buffer.from(content, "utf8").toString("base64"),
+        branch
+      })
+    }
+  );
+
+  const pullRequest = await githubRequest<GitHubPullRequest>(
+    `/repos/${source.owner}/${source.repo}/pulls`,
+    profile.accessToken,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: `Add flow: ${sharedFlow.name} ${sharedFlow.version}`,
+        head: forkOwner === source.owner ? branch : `${forkOwner}:${branch}`,
+        base: baseBranch,
+        body: [
+          `Flow: ${sharedFlow.name}`,
+          `Version: ${sharedFlow.version}`,
+          `Author: ${sharedFlow.author}`,
+          "",
+          sharedFlow.description || "No description provided."
+        ].join("\n")
+      })
+    }
+  );
+
+  return {
+    kind: "pull_request" as const,
+    path: `github:${source.owner}/${source.repo}/${targetPath}`,
+    branch,
+    pullRequestUrl: pullRequest.html_url,
+    pullRequestNumber: pullRequest.number,
+    pullRequestState: pullRequest.merged_at ? ("merged" as const) : ("open" as const)
+  };
+}
+
+async function listGithubFlows(source: GitHubToolSource): Promise<SavedCustomFlow[]> {
+  const ref = source.ref ? `?ref=${encodeURIComponent(source.ref)}` : "";
+  const response = await fetch(
+    `https://api.github.com/repos/${source.owner}/${source.repo}/contents/${encodeURIComponent(source.path).replace(/%2F/g, "/")}${ref}`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      }
+    }
+  );
+  if (response.status === 404) {
+    return [];
+  }
+  if (!response.ok) {
+    throw new Error(`GitHub flows request failed: ${response.status}`);
+  }
+
+  const entries = (await response.json()) as GitHubContentItem[] | GitHubContentItem;
+  const files = (Array.isArray(entries) ? entries : [entries]).filter(
+    (entry) => entry.type === "file" && entry.name.toLowerCase().endsWith(".json")
+  );
+  const flows = await Promise.all<SavedCustomFlow | null>(
+    files.map(async (entry) => {
+      if (!entry.download_url) {
+        return null;
+      }
+      const file = await fetch(entry.download_url);
+      if (!file.ok) {
+        return null;
+      }
+      const data = (await file.json()) as Partial<SavedCustomFlow>;
+      if (!data.name || !data.graph) {
+        return null;
+      }
+      return {
+        id: `github-flow-${safeFilePart(entry.path)}`,
+        name: String(data.name),
+        description: String(data.description ?? ""),
+        version: data.version ? String(data.version) : "1.0.0",
+        author: data.author ? String(data.author) : "MCP Registry",
+        sourcePath: `github:${source.owner}/${source.repo}/${entry.path}`,
+        createdAt: Number(data.createdAt ?? Date.now()),
+        updatedAt: Number(data.updatedAt ?? data.createdAt ?? Date.now()),
+        graph: data.graph as SavedCustomFlow["graph"]
+      } satisfies SavedCustomFlow;
+    })
+  );
+
+  return flows.filter((flow): flow is SavedCustomFlow => Boolean(flow));
+}
+
 async function getGitHubPullRequestState(source: GitHubToolSource, pullRequestNumber: number) {
   const profile = await loadGitHubAuthProfile();
   const token = profile?.accessToken ?? "";
@@ -1376,38 +1425,22 @@ async function deleteGitHubToolPath(githubPath: string): Promise<GitHubDeleteToo
     `/repos/${owner}/${repo}/git/ref/heads/${baseBranch}`,
     profile.accessToken
   );
-  let content: { sha: string };
   try {
-    content = await githubRequest<{ sha: string }>(
-      `/repos/${owner}/${repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}?ref=${encodeURIComponent(baseBranch)}`,
-      profile.accessToken
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (message.includes("GitHub request failed: 404")) {
+    const deleteResult = await deleteGitHubContentFile({
+      owner,
+      repo,
+      targetPath,
+      branch: baseBranch,
+      token: profile.accessToken,
+      message: `Delete tool ${targetPath}`
+    });
+    if (deleteResult === "missing") {
       return { kind: "missing" };
     }
-    throw error;
-  }
-
-  try {
-    await githubRequest(
-      `/repos/${owner}/${repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}`,
-      profile.accessToken,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: `Delete tool ${targetPath}`,
-          sha: content.sha,
-          branch: baseBranch
-        })
-      }
-    );
     return { kind: "deleted" };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (!message.includes("403") && !message.includes("404")) {
+    const status = githubStatusFromError(error);
+    if (status !== 403 && status !== 404) {
       throw error;
     }
   }
@@ -1438,19 +1471,14 @@ async function deleteGitHubToolPath(githubPath: string): Promise<GitHubDeleteToo
     profile.accessToken
   );
 
-  await githubRequest(
-    `/repos/${forkOwner}/${repo}/contents/${encodeURIComponent(targetPath).replace(/%2F/g, "/")}`,
-    profile.accessToken,
-    {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: `Delete tool ${targetPath}`,
-        sha: content.sha,
-        branch
-      })
-    }
-  );
+  await deleteGitHubContentFile({
+    owner: forkOwner,
+    repo,
+    targetPath,
+    branch,
+    token: profile.accessToken,
+    message: `Delete tool ${targetPath}`
+  });
 
   const pullRequest = await githubRequest<GitHubPullRequest>(
     `/repos/${owner}/${repo}/pulls`,
@@ -1824,6 +1852,7 @@ async function listGithubMarkdownTools(source: GitHubToolSource) {
       const content = await contentResponse.text();
       const metadata = parseToolMetadata(content) as Partial<CustomToolMetadata> & {
         toolName?: string;
+        learningLog?: unknown;
       };
       const name = String(
         metadata.toolName ?? metadata.name ?? basename(file.name).replace(/\.(md|markdown)$/i, "")
@@ -1840,7 +1869,8 @@ async function listGithubMarkdownTools(source: GitHubToolSource) {
         sectionId: String(metadata.sectionId ?? "servers"),
         isToolLike: isToolMarkdown(content),
         riskWarnings: detectToolRiskWarnings(content),
-        toolSchema: parseToolRuntimeSchema(content)
+        toolSchema: parseToolRuntimeSchema(content),
+        learningLog: metadata.learningLog
       };
     })
   );
@@ -2123,18 +2153,28 @@ ipcMain.handle("github-auth:logout", async () => {
   return null;
 });
 
-ipcMain.handle("openai-settings:get", async () => openAiSettingsStatus());
-
-ipcMain.handle("openai-settings:save", async (_event, input: SaveOpenAiSettingsInput) =>
-  saveOpenAiSettings(input)
-);
-
-ipcMain.handle("openai-settings:clear", async () => clearOpenAiSettings());
-
 ipcMain.handle("active-files:detect", async () => detectActiveFilesFromMcpServers());
 
 ipcMain.handle("tool-execution:run", async (_event, request: ToolExecutionRequest) =>
   runToolExecutionRequest(request)
+);
+
+ipcMain.handle("custom-flows:list-github-flows", async (_event, source: GitHubToolSource) =>
+  listGithubFlows(source)
+);
+
+ipcMain.handle("custom-flows:delete-github-flow", async (_event, githubPath: string) =>
+  deleteGitHubToolPath(githubPath)
+);
+
+ipcMain.handle(
+  "custom-flows:publish-github-flow",
+  async (
+    _event,
+    flow: SavedCustomFlow,
+    source: GitHubToolSource,
+    options: GitHubPublishOptions
+  ) => publishSavedFlowToGitHub(flow, source, options)
 );
 
 ipcMain.handle("custom-tools:choose-directory", async () => {
@@ -2171,6 +2211,7 @@ ipcMain.handle("custom-tools:choose-md-file", async () => {
   const content = await readFile(filePath, "utf8");
   const metadata = parseToolMetadata(content) as Partial<CustomToolMetadata> & {
     toolName?: string;
+    learningLog?: unknown;
   };
   const name = String(metadata.toolName ?? metadata.name ?? basename(filePath).replace(/\.(md|markdown)$/i, ""));
   return {
@@ -2180,7 +2221,8 @@ ipcMain.handle("custom-tools:choose-md-file", async () => {
     preview: content.slice(0, 4000),
     isToolLike: isToolMarkdown(content),
     riskWarnings: detectToolRiskWarnings(content),
-    toolSchema: parseToolRuntimeSchema(content)
+    toolSchema: parseToolRuntimeSchema(content),
+    learningLog: metadata.learningLog
   };
 });
 
@@ -2197,6 +2239,7 @@ ipcMain.handle("custom-tools:list-md-files", async (_event, directory: string) =
       const content = await readFile(filePath, "utf8");
       const metadata = parseToolMetadata(content) as Partial<CustomToolMetadata> & {
         toolName?: string;
+        learningLog?: unknown;
       };
       const name = String(metadata.toolName ?? metadata.name ?? basename(file.name).replace(/\.(md|markdown)$/i, ""));
       const version = String(metadata.version ?? "1.0.0");
@@ -2210,7 +2253,8 @@ ipcMain.handle("custom-tools:list-md-files", async (_event, directory: string) =
         sectionId: String(metadata.sectionId ?? "servers"),
         isToolLike: isToolMarkdown(content),
         riskWarnings: detectToolRiskWarnings(content),
-        toolSchema: parseToolRuntimeSchema(content)
+        toolSchema: parseToolRuntimeSchema(content),
+        learningLog: metadata.learningLog
       };
     })
   );

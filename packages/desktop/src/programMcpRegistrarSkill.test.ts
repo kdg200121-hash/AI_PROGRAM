@@ -13,11 +13,14 @@ const skillPath = join(
 );
 
 describe("program-mcp-registrar bundled skill", () => {
-  it("documents the registration trigger and OpenAI API settings flow", () => {
+  it("documents registration, MCP verification, and Codex/MCP roles", () => {
     const skill = readFileSync(skillPath, "utf8");
 
     expect(skill).toContain("/등록");
-    expect(skill).toContain("Settings > AI 연결");
-    expect(skill).toContain("API 키를 채팅, 로그, GitHub, 툴 MD 파일에 기록하지 않는다.");
+    expect(skill).toContain("MCP 명령 목록");
+    expect(skill).toContain("Codex와 MCP 역할");
+    expect(skill).toContain("codex mcp add");
+    expect(skill).toContain("ai-program-cad");
+    expect(skill).not.toContain("AI 연결");
   });
 });

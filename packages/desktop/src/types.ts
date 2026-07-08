@@ -3,7 +3,7 @@ import type { NewMcpServerInput, UpdateMcpServerInput } from "@mcp-registry/core
 import type { ServerProcessResult } from "./processMonitor";
 import type { ToolRuntimeSchema } from "./toolSettingsSchema";
 import type { ToolExecutionRequest, ToolExecutionResult } from "./toolExecutionModel";
-import type { OpenAiSettingsStatus } from "./openAiSettings";
+import type { SavedCustomFlow } from "./customFlowLibrary";
 
 declare global {
   interface Window {
@@ -26,10 +26,37 @@ declare global {
     toolExecution?: {
       run: (request: ToolExecutionRequest) => Promise<ToolExecutionResult>;
     };
-    openAiSettings?: {
-      get: () => Promise<OpenAiSettingsStatus>;
-      save: (input: { apiKey?: string; model?: string }) => Promise<OpenAiSettingsStatus>;
-      clear: () => Promise<OpenAiSettingsStatus>;
+    customFlows?: {
+      listGithubFlows: (source: {
+        owner: string;
+        repo: string;
+        path: string;
+        ref?: string;
+      }) => Promise<SavedCustomFlow[]>;
+      deleteGithubFlow: (githubPath: string) => Promise<{
+        kind: "deleted" | "missing" | "pull_request";
+        branch?: string;
+        pullRequestUrl?: string;
+        pullRequestNumber?: number;
+        pullRequestState?: "open" | "closed" | "merged";
+      }>;
+      publishGithubFlow: (
+        flow: SavedCustomFlow,
+        source: {
+          owner: string;
+          repo: string;
+          path: string;
+          ref?: string;
+        },
+        options: { requireReview: boolean }
+      ) => Promise<{
+        kind: "direct" | "pull_request";
+        path: string;
+        branch: string;
+        pullRequestUrl: string;
+        pullRequestNumber: number;
+        pullRequestState: "open" | "closed" | "merged";
+      }>;
     };
     skillInstaller?: {
       installSaveTool: () => Promise<{ installedPath: string }>;
@@ -93,6 +120,7 @@ declare global {
         isToolLike: boolean;
         riskWarnings: string[];
         toolSchema: ToolRuntimeSchema;
+        learningLog?: unknown;
       } | null>;
       listMarkdownTools: (directory: string) => Promise<
         {
@@ -106,6 +134,7 @@ declare global {
           isToolLike: boolean;
           riskWarnings: string[];
           toolSchema: ToolRuntimeSchema;
+          learningLog?: unknown;
         }[]
       >;
       listGithubTools: (source: {
@@ -125,6 +154,7 @@ declare global {
           isToolLike: boolean;
           riskWarnings: string[];
           toolSchema: ToolRuntimeSchema;
+          learningLog?: unknown;
         }[]
       >;
       publishGithubTool: (

@@ -48,6 +48,22 @@ settingsLayout:
     - id: advanced
       label: 고급 설정
       defaultOpen: false
+executionSteps:
+  - id: input
+    label: 설정 입력
+    description: 실행에 필요한 파일, 선택 범위, 옵션을 입력합니다.
+    section: input
+    state: active
+  - id: preview
+    label: 미리보기
+    description: 원본을 바꾸기 전에 예상 결과를 확인합니다.
+    actionId: preview
+    state: waiting
+  - id: apply
+    label: 적용
+    description: 미리보기 결과가 맞으면 실제 MCP 명령을 실행합니다.
+    actionId: apply
+    state: waiting
 testCases:
   - name: 기본 실행
     given: 같은 입력과 같은 설정
@@ -106,6 +122,7 @@ Use `risk: safe` only for older/simple tools. For new tools, prefer the more spe
 Use these fields when the tool should become executable by MCP later.
 
 - `executionMode`: `manual`, `mcp`, `custom-flow`, or `hybrid`.
+- `executionSteps`: selectable tool-page steps. Use `section` to show settings for that step, and `actionId` to connect a step to an item in `actions`.
 - `requiredServers`: MCP servers that must be connected before execution. Use lowercase names such as `cad`, `revit`, `excel`, `tekla`.
 - `mcpCommands`: ordered list of MCP command calls.
 - `preflightChecks`: validation checks before execution.
@@ -469,6 +486,34 @@ Use it when the creation conversation revealed useful patterns:
 Keep entries short and anonymized. Do not store secrets, personal chat excerpts, tokens, file contents, or Codex session IDs.
 
 ## Body Template
+
+Use this current body structure even if older examples below mention `작동 원리` or a separate `설정` panel:
+
+```markdown
+# Tool Name
+
+## 목적
+
+이 툴이 무엇을 하고 언제 사용하는지 설명합니다.
+
+## 실행 단계
+
+### 1. 설정 입력
+
+필요한 파일, 선택 객체, 범위, 레이어, 파라미터, 사용자 설정값을 정리합니다.
+
+### 2. 미리보기
+
+원본을 바꾸기 전에 예상 결과, 후보, 경고를 확인합니다.
+
+### 3. 적용
+
+확정된 설정과 후보를 MCP 명령 또는 Codex orchestration으로 넘깁니다.
+
+## 단계별 설정
+
+설정 schema는 frontmatter의 `settings`에 정의합니다. 특정 단계에서 보여야 하는 설정은 `settings[].section`을 지정하고 `executionSteps[].section`과 연결합니다.
+```
 
 ```markdown
 # Tool Name

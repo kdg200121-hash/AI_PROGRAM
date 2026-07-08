@@ -97,6 +97,15 @@ export interface ToolExecutionAction {
   confirm: boolean;
 }
 
+export interface ToolExecutionStep {
+  id: string;
+  label: string;
+  description: string;
+  section?: string;
+  actionId?: string;
+  state: "active" | "waiting" | "complete";
+}
+
 export interface ToolTestCase {
   name: string;
   given: string;
@@ -118,6 +127,7 @@ export interface ToolRuntimeSchema {
   resultSchema: ToolResultSchema;
   failurePolicy: ToolFailurePolicy;
   settingsLayout: ToolSettingsLayout;
+  executionSteps?: ToolExecutionStep[];
   settings: ToolSettingField[];
   actions: ToolExecutionAction[];
   inputs: ToolResultField[];
@@ -134,6 +144,7 @@ export const defaultToolRuntimeSchema: ToolRuntimeSchema = {
   resultSchema: { type: "text", fields: [] },
   failurePolicy: { partialSuccess: "report", rollback: "none", log: true },
   settingsLayout: { mode: "simple", sections: [] },
+  executionSteps: [],
   settings: [],
   actions: [],
   inputs: [],
@@ -557,6 +568,28 @@ function normalizeActions(content: string): ToolExecutionAction[] {
     .filter((action): action is ToolExecutionAction => Boolean(action));
 }
 
+function normalizeExecutionSteps(content: string): ToolExecutionStep[] {
+  return parseObjectArray(content, "executionSteps")
+    .map((item): ToolExecutionStep | null => {
+      const id = String(item.id ?? "");
+      if (!id) {
+        return null;
+      }
+      const state = String(item.state ?? "waiting");
+      return {
+        id,
+        label: String(item.label ?? id),
+        description: String(item.description ?? ""),
+        section: item.section ? String(item.section) : undefined,
+        actionId: item.actionId ? String(item.actionId) : undefined,
+        state: ["active", "complete"].includes(state)
+          ? (state as ToolExecutionStep["state"])
+          : "waiting"
+      };
+    })
+    .filter((step): step is ToolExecutionStep => Boolean(step));
+}
+
 function normalizeResultFields(content: string, key: string): ToolResultField[] {
   return parseObjectArray(content, key)
     .map((item) => {
@@ -700,6 +733,7 @@ export function parseToolRuntimeSchema(content: string): ToolRuntimeSchema {
     resultSchema: parseResultSchema(content),
     failurePolicy: parseFailurePolicy(content),
     settingsLayout: parseSettingsLayout(content),
+    executionSteps: normalizeExecutionSteps(content),
     settings: normalizeSettings(content),
     actions: normalizeActions(content),
     inputs: normalizeResultFields(content, "inputs"),

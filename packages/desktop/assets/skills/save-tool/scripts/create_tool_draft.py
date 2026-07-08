@@ -131,6 +131,7 @@ def main() -> int:
                 "settingsLayout:",
                 '  mode: "simple"',
                 "  sections: []",
+                "executionSteps: []",
                 "testCases: []",
                 "settings: []",
                 "actions: []",
