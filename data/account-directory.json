@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-08T01:52:19.381Z",
+  "users": [
+    {
+      "githubId": "kdg200121-hash",
+      "nickname": "김동건",
+      "role": "admin",
+      "license": true,
+      "status": "active",
+      "joinedAt": "2026-07-08T00:38:46.540Z"
+    }
+  ],
+  "policy": {
+    "signupMode": "open",
+    "licenseMode": "all",
+    "toolRegistrationMode": "open"
+  }
+}
