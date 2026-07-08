@@ -24,6 +24,7 @@ import {
 import { parseToolRuntimeSchema } from "../src/toolSettingsSchema";
 import {
   extractTitleBlockCandidates,
+  toolExecutionFailureMessage,
   type ToolExecutionRequest,
   type ToolExecutionRequestCommand,
   type ToolExecutionResult
@@ -606,6 +607,21 @@ async function runToolExecutionRequest(request: ToolExecutionRequest): Promise<T
     const raw = await callRegisteredMcpCommand(server, command, request);
     if (!raw) {
       continue;
+    }
+
+    const failureMessage = toolExecutionFailureMessage({
+      status: request.runtimeAction === "preview" ? "preview" : "completed",
+      message: "",
+      raw
+    });
+    if (failureMessage) {
+      return {
+        status: "error",
+        message: failureMessage,
+        raw: {
+          mcp: raw
+        }
+      };
     }
 
     const titleBlockCandidates = extractTitleBlockCandidates(raw);
@@ -1792,8 +1808,32 @@ async function findBundledSkillPath(skillName: string) {
   throw new Error(`Bundled ${skillName} skill was not found.`);
 }
 
+function assertReadableSkillText(skillName: string, fileName: string, content: string) {
+  const brokenEncodingPattern = /�|\?꾩|\?ㅽ|\?묐|\?낅|\?먮|\?대|\?쒕|\?좏|\?곌|\?몃|\?뚯/;
+  if (brokenEncodingPattern.test(content)) {
+    throw new Error(`${skillName} skill file appears to be corrupted: ${fileName}`);
+  }
+}
+
+async function assertBundledSkillReadable(skillName: string, sourcePath: string) {
+  const filesToCheck = ["SKILL.md", join("references", "ai-program-md-tool.md")];
+  for (const fileName of filesToCheck) {
+    const filePath = join(sourcePath, fileName);
+    try {
+      const content = await readFile(filePath, "utf8");
+      assertReadableSkillText(skillName, fileName, content);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 async function installBundledSkill(skillName: string) {
   const sourcePath = await findBundledSkillPath(skillName);
+  await assertBundledSkillReadable(skillName, sourcePath);
   const targetPath = join(app.getPath("home"), ".codex", "skills", skillName);
   await mkdir(join(app.getPath("home"), ".codex", "skills"), { recursive: true });
   await cp(sourcePath, targetPath, { recursive: true, force: true });
@@ -1926,7 +1966,7 @@ async function ensureBundledProgramBridgeServers(targetPath: string) {
       url: "http://localhost:5100/mcp",
       port: 5100,
       program: "AutoCAD",
-      notes: "Local AutoCAD MCP bridge. The process can be detected by AI Program; real AutoCAD SDK/add-in commands are the next integration step."
+      notes: "Local AutoCAD MCP bridge with safe COM read commands for active document, layers, objects, and title block candidates. Commands succeed only when AutoCAD is running."
     },
     {
       id: "revit-default",

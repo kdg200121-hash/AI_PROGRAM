@@ -110,6 +110,18 @@ describe("renderer build config", () => {
     expect(checkBlock).toContain("!isRegistryLoaded");
   });
 
+  it("keeps execution preset controls pinned to the right edge of step headers", () => {
+    const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+    const presetHeaderBlock = styles.slice(
+      styles.indexOf(".submenuConfigPanel > .panelHeader .schemaPresetControls"),
+      styles.indexOf(".schemaSectionToggle")
+    );
+
+    expect(presetHeaderBlock).toContain("margin-left: auto");
+    expect(presetHeaderBlock).toContain("justify-content: flex-end");
+    expect(presetHeaderBlock).toContain("flex: 0 0 auto");
+  });
+
   it("keeps dialog window actions fixed at the upper-right of modal windows", () => {
     const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
     const dialogHeaderBlock = styles.slice(
@@ -216,5 +228,36 @@ describe("renderer build config", () => {
     expect(appSource).toContain('"실행 흐름"');
     expect(appSource).not.toContain("<h2>작동 원리</h2>");
     expect(appSource).not.toContain(">작동 원리<");
+  });
+  it("keeps selected execution step styling separate from current-stage styling", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+
+    expect(appSource).toContain('step.state === "active" ? "currentStep"');
+    expect(styles).toContain(".executionStepButton.currentStep");
+    expect(styles).not.toContain(".executionStepButton.activeCurrent");
+  });
+
+  it("does not complete title-block previews until candidates are returned", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+
+    expect(appSource).toContain("const hasRequiredPreviewResult =");
+    expect(appSource).toContain(
+      "isPreviewReady && (!usesTitleBlockCandidates || nextTitleBlockCandidates.length > 0)"
+    );
+    expect(appSource).toContain("setPreviewGenerated(hasRequiredPreviewResult)");
+  });
+
+  it("runs Custom Flow nodes through the tool execution bridge instead of fake timers", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const runFlowBlock = appSource.slice(
+      appSource.indexOf("const runFlow = async () =>"),
+      appSource.indexOf("const focusFlowIssue =")
+    );
+
+    expect(runFlowBlock).toContain("buildFlowNodeExecutionRequest");
+    expect(runFlowBlock).toContain("window.toolExecution.run(request)");
+    expect(runFlowBlock).toContain("flowResultPayload(result)");
+    expect(runFlowBlock).not.toContain("setTimeout");
   });
 });

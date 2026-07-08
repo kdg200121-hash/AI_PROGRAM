@@ -9,6 +9,7 @@ import {
   buildFlowRunRecords,
   resolveFlowRunNodeIds
 } from "./customFlowRunModel";
+import { validateToolRuntimeSchema } from "./toolRuntimeValidation";
 
 describe("customFlowRunModel", () => {
   it("resolves run scopes for step execution", () => {
@@ -78,10 +79,20 @@ describe("customFlowRunModel", () => {
     expect(schema.executionMode).toBe("custom-flow");
     expect(schema.requiredServers).toEqual(["cad", "excel"]);
     expect(schema.outputs.map((port) => port.label)).toContain("Excel");
+    expect(schema.settings.map((field) => field.id)).toEqual([
+      "node-cad-read__selection_scope",
+      "node-cad-read__object_types",
+      "node-cad-read__unit",
+      "node-cad-read__tolerance",
+      "node-excel-export__export_path",
+      "node-excel-export__file_name_template",
+      "node-excel-export__overwrite_policy"
+    ]);
     expect(schema.mcpCommands.map((command) => command.command)).toEqual([
       "cad.read_objects",
       "excel.write_table"
     ]);
+    expect(validateToolRuntimeSchema(schema).filter((issue) => issue.severity === "error")).toEqual([]);
   });
 
   it("builds reusable custom-flow schemas in graph order", () => {

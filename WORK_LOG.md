@@ -1960,3 +1960,130 @@
 - Shared Flow 등록 해제 후 새로고침하면 다시 나타나던 문제는 GitHub 원본 삭제가 즉시 반영되지 않아 목록을 다시 덮어썼기 때문이었다. 삭제 요청한 GitHub Flow 경로를 로컬 차단 목록에 저장하고, GitHub 새로고침/카탈로그/관리 화면에서 모두 필터링하도록 했다.
 - 툴 등록 중 발생한 GitHub 409 오류는 GitHub Contents API 삭제 시 파일 SHA가 바뀐 상태에서 오래된 SHA로 삭제 요청해서 생긴 충돌이었다. 삭제 직전 최신 SHA를 다시 조회하고, 409가 오면 최신 SHA로 한 번 재시도하는 `deleteGitHubContentFile` 공통 함수를 추가했다.
 - 검증 완료: `pnpm test packages/desktop/src/rendererBuild.test.ts`, `pnpm typecheck`, `pnpm test` 36개 파일/161개 테스트, `pnpm build`, `pnpm package:win` 통과. 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe` 실행 후 `5001/Revit`, `5100/AutoCAD`, `5200/Excel` `/status` 응답이 모두 200임을 확인했다.
+
+## 2026-07-08 추가 224
+
+- Market을 열 때 GitHub tools 목록 동기화가 `customTools` 상태를 GitHub 항목만으로 다시 만들면서, 로컬/기존 등록 툴 상세 페이지가 사라질 수 있던 문제를 수정했다.
+- `customToolSync.ts`를 추가해 GitHub 툴만 갱신하고, GitHub 경로가 아닌 기존 등록 툴은 보존하도록 병합 로직을 분리했다.
+- GitHub 툴은 기존 id/등록/고정/사용횟수 상태를 유지한 채 최신 버전 정보만 갱신하도록 테스트를 추가했다.
+- 검증 완료: `pnpm test packages/desktop/src/customToolSync.test.ts`, `pnpm typecheck`, `pnpm test`, `pnpm package:win` 통과. 패키징 중 release 폴더를 잠근 MCP bridge 프로세스가 있어 종료 후 재실행했고, 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 생성/실행했다.
+
+## 2026-07-08 추가 225
+
+- 실행 단계 설정 패널 헤더의 `저장`, `불러오기` preset 버튼이 제목 바로 옆에 붙어 보이던 문제를 수정했다.
+- `.submenuConfigPanel > .panelHeader .schemaPresetControls`에 오른쪽 정렬 규칙을 추가해 버튼이 패널 오른쪽 끝에 고정되도록 했다.
+- 같은 배치가 깨지지 않도록 `rendererBuild.test.ts`에 회귀 테스트를 추가했다.
+- 검증 완료: `pnpm test packages/desktop/src/rendererBuild.test.ts`, `pnpm typecheck`, `pnpm test` 통과.
+
+## 2026-07-08 추가 226
+
+- 툴 설정 패널에서 `Ctrl+S`를 누르면 현재 설정 preset을 저장하도록 추가했다.
+- 일반 툴 페이지, Player view, Custom Flow 노드 설정 저장 시 기존 하단 save-toast 알림으로 저장 완료를 표시하도록 연결했다.
+- CAD 도면번호 일괄 순번 변경처럼 `미리보기` 후 `실행`으로 넘어가는 툴에서 미리보기 완료 상태가 상단 실행 단계 카드까지 반영되도록 수정했다. 완료 단계는 카드 전체에 완료 색상과 다크 모드 스타일을 적용했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm build` 통과.
+
+## 2026-07-08 추가 227
+
+- `tools/CAD_도면번호_일괄_순번_변경_1.0.8.md`에 명시적 `settingsLayout`, `settings`, `actions`, `executionSteps`, `mcpCommands`, `preflightChecks`, `resultSchema`, `inputs`, `outputs`, `testCases`를 추가했다.
+- 기준 흐름은 `입력 -> 미리보기 -> 실행`이며, `apply` action은 `requiresPreview: true`로 preview 완료 후에만 활성화된다.
+- `toolSettingsSchema.test.ts`에 최신 CAD 도면번호 툴 MD가 명시적 preview/apply workflow로 파싱되는지 확인하는 회귀 테스트를 추가했다.
+- 검증 완료: `pnpm test packages/desktop/src/toolSettingsSchema.test.ts`, `pnpm typecheck`, `pnpm test`, `pnpm --filter @mcp-registry/desktop package:win` 통과.
+- 기존 release 폴더 잠금으로 첫 패키징이 실패해 실행 중인 release/bridge 프로세스를 종료한 뒤 재실행했다. 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 생성하고 실행 확인했다.
+
+## 2026-07-08 추가 228
+
+- 설정 preset 저장 동작을 분리했다. `저장`은 현재 선택된 저장본만 덮어쓰고, 선택된 저장본이 없으면 새 항목을 만들지 않는다.
+- 새 저장본 생성은 `저장` 옆 화살표의 `다른 이름으로 저장`에서만 수행하도록 수정했다. `다른 이름으로 저장` 후 생성된 preset은 현재 선택 preset으로 잡힌다.
+- 설정 패널 `Ctrl+S`도 현재 선택된 preset이 있을 때만 덮어쓰기 저장하고, 선택 preset이 없으면 브라우저 기본 저장 동작만 막고 새 항목은 만들지 않도록 수정했다.
+- 현재 실행 단계 표시 색상을 파랑 계열에서 주황/amber 계열로 변경하고 다크 모드 색상도 맞췄다.
+- 검증 완료: `pnpm typecheck`, `pnpm test packages/desktop/src/rendererBuild.test.ts packages/desktop/src/toolSettingsSchema.test.ts`, `pnpm test`, `pnpm build` 통과.
+
+## 2026-07-08 추가 229
+
+- 실행 단계 카드의 `선택됨` 효과와 `현재 진행 단계` 효과를 분리했다. 선택 효과는 기존 파랑 계열을 유지하고, 실제 현재 단계(`state: active`)만 주황/amber 계열로 표시한다.
+- CAD 도면번호 일괄 순번 변경처럼 도곽 후보가 필요한 툴에서 미리보기 결과에 `titleBlockCandidates`가 비어 있으면 하단 알림으로 도곽 후보 미검출을 알려주도록 했다.
+- 설정 패널 `Ctrl+S`가 패널 내부 입력창에 포커스가 있을 때만 동작하던 제한을 풀었다. 툴 설정 패널이 열려 있으면 현재 선택된 preset을 덮어쓰고 저장 알림을 띄운다.
+- 회귀 방지를 위해 현재 단계 스타일이 `active` 선택 스타일과 다른 `currentStep` 클래스로 유지되는지 렌더러 테스트에 추가했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test packages/desktop/src/rendererBuild.test.ts packages/desktop/src/toolExecutionModel.test.ts packages/desktop/src/toolSettingsSchema.test.ts packages/desktop/src/settingPresetModel.test.ts`, `pnpm test`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 실행했다.
+
+## 2026-07-08 추가 230
+
+- 도곽 후보가 필요한 preview action에서 `status: preview`만으로 미리보기 완료 처리되던 문제를 수정했다.
+- 이제 CAD 도면번호 일괄 순번 변경처럼 `titleBlockCandidates`가 필요한 툴은 후보가 1개 이상 반환되어야만 `previewGenerated`와 실행 단계 완료 처리가 된다.
+- 후보가 0개면 실행 단계가 4번/실행으로 넘어가지 않고, `도곽 후보를 찾지 못했습니다` 알림을 표시한다.
+- `window.toolExecution`이 연결되지 않은 fallback 상태에서도 도곽 후보 필요 툴은 preview 완료로 처리하지 않도록 막았다.
+- 회귀 방지를 위해 도곽 후보 없는 preview가 완료 처리되지 않는 조건을 `rendererBuild.test.ts`에 추가했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test packages/desktop/src/rendererBuild.test.ts packages/desktop/src/toolExecutionModel.test.ts packages/desktop/src/toolSettingsSchema.test.ts`, `pnpm test`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 실행했다.
+
+## 2026-07-08 추가 231
+
+- preview/apply 결과 공통 오류 판정 함수를 추가했다. `status: error`뿐 아니라 `ok: false`, `success: false`, `errors`, `failures`, `issues severity=error` 같은 raw payload 실패 신호도 감지한다.
+- 실패 신호가 감지되면 실행 단계 완료 콜백을 호출하지 않고 하단 알림과 패널 메시지만 표시하도록 했다.
+- `needs-ai`나 완료 상태가 아닌 결과도 preview/apply 완료로 처리하지 않고 사용자에게 추가 확인 필요 알림을 띄운다.
+- 관련 회귀 테스트를 `toolExecutionModel.test.ts`에 추가했다.
+- 검증 완료: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 실행했다.
+
+## 2026-07-08 추가 232
+
+- OpenAI API 직접 호출 오케스트레이터는 이번 범위에서 제외하고, MD 툴 제작/등록/실행 전 안전망을 강화했다.
+- `toolRuntimeValidation.ts`를 정리해 중복 설정/액션/단계 ID, 끊어진 `executionSteps[].actionId`, 없는 설정 섹션, 없는 `settings.*` MCP 파라미터 참조, `requiredServers` 누락, 하나뿐인 select 설정, 위험 action의 preview/confirm 부족, 출력/testCases 누락을 잡도록 했다.
+- `toolExecutionModel.ts`의 사용자 안내 문장과 도곽 후보 추출 문구를 깨지지 않은 UTF-8 한글로 정리하고, `raw.mcp`로 감싸진 실패 응답도 `toolExecutionFailureMessage`가 감지하도록 했다.
+- Electron main의 MCP 실행 결과 처리에서 raw MCP 응답이 `ok:false`, `success:false`, `errors`, `failures`, `issues severity=error` 등을 반환하면 바로 `status: error`로 돌려보내도록 연결했다.
+- 번들 `mcp-tool-builder`, `save-tool`, `ai-program-md-tool` 참고 문서를 UTF-8 기준으로 재작성했다. 새 기준은 스무고개식 질문, 사양 승인, HTML 설정창 목업 승인, 실행 단계/action 기반 MD, `learningLog` 비실행 메타데이터, CAD/Revit/Excel/Tekla/Custom Flow 체크리스트를 포함한다.
+- 스킬 설치 전에 번들 스킬 본문이 깨진 인코딩 패턴을 포함하는지 검사해 깨진 스킬을 사용자 `.codex/skills`로 복사하지 않도록 했다.
+- 현재 사용자 로컬 `C:\Users\DONG KIM\.codex\skills\mcp-tool-builder`, `C:\Users\DONG KIM\.codex\skills\save-tool`도 번들 스킬과 같은 내용으로 다시 동기화했다.
+- 회귀 테스트를 갱신해 스킬 문서 깨짐 방지, MD 런타임 교차검증, `raw.mcp` 실패 감지를 검증한다.
+- 검증 완료: `pnpm test` 37개 파일/169개 테스트, `pnpm typecheck`, `pnpm build`, `pnpm --filter @mcp-registry/desktop package:win` 통과. release 폴더를 잠근 기존 AI_PROGRAM/bridge 프로세스를 종료한 뒤 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 생성하고 실행했다.
+
+## 2026-07-08 추가 233
+
+- 출시 전 최종 점검 관점으로 Custom Flow를 별도 시뮬레이션했다.
+- `customFlowPreRelease.test.ts`를 추가해 기본 CAD -> Excel 플로우가 검증, 연결 순서 계산, 실행 미리보기, 그룹 삽입, 재사용 가능한 custom-flow schema 생성까지 통과하는지 한 번에 확인한다.
+- Custom Flow 기본 노드/검증/실행 모델 테스트가 깨진 문자열을 기준으로 삼지 않도록 기대값을 사람이 읽을 수 있는 UTF-8 한글로 정리했다.
+- `buildFlowGroupToolSchema`가 그룹 내부 노드의 `settings.*` MCP 파라미터를 참조하면서 정작 그룹 툴 schema에는 설정 필드를 넣지 않아 runtime validation error가 나던 구조를 수정했다. 이제 그룹 저장 툴은 각 노드 설정을 `nodeId__settingId`로 namespacing하고 MCP command params도 같은 ID로 재매핑한다.
+- Custom Flow validation/run preview 문구를 정상 한글로 정리하고, 깨진 인코딩 패턴이 다시 들어오면 pre-release test에서 잡히도록 했다.
+- 확인한 제품 리스크: 현재 Custom Flow의 `실행` 버튼은 실제 MCP 명령 큐가 아니라 UI 타임라인/예상 결과 시뮬레이션을 성공 처리한다. 실제 출시 전에는 노드별 MCP 실행 엔진, 중간 결과 전달, 실패/부분성공/롤백 적용이 다음 핵심 단계다.
+- 검증 완료: `pnpm test -- packages/desktop/src/customFlowPreRelease.test.ts packages/desktop/src/customFlowModel.test.ts packages/desktop/src/customFlowRunModel.test.ts packages/desktop/src/customFlowValidation.test.ts` 통과, `pnpm typecheck` 통과.
+- 전체 검증: `pnpm test` 38개 파일/171개 테스트, `pnpm typecheck`, `pnpm build` 통과. `pnpm --filter @mcp-registry/desktop package:win`은 실행 중인 release `AI_PROGRAM.exe`가 `release\AI_PROGRAM-win32-x64\icudtl.dat`를 잠가 실패했다. 실행 파일 갱신은 앱을 닫은 뒤 재시도해야 한다.
+
+## 2026-07-08 추가 234
+
+- Custom Flow `실행` 버튼을 UI 타이머 시뮬레이션에서 실제 `window.toolExecution.run` 실행 흐름으로 전환했다.
+- 노드별 `settingsValues`를 `buildToolExecutionRequest` 기반 MCP 실행 요청으로 만들고, 앞 노드 결과를 `previous.result` 또는 `previous.<portId>` 파라미터 참조에 주입하도록 `customFlowExecutionModel.ts`를 추가했다.
+- MCP 실행 결과는 `raw.mcp`, `raw.result`, `raw.data` 우선순위로 정규화해 다음 노드 입력으로 넘긴다. 보조 노드(`결과 미리보기`, `경로 지정`, `활성 파일`, `프롬프트`)는 MCP 호출 없이 pass-through 결과를 만든다.
+- 실행 중 오류, `needs-ai`, raw payload 실패 신호가 나오면 해당 노드를 error로 표시하고 하단 알림/흐름 점검에 원인을 남긴다. 기본은 이후 노드를 건너뛰며, 노드 `failurePolicy.partialSuccess`가 `keep-success`일 때만 다음 노드로 계속 진행한다.
+- 회귀 테스트를 추가해 Custom Flow 실행이 더 이상 `setTimeout` 가짜 완료에 의존하지 않고 tool execution bridge를 호출하는지 확인한다.
+- 검증 완료: `pnpm test`, `pnpm typecheck`, `pnpm build` 통과.
+
+## 2026-07-08 추가 235
+
+- 다음 단계 1번으로 AutoCAD MCP 브리지의 안전한 읽기 명령을 구현했다.
+- `tools/mcp-bridges/program-bridge/program-mcp-bridge.ps1`가 실제 AutoCAD COM 세션을 읽어 `cad.get_active_document`, `cad.list_layers`, `cad.detect_title_block_candidates`를 처리한다.
+- AutoCAD가 실행 중이 아니거나 COM 연결이 없으면 가짜 성공 대신 `ok:false`, `connectedToProgram:false`를 반환하게 했다.
+- `/commands`, `/active-file`, JSON-RPC `tools/call`, `/tools/{command}` 호출을 모두 처리하도록 브리지 HTTP 라우팅을 정리했다.
+- Custom Flow 기본 CAD 객체 읽기 노드의 `cad.read_objects` 명령은 큰 DWG 전체 스캔 안전 전략이 정리될 때까지 `planned`로 유지한다.
+- MD `mcpCommands[].runtimeAction`을 파싱하고 실행 요청에서 현재 action과 맞는 명령만 보내도록 했다. 이로써 CAD 도면번호 툴의 `preview`가 `open_dwg` 같은 apply 명령을 먼저 호출하지 않는다.
+- 최신 `CAD 도면번호 일괄 순번 변경` MD는 `detect_title_block_candidates`만 preview available로 두고, 실제 열기/수정/저장 명령은 apply/planned로 분리했다.
+- PowerShell parser 검사와 로컬 브리지 smoke test를 실행했다. AutoCAD가 붙어 있지 않은 환경에서는 `cad.get_active_document`가 기대대로 실패 응답을 반환했다.
+- 검증 완료: `pnpm test` 40개 파일/181개 테스트, `pnpm typecheck`, `pnpm build`, `git diff --check`, `pnpm --filter @mcp-registry/desktop package:win` 통과.
+- 패키징 중 기존 release 앱과 AutoCAD/Revit/Excel 브리지 PowerShell 프로세스가 release 폴더를 잠가 실패했으나, 해당 프로세스만 종료한 뒤 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 생성했다.
+
+## 2026-07-08 추가 236
+
+- 실제 AutoCAD 2022와 현재 DWG를 대상으로 CAD bridge를 검증했다.
+- `GET /mcp/status`, JSON-RPC `tools/call`의 `cad.get_active_document`, `cad.list_layers`가 실제 AutoCAD COM 세션에서 성공했다.
+- JSON-RPC POST body가 비거나 command가 빈 값이 되는 문제가 있어, `Read-HttpRequest`가 `Content-Length` 기준으로 request body를 끝까지 읽고 `Expect: 100-continue`도 처리하도록 수정했다.
+- 처음 확인한 DWG는 도곽 주소 변경으로 제대로 로드되지 않은 도면이라 도곽 후보 0개가 나왔다. 이후 다른 DWG에서 활성 문서/레이어 읽기는 성공했다.
+- 큰 DWG에서 `foreach ModelSpace` 또는 AutoCAD SelectionSet 전체 스캔은 20~30초 이상 bridge를 점유할 수 있음을 확인했다. 따라서 `cad.read_objects`는 다시 `planned`로 내리고, 호출 시 전체 모델 공간 스캔을 하지 않고 `ok:false` 안내 메시지를 반환하도록 했다.
+- `cad.detect_title_block_candidates`는 빠른 종이공간/layout 검사만 유지한다. 모델 공간 도곽 자동 탐색은 ActiveSelection, 사용자가 고른 블록명, 또는 범위 제한 전략이 정리된 뒤 다시 구현한다.
+- 검증 완료: PowerShell parser `OK`, `pnpm test` 40개 파일/181개 테스트, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 exe를 실행한 뒤 `cad.get_active_document`, `cad.list_layers`, `cad.read_objects` 빠른 실패 응답을 확인했다.
+
+## 2026-07-08 추가 237
+
+- AutoCAD bridge의 `cad.read_objects`를 현재 AutoCAD 선택 객체만 읽는 안전 명령으로 전환했다. 전체 ModelSpace 순회와 AutoCAD SelectionSet 전체 스캔 경로는 큰 DWG에서 멈출 수 있어 제거/비활성화했다.
+- `cad.read_objects`는 `scope: selection/current_selection/selected`만 허용하며, 선택이 없거나 다른 scope가 들어오면 `ok:false`, `code: selectionRequired`를 반환한다.
+- `cad.detect_title_block_candidates`에 `scope`, `blockName`, `titleBlockName` 파라미터를 추가했다. 기본은 기존처럼 Paper Space/Layout 블록만 빠르게 검사하고, `scope=selection`이면 사용자가 AutoCAD에서 선택한 블록 참조를 도곽 후보로 반환한다.
+- CAD 도면번호 일괄 순번 변경 MD 설정에 `도곽 감지 방식`과 `도곽 블록명`을 추가해 자동 후보가 없을 때 사용자가 선택 블록 또는 명시 블록명으로 재시도할 수 있게 했다.
+- Custom Flow 기본 CAD 객체 읽기 노드는 `cad.read_objects`를 `available`로 표시하되 선택 기반 읽기라는 제한을 유지한다.
+- 앱 실행 기준은 `AI Program -> MCP bridge -> AutoCAD COM` 직접 호출이다. Codex CLI 연결은 `/등록` 자동화나 Codex 채팅에서 MCP를 직접 호출할 때 쓰는 보조 경로로 분리한다.
+- 검증 완료: PowerShell parser `OK`, `pnpm test` 40개 파일/183개 테스트, `pnpm typecheck`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 브리지를 직접 띄워 JSON-RPC `cad.read_objects`가 선택 객체 없을 때 `ok:false`, `code: selectionRequired`, `connectedToProgram:true`를 즉시 반환하는 것을 확인했고, 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 실행했다.

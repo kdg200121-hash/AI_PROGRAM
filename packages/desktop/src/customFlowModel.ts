@@ -70,16 +70,6 @@ export interface FlowPathSelection {
   path: string;
 }
 
-const activeFileProgramOutputMeta: Record<
-  FlowActiveFileSelection["program"],
-  { label: string; type: FlowPortType; iconName: AppIconName }
-> = {
-  cad: { label: "CAD", type: "cad", iconName: "cad" },
-  revit: { label: "Revit", type: "revit", iconName: "revit" },
-  excel: { label: "Excel", type: "excel", iconName: "excel" },
-  tekla: { label: "Tekla", type: "object", iconName: "tekla" }
-};
-
 export interface FlowConnection {
   id: string;
   fromNodeId: string;
@@ -129,6 +119,16 @@ interface FlowSubmenuItem {
   settingsSchema?: ToolRuntimeSchema;
 }
 
+const activeFileProgramOutputMeta: Record<
+  FlowActiveFileSelection["program"],
+  { label: string; type: FlowPortType; iconName: AppIconName }
+> = {
+  cad: { label: "CAD", type: "cad", iconName: "cad" },
+  revit: { label: "Revit", type: "revit", iconName: "revit" },
+  excel: { label: "Excel", type: "excel", iconName: "excel" },
+  tekla: { label: "Tekla", type: "object", iconName: "tekla" }
+};
+
 function sidebarLabel(sectionId: SidebarSectionId) {
   return sidebarSections.find((section) => section.id === sectionId)?.label ?? "Unknown";
 }
@@ -163,7 +163,7 @@ export const flowToolPalette: FlowTool[] = [
         {
           server: "cad",
           command: "cad.read_objects",
-          status: "planned",
+          status: "available",
           params: {
             scope: "settings.selection_scope",
             objectTypes: "settings.object_types",
@@ -225,7 +225,7 @@ export const flowToolPalette: FlowTool[] = [
           type: "tolerance",
           required: false,
           default: 0,
-          description: "중복/근접 판정에 사용할 거리 허용 오차입니다.",
+          description: "중복이나 근접 판정에 사용할 거리 허용 오차입니다.",
           section: "advanced",
           advanced: true
         }
@@ -369,7 +369,7 @@ export const flowToolPalette: FlowTool[] = [
       settings: [
         {
           id: "family_type",
-          label: "패밀리/타입",
+          label: "패밀리 타입",
           type: "family-type",
           required: true,
           default: "",
@@ -486,23 +486,17 @@ export function flowPortIconName(port: string): AppIconName {
   if (port === "object") {
     return "objectData";
   }
-  if (port === "number") {
+  if (port === "number" || port === "coordinate" || port === "boolean") {
     return "numberData";
   }
   if (port === "text") {
     return "textData";
-  }
-  if (port === "coordinate") {
-    return "numberData";
   }
   if (port === "table") {
     return "excel";
   }
   if (port === "file") {
     return "customTools";
-  }
-  if (port === "boolean") {
-    return "numberData";
   }
   return "customTools";
 }
@@ -792,6 +786,7 @@ export function normalizeStoredBasicFlowNode(node: FlowNode): FlowNode {
 
   return node;
 }
+
 export function defaultFlowNodes() {
   return [
     { ...cloneFlowTool(flowToolPalette[0]), nodeId: "node-cad-read", ...defaultFlowNodePosition(0) },

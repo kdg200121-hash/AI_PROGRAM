@@ -40,6 +40,7 @@ const baseSchema: ToolRuntimeSchema = {
     mode: "sections",
     sections: [{ id: "input", label: "입력", defaultOpen: true }]
   },
+  executionSteps: [],
   settings: [
     {
       id: "selection_scope",
@@ -101,7 +102,7 @@ describe("toolRuntimeValidation", () => {
         }
       }
     ]);
-    expect(plan.summary).toContain("CAD MCP 연결");
+    expect(plan.summary).toContain("CAD MCP 연결 확인");
     expect(plan.sampleResult).toContain("table");
   });
 
@@ -114,10 +115,89 @@ describe("toolRuntimeValidation", () => {
       failurePolicy: { partialSuccess: "report", rollback: "none", log: true }
     });
 
-    expect(issues.map((issue) => issue.id)).toEqual([
-      "missing-required-servers",
-      "missing-preflight-checks",
-      "weak-failure-policy"
-    ]);
+    expect(issues.map((issue) => issue.id)).toEqual(
+      expect.arrayContaining([
+        "missing-required-servers",
+        "missing-preflight-checks",
+        "weak-failure-policy"
+      ])
+    );
+  });
+
+  it("catches broken cross references in tool markdown schemas", () => {
+    const issues = validateToolRuntimeSchema({
+      ...baseSchema,
+      requiredServers: ["cad"],
+      mcpCommands: [
+        {
+          server: "revit",
+          command: "revit.update_elements",
+          status: "planned",
+          params: {
+            scope: "settings.missing_scope"
+          }
+        }
+      ],
+      actions: [
+        {
+          id: "apply",
+          label: "실행",
+          runtimeAction: "apply",
+          description: "원본에 적용합니다.",
+          primary: true,
+          requiresPreview: false,
+          confirm: false
+        }
+      ],
+      executionSteps: [
+        {
+          id: "run",
+          label: "실행",
+          description: "없는 액션을 참조합니다.",
+          actionId: "missing_action",
+          state: "waiting"
+        }
+      ],
+      settings: [
+        ...baseSchema.settings,
+        {
+          id: "single_choice",
+          label: "하나뿐인 선택",
+          type: "select",
+          required: false,
+          default: "only",
+          description: "고정값이어야 합니다.",
+          options: [{ value: "only", label: "Only" }],
+          section: "missing_section"
+        },
+        {
+          id: "selection_scope",
+          label: "중복 필드",
+          type: "text",
+          required: false,
+          default: "",
+          description: "중복입니다.",
+          section: "input"
+        }
+      ],
+      risk: "bulk-modify",
+      outputs: [],
+      resultSchema: { type: "text", fields: [] },
+      testCases: []
+    });
+
+    expect(issues.map((issue) => issue.id)).toEqual(
+      expect.arrayContaining([
+        "duplicate-setting-id-selection_scope",
+        "command-server-not-required-revit",
+        "unknown-command-setting-missing_scope",
+        "unknown-step-action-missing_action",
+        "single-option-setting-single_choice",
+        "unknown-setting-section-single_choice",
+        "unsafe-action-without-preview-apply",
+        "missing-outputs",
+        "missing-test-cases"
+      ])
+    );
   });
 });

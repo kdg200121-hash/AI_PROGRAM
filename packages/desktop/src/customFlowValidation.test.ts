@@ -28,7 +28,8 @@ describe("customFlowValidation", () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: "type-mismatch-bad",
-          severity: "warning"
+          severity: "warning",
+          title: "포트 타입 불일치"
         })
       ])
     );
@@ -87,7 +88,8 @@ describe("customFlowValidation", () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: "missing-node-dangling",
-          severity: "error"
+          severity: "error",
+          title: "없는 노드 연결"
         })
       ])
     );

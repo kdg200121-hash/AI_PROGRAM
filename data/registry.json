@@ -27,7 +27,7 @@
       "workingDirectory": "C:\\Tools\\AutoCadMcpBridge",
       "environment": {},
       "status": "unknown",
-      "notes": "CAD connection placeholder for the first version",
+      "notes": "Local AutoCAD MCP bridge with safe COM read commands for active document, layers, objects, and title block candidates. Commands succeed only when AutoCAD is running.",
       "createdAt": "2026-07-03T00:00:00.000Z",
       "updatedAt": "2026-07-03T00:00:00.000Z"
     },

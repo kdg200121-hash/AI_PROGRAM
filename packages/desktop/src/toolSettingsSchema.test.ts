@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   defaultSettingOptions,
   flowPortTypeFromToolType,
@@ -264,6 +265,51 @@ executionSteps:
         state: "waiting"
       }
     ]);
+  });
+
+  it("parses CAD drawing-number tool as an explicit preview/apply workflow", () => {
+    const markdown = readFileSync(
+      new URL("../../../tools/CAD_도면번호_일괄_순번_변경_1.0.8.md", import.meta.url),
+      "utf8"
+    );
+    const schema = parseToolRuntimeSchema(markdown);
+
+    expect(schema.settings.map((field) => field.id)).toContain("dwg_files");
+    expect(schema.settings.map((field) => field.id)).toEqual(
+      expect.arrayContaining(["title_block_detection_scope", "title_block_name"])
+    );
+    expect(schema.actions.map((action) => ({
+      id: action.id,
+      runtimeAction: action.runtimeAction,
+      requiresPreview: action.requiresPreview
+    }))).toEqual([
+      { id: "preview", runtimeAction: "preview", requiresPreview: false },
+      { id: "apply", runtimeAction: "apply", requiresPreview: true }
+    ]);
+    expect((schema.executionSteps ?? []).map((step) => ({
+      id: step.id,
+      section: step.section,
+      actionId: step.actionId,
+      state: step.state
+    }))).toEqual([
+      { id: "input", section: "input", actionId: undefined, state: "active" },
+      { id: "preview", section: undefined, actionId: "preview", state: "waiting" },
+      { id: "apply", section: undefined, actionId: "apply", state: "waiting" }
+    ]);
+    expect(schema.mcpCommands.map((command) => ({
+      command: command.command,
+      status: command.status,
+      runtimeAction: command.runtimeAction
+    }))).toEqual([
+      { command: "open_dwg", status: "planned", runtimeAction: "apply" },
+      { command: "detect_title_block_candidates", status: "available", runtimeAction: "preview" },
+      { command: "find_text_in_title_block", status: "planned", runtimeAction: "preview" },
+      { command: "update_text_values", status: "planned", runtimeAction: "apply" }
+    ]);
+    expect(schema.mcpCommands.find((command) => command.command === "detect_title_block_candidates")?.params).toEqual({
+      scope: "settings.title_block_detection_scope",
+      blockName: "settings.title_block_name"
+    });
   });
 
   it("ignores learningLog metadata when building runtime schema", () => {

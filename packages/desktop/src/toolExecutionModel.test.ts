@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildToolExecutionRequest,
-  extractTitleBlockCandidates
+  extractTitleBlockCandidates,
+  toolExecutionFailureMessage
 } from "./toolExecutionModel";
 import type { ToolRuntimeSchema } from "./toolSettingsSchema";
 
@@ -25,6 +26,7 @@ const titleBlockSchema: ToolRuntimeSchema = {
   resultSchema: { type: "table", fields: [] },
   failurePolicy: { partialSuccess: "report", rollback: "backup", log: true },
   settingsLayout: { mode: "sections", sections: [] },
+  executionSteps: [],
   settings: [
     {
       id: "dwg_files",
@@ -59,7 +61,7 @@ const titleBlockSchema: ToolRuntimeSchema = {
   actions: [
     {
       id: "preview",
-      label: "분석 미리보기",
+      label: "미리보기",
       runtimeAction: "preview",
       description: "",
       primary: true,
@@ -101,6 +103,45 @@ describe("tool execution model", () => {
     expect(request.aiInstruction).toContain("블록명");
   });
 
+  it("keeps only commands for the requested runtime action when commands are scoped", () => {
+    const request = buildToolExecutionRequest({
+      toolName: "CAD 도면번호 일괄 순번 변경",
+      menuName: "CAD",
+      runtimeAction: "preview",
+      schema: {
+        ...titleBlockSchema,
+        mcpCommands: [
+          {
+            server: "cad",
+            command: "cad.open_dwg",
+            status: "planned",
+            runtimeAction: "apply",
+            params: {}
+          },
+          {
+            server: "cad",
+            command: "cad.detect_title_block_candidates",
+            status: "available",
+            runtimeAction: "preview",
+            params: {}
+          },
+          {
+            server: "cad",
+            command: "cad.list_layers",
+            status: "available",
+            params: {}
+          }
+        ]
+      },
+      values: {}
+    });
+
+    expect(request.commands.map((command) => command.command)).toEqual([
+      "cad.detect_title_block_candidates",
+      "cad.list_layers"
+    ]);
+  });
+
   it("extracts concrete title block candidates returned by CAD MCP", () => {
     const candidates = extractTitleBlockCandidates({
       titleBlockCandidates: [
@@ -135,5 +176,35 @@ describe("tool execution model", () => {
 
   it("does not invent title block candidates when CAD MCP returns none", () => {
     expect(extractTitleBlockCandidates({ ok: true })).toEqual([]);
+  });
+
+  it("detects explicit error and failed raw payloads before completing runtime steps", () => {
+    expect(
+      toolExecutionFailureMessage({
+        status: "error",
+        message: "CAD MCP 연결 실패"
+      })
+    ).toBe("CAD MCP 연결 실패");
+    expect(
+      toolExecutionFailureMessage({
+        status: "preview",
+        message: "",
+        raw: { ok: false, error: "도곽 분석 실패" }
+      })
+    ).toBe("도곽 분석 실패");
+    expect(
+      toolExecutionFailureMessage({
+        status: "completed",
+        message: "",
+        raw: { issues: [{ severity: "error", message: "원본 DWG를 찾을 수 없습니다." }] }
+      })
+    ).toBe("원본 DWG를 찾을 수 없습니다.");
+    expect(
+      toolExecutionFailureMessage({
+        status: "preview",
+        message: "",
+        raw: { mcp: { ok: false, message: "도곽 후보를 찾지 못했습니다." } }
+      })
+    ).toBe("도곽 후보를 찾지 못했습니다.");
   });
 });

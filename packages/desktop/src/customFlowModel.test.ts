@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultFlowNodes,
   activeFileOutputPortForSelections,
   applyFlowNodeDrag,
+  defaultFlowNodes,
   flowConnectionEndpoint,
   flowNodeDisplayIconName,
   flowNodeWidth,
-  normalizeStoredBasicFlowNode,
+  flowToolPalette,
   insertStoredFlowGraphAsGroup,
+  normalizeStoredBasicFlowNode,
   parseDraggedFlowTool,
   removeNodeIdsFromFlowGroups,
-  flowToolPalette,
-  type FlowSnapshot,
-  type FlowNode
+  type FlowNode,
+  type FlowSnapshot
 } from "./customFlowModel";
 
 describe("customFlowModel", () => {
@@ -30,7 +30,8 @@ describe("customFlowModel", () => {
     expect(flowToolPalette[0].settingsSchema?.requiredServers).toEqual(["cad"]);
     expect(flowToolPalette[0].settingsSchema?.mcpCommands[0]).toMatchObject({
       server: "cad",
-      command: "cad.read_objects"
+      command: "cad.read_objects",
+      status: "available"
     });
     expect(flowToolPalette[0].settingsSchema?.settings.map((field) => field.id)).toContain(
       "selection_scope"
@@ -98,6 +99,7 @@ describe("customFlowModel", () => {
               description: "읽을 레이어입니다."
             }
           ],
+          actions: [],
           inputs: [],
           outputs: [{ id: "result", label: "결과", type: "table" }],
           testCases: []

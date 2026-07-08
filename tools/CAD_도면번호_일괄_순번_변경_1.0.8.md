@@ -4,6 +4,204 @@ description: "여러 DWG에서 도곽 기준 위치의 Text/MText 도면번호�
 version: "1.0.8"
 author: "김동건"
 sectionId: "servers"
+tool: true
+risk: "bulk-modify"
+deterministic: true
+executionMode: "mcp"
+requiredServers:
+  - cad
+settingsLayout:
+  mode: "steps"
+  sections:
+    - id: input
+      label: "입력"
+      description: "DWG 파일 목록과 번호 규칙을 입력합니다."
+      defaultOpen: true
+    - id: review
+      label: "검토"
+      description: "미리보기 결과와 도곽 후보를 확인합니다."
+      defaultOpen: true
+settings:
+  - id: dwg_files
+    label: "DWG 파일 목록"
+    type: repeatable-list
+    itemType: file
+    valueKey: file_path
+    accept: ".dwg,.dxf"
+    required: true
+    default: []
+    section: input
+    preview: true
+    showItemSummary: true
+    summaryCountKey: title_block_count
+    summaryRangeKey: number_range
+    pendingSummaryLabel: "미분석"
+    pendingRangeLabel: "미리보기 필요"
+    description: "처리할 DWG 파일을 추가하고 순서를 정합니다. 목록 순서가 번호 부여 순서입니다."
+  - id: reference_search_text
+    label: "기준 검색 문자"
+    type: text
+    required: true
+    default: "P-"
+    section: input
+    preview: true
+    description: "첫 DWG의 도곽 내부에서 도면번호 위치를 찾기 위한 기존 문자입니다."
+  - id: number_prefix
+    label: "접두어"
+    type: text
+    required: true
+    default: "P-"
+    section: input
+    preview: true
+    description: "새 도면번호 앞에 붙일 문자입니다."
+  - id: start_number
+    label: "시작 번호"
+    type: number
+    required: true
+    default: 101
+    section: input
+    preview: true
+    description: "첫 도곽에 부여할 시작 번호입니다."
+  - id: digit_count
+    label: "번호 자리수"
+    type: number
+    required: true
+    default: 3
+    section: input
+    description: "번호를 몇 자리로 맞출지 정합니다. 예: 3이면 001 형식입니다."
+  - id: title_block_candidate_id
+    label: "도곽 후보"
+    type: select
+    required: true
+    default: ""
+    section: review
+    description: "미리보기에서 감지된 도곽 후보 중 기준 도곽을 선택합니다."
+  - id: title_block_detection_scope
+    label: "도곽 감지 방식"
+    type: select
+    required: true
+    default: "layout"
+    section: review
+    preview: true
+    options:
+      - value: "layout"
+        label: "배치에서 자동 감지"
+      - value: "selection"
+        label: "CAD에서 선택한 블록 사용"
+    description: "자동 후보가 없으면 CAD에서 도곽 블록을 선택한 뒤 선택한 블록 사용으로 다시 미리보기합니다."
+  - id: title_block_name
+    label: "도곽 블록명"
+    type: text
+    required: false
+    default: ""
+    section: review
+    preview: true
+    description: "도곽 블록명을 알고 있으면 입력합니다. 비워두면 이름과 속성으로 후보를 찾습니다."
+actions:
+  - id: preview
+    label: "미리보기"
+    runtimeAction: preview
+    primary: true
+    requiresPreview: false
+    confirm: false
+    description: "원본 DWG를 저장하지 않고 도곽 후보와 파일별 번호 범위를 분석합니다."
+  - id: apply
+    label: "실행"
+    runtimeAction: apply
+    primary: true
+    requiresPreview: true
+    confirm: true
+    description: "미리보기와 도곽 후보를 확인한 뒤 원본 DWG에 새 도면번호를 적용합니다."
+executionSteps:
+  - id: input
+    label: "입력"
+    description: "DWG 파일과 번호 규칙을 입력합니다."
+    section: input
+    state: active
+  - id: preview
+    label: "미리보기"
+    description: "도곽 후보와 파일별 번호 범위를 분석합니다."
+    actionId: preview
+    state: waiting
+  - id: apply
+    label: "실행"
+    description: "확인한 결과를 원본 DWG에 적용합니다."
+    actionId: apply
+    state: waiting
+mcpCommands:
+  - server: cad
+    command: open_dwg
+    status: planned
+    runtimeAction: apply
+    description: "선택한 DWG 파일을 순서대로 엽니다."
+  - server: cad
+    command: detect_title_block_candidates
+    status: available
+    runtimeAction: preview
+    params:
+      scope: settings.title_block_detection_scope
+      blockName: settings.title_block_name
+    description: "첫 DWG에서 도곽 후보 블록과 위치를 감지합니다."
+  - server: cad
+    command: find_text_in_title_block
+    status: planned
+    runtimeAction: preview
+    description: "도곽 내부 기준 검색 문자 주변의 Text/MText 도면번호 위치를 찾습니다."
+  - server: cad
+    command: update_text_values
+    status: planned
+    runtimeAction: apply
+    description: "미리보기에서 확정한 위치 기준으로 새 도면번호를 적용합니다."
+preflightChecks:
+  - id: cad-connected
+    label: "CAD MCP 연결"
+    severity: error
+    message: "CAD MCP 서버가 연결되어 있어야 합니다."
+  - id: dwg-files
+    label: "DWG 파일 목록"
+    severity: error
+    message: "처리할 DWG 파일이 1개 이상 필요합니다."
+  - id: preview-required
+    label: "미리보기 필요"
+    severity: warning
+    message: "원본 적용 전 미리보기와 도곽 후보 확인이 필요합니다."
+resultSchema:
+  type: table
+  fields:
+    - id: file_path
+      label: "DWG 파일"
+      type: text
+    - id: title_block_count
+      label: "도곽 수"
+      type: number
+    - id: number_range
+      label: "번호 범위"
+      type: text
+    - id: status
+      label: "상태"
+      type: text
+failurePolicy:
+  partialSuccess: report
+  rollback: none
+  log: true
+inputs:
+  - id: dwg_files
+    label: "DWG 파일 목록"
+    type: file-list
+outputs:
+  - id: file_summaries
+    label: "파일별 미리보기 요약"
+    type: table
+  - id: changed_rows
+    label: "변경 결과"
+    type: table
+  - id: log
+    label: "실행 로그"
+    type: log
+testCases:
+  - name: "기본 순번 변경"
+    given: "DWG 2개, 접두어 P-, 시작번호 101, 자리수 3"
+    expect: "파일 순서와 도곽 위치 순서대로 P-101부터 번호가 배정됩니다."
 ---
 
 # CAD 도면번호 일괄 순번 변경
@@ -79,17 +277,14 @@ HTML 설정창 목업은 `outputs/cad-drawing-number-batch-renumber-settings-moc
 
 ## MCP 명령 계획
 
-아직 구현/확인 필요: 아래 MCP 명령은 실행 설계를 위한 planned 명령입니다. 실제 CAD MCP 서버에 같은 명령이 있는지 확인하거나 브리지에서 구현해야 합니다.
+현재 구현 상태: `cad.detect_title_block_candidates`는 AutoCAD가 실행 중이고 COM 연결이 가능할 때 읽기 전용으로 동작합니다. 나머지 원본 열기/수정/저장 명령은 아직 실행 설계를 위한 planned 명령입니다.
 
 - Required servers: `cad`
 - Command sequence:
-  1. `cad.open_dwg`
-  2. `cad.detect_title_block_candidates`
-  3. `cad.select_title_block_candidate`
-  4. `cad.find_text_in_title_block`
-  5. `cad.apply_relative_text_position_to_drawings`
-  6. `cad.update_text_values`
-  7. `cad.save_dwg`
+  1. `cad.detect_title_block_candidates` - available preview read
+  2. `cad.find_text_in_title_block` - planned preview read
+  3. `cad.open_dwg` - planned apply
+  4. `cad.update_text_values` - planned apply
 - Parameter mapping:
   - `settings.dwg_files` → 처리할 DWG 파일 목록
   - `settings.reference_search_text` → 도면번호 위치 검색 문자

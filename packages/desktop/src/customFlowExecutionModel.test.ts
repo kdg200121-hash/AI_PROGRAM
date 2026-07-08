@@ -1,0 +1,111 @@
+import { describe, expect, it } from "vitest";
+import { defaultFlowConnections, defaultFlowNodes } from "./customFlowModel";
+import {
+  buildFlowNodeExecutionRequest,
+  flowInputResultsForNode,
+  flowResultPayload,
+  syntheticFlowNodeResult,
+  shouldContinueAfterFlowNodeFailure
+} from "./customFlowExecutionModel";
+
+describe("customFlowExecutionModel", () => {
+  it("builds executable MCP requests for a flow node and injects previous node results", () => {
+    const nodes = defaultFlowNodes();
+    const inputResults = {
+      objects: {
+        rows: [{ handle: "A1", layer: "A-WALL" }]
+      }
+    };
+
+    const request = buildFlowNodeExecutionRequest({
+      node: nodes[1],
+      menuName: "Custom Flow",
+      runtimeAction: "apply",
+      inputResults
+    });
+
+    expect(request).toMatchObject({
+      kind: "ai-mcp-tool-execution",
+      toolName: "Excel 내보내기",
+      menuName: "Custom Flow",
+      runtimeAction: "apply",
+      requiredServers: ["excel"]
+    });
+    expect(request?.commands[0].params.source).toEqual(inputResults.objects);
+    expect(request?.aiInstruction).toContain("Custom Flow");
+  });
+
+  it("collects input results from incoming connections by target port id", () => {
+    const nodes = defaultFlowNodes();
+    const resultsByNodeId = new Map<string, unknown>([
+      [nodes[0].nodeId, { rows: [{ handle: "A1" }] }]
+    ]);
+
+    expect(flowInputResultsForNode(nodes[1], defaultFlowConnections(), resultsByNodeId)).toEqual({
+      objects: { rows: [{ handle: "A1" }] }
+    });
+  });
+
+  it("normalizes MCP results so downstream nodes receive the real payload", () => {
+    expect(flowResultPayload({ status: "completed", message: "", raw: { mcp: { ok: true, data: [1] } } })).toEqual({
+      ok: true,
+      data: [1]
+    });
+    expect(flowResultPayload({ status: "completed", message: "", raw: { result: { rows: [] } } })).toEqual({
+      rows: []
+    });
+    expect(flowResultPayload({ status: "completed", message: "완료" })).toEqual({ message: "완료" });
+  });
+
+  it("continues after a node failure only when the node failure policy allows keeping successes", () => {
+    const [cadNode] = defaultFlowNodes();
+
+    expect(shouldContinueAfterFlowNodeFailure(cadNode)).toBe(false);
+    expect(
+      shouldContinueAfterFlowNodeFailure({
+        ...cadNode,
+        settingsSchema: {
+          ...cadNode.settingsSchema!,
+          failurePolicy: { partialSuccess: "keep-success", rollback: "none", log: true }
+        }
+      })
+    ).toBe(true);
+  });
+
+  it("creates pass-through payloads for non-MCP helper nodes", () => {
+    expect(
+      syntheticFlowNodeResult(
+        {
+          nodeId: "preview-1",
+          id: "basic-result-preview",
+          programIcon: "preview",
+          name: "결과 미리보기",
+          description: "",
+          inputs: [],
+          outputs: [],
+          x: 0,
+          y: 0
+        },
+        { result: { rows: [1] } }
+      )
+    ).toEqual({ rows: [1] });
+
+    expect(
+      syntheticFlowNodeResult(
+        {
+          nodeId: "prompt-1",
+          id: "basic-custom-prompt",
+          programIcon: "promptDetached",
+          name: "프롬프트",
+          description: "",
+          inputs: [],
+          outputs: [],
+          promptText: "레이어별로 요약",
+          x: 0,
+          y: 0
+        },
+        {}
+      )
+    ).toEqual({ prompt: "레이어별로 요약" });
+  });
+});

@@ -1,43 +1,58 @@
-# AI Program MD Tool Reference
+# AI Program Markdown Tool Reference
 
-Use this reference when generating Markdown tools for AI Program Custom Tools or More Tools.
+Use this reference when generating Markdown tools for AI Program Custom Tools, Market Tools, and `/save` drafts.
 
-## Frontmatter
+The settings schema must be specific enough for AI Program to render a consistent 설정창 for different people's tools.
+
+AI Program reads frontmatter first. The Markdown body explains the tool for people. Keep executable behavior in frontmatter whenever possible.
+
+## Runtime Boundary
+
+AI Program must ignore learningLog at runtime. `learningLog` is only analytics metadata for improving the tool-making skills later.
+
+Never use `learningLog` to decide execution, settings, MCP commands, permissions, or risk.
+
+## Recommended Frontmatter
 
 ```yaml
 ---
 tool: true
-toolName: Tool Name
-sectionId: cad
-program: CAD
-version: 1.0.0
-author: GitHub-or-nickname
-description: One short sentence.
-risk: read
+toolName: "CAD 도면번호 일괄 순번 변경"
+sectionId: "cad"
+program: "CAD"
+version: "1.0.0"
+author: "GitHub-or-nickname"
+description: "여러 DWG에서 도곽 기준 위치의 도면번호를 순서대로 일괄 변경합니다."
+risk: "bulk-modify"
 deterministic: true
-executionMode: manual
+executionMode: "mcp"
 requiredServers:
   - cad
 mcpCommands:
   - server: cad
-    command: cad.read_objects
+    command: cad.titleBlocks.previewRenumber
     status: planned
     params:
-      source: settings.selection_scope
+      files: settings.dwg_files
+      startNumber: settings.start_number
 preflightChecks:
   - id: cad_connected
-    label: CAD MCP 서버 연결 확인
+    label: CAD MCP 연결 확인
     severity: error
     message: CAD MCP 서버가 연결되어 있어야 합니다.
+    blocksExecution: true
 resultSchema:
   type: table
   fields:
-    - id: name
-      label: 이름
-      type: text
+    - id: file_path
+      label: 파일
+      type: file
+    - id: title_block_count
+      label: 도곽 수
+      type: number
 failurePolicy:
   partialSuccess: report
-  rollback: none
+  rollback: backup
   log: true
 settingsLayout:
   mode: sections
@@ -45,37 +60,74 @@ settingsLayout:
     - id: input
       label: 입력
       defaultOpen: true
-    - id: advanced
-      label: 고급 설정
-      defaultOpen: false
+    - id: review
+      label: 후보 확인
+      defaultOpen: true
 executionSteps:
   - id: input
     label: 설정 입력
-    description: 실행에 필요한 파일, 선택 범위, 옵션을 입력합니다.
+    description: 실행할 파일과 번호 기준을 입력합니다.
     section: input
     state: active
   - id: preview
     label: 미리보기
-    description: 원본을 바꾸기 전에 예상 결과를 확인합니다.
+    description: 원본을 바꾸기 전에 도곽 후보와 변경 예정 번호를 분석합니다.
     actionId: preview
     state: waiting
   - id: apply
-    label: 적용
-    description: 미리보기 결과가 맞으면 실제 MCP 명령을 실행합니다.
+    label: 실행
+    description: 미리보기 결과가 맞으면 원본에 적용합니다.
     actionId: apply
     state: waiting
-testCases:
-  - name: 기본 실행
-    given: 같은 입력과 같은 설정
-    expect: 같은 결과 반환
-inputs:
-  - id: source
-    label: 입력 객체
-    type: object
+actions:
+  - id: preview
+    label: 미리보기
+    runtimeAction: preview
+    primary: true
+    requiresPreview: false
+    confirm: false
+    description: 원본을 저장하지 않고 변경 예정 결과만 계산합니다.
+  - id: apply
+    label: 실행
+    runtimeAction: apply
+    primary: true
+    requiresPreview: true
+    confirm: true
+    description: 미리보기 결과를 원본에 적용합니다.
+settings:
+  - id: dwg_files
+    label: DWG 파일 목록
+    type: repeatable-list
+    itemType: file
+    valueKey: file_path
+    accept: .dwg,.dxf
+    showItemSummary: true
+    summaryCountKey: title_block_count
+    summaryRangeKey: number_range
+    pendingSummaryLabel: 미분석
+    pendingRangeLabel: 미리보기 필요
+    required: true
+    default: []
+    section: input
+    preview: true
+    description: 항목 추가 버튼으로 처리할 DWG 파일을 선택합니다.
+  - id: start_number
+    label: 시작 번호
+    type: number
+    required: true
+    default: 1
+    section: input
+    preview: true
+    description: 첫 도면에 적용할 시작 번호입니다.
+inputs: []
 outputs:
   - id: result
-    label: 결과
-    type: text
+    label: 변경 결과
+    type: table
+testCases:
+  - name: 두 개 DWG 미리보기
+    given: DWG 2개와 시작 번호 1
+    expect: 각 파일별 도곽 후보와 번호 범위가 표시된다.
 learningLog:
   schemaVersion: "1"
   sourceSkill: "mcp-tool-builder"
@@ -83,224 +135,117 @@ learningLog:
   suggestedOptions: []
   selectedOptions: []
   deferredImprovements: []
-actions:
-  - id: preview
-    label: 분석 미리보기
-    runtimeAction: preview
-    primary: true
-    description: 원본을 수정하지 않고 결과를 계산합니다.
-settings:
-  - id: source_file
-    label: 원본 파일
-    type: file
-    required: true
-    default: ""
-    description: 실행할 원본 파일입니다.
 ---
 ```
 
-Use a specific risk level when the tool can create, delete, move, rename, overwrite, export, batch edit, change model parameters, or modify user data. Prefer `create`, `modify`, `bulk-modify`, or `delete` instead of the older generic `caution`.
+## Required Fields
 
-Use `toolName` and `sectionId` as the primary app-facing metadata. `name` and `program` may be included for compatibility or readability, but AI Program reads `toolName` and `sectionId` first.
-
-`toolName` is the visible display name in AI Program. Use the approved Korean tool name exactly. Do not put an English filename, slug, command id, or translated title in `toolName`. If `name` is included for compatibility, set it to the same Korean display name.
-
-`description` must be filled. If the user did not provide a description, generate one Korean sentence from the target program, input/source, core action, and output/result. Do not leave it blank or as `Short description`.
-
-Recommended risk levels:
-
-- `read`: reads data only and does not create files.
-- `create`: creates a new file, report, object, sheet, or view without changing existing data.
-- `modify`: changes existing CAD/Revit/Excel/model data.
-- `bulk-modify`: changes many objects, many cells, many model elements, or many files.
-- `delete`: deletes or overwrites user data.
-
-Use `risk: safe` only for older/simple tools. For new tools, prefer the more specific risk levels above.
-
-## Executable Tool Fields
-
-Use these fields when the tool should become executable by MCP later.
-
+- `tool: true`: marks the file as a tool.
+- `toolName`: visible name in AI Program.
+- `sectionId`: target menu such as `cad`, `revit`, `excel`, `tekla`, `custom-flow`, or `other`.
+- `description`: short Korean sentence explaining target, action, and result.
+- `risk`: `read`, `create`, `modify`, `bulk-modify`, `delete`, `safe`, or `caution`.
 - `executionMode`: `manual`, `mcp`, `custom-flow`, or `hybrid`.
-- `executionSteps`: selectable tool-page steps. Use `section` to show settings for that step, and `actionId` to connect a step to an item in `actions`.
-- `requiredServers`: MCP servers that must be connected before execution. Use lowercase names such as `cad`, `revit`, `excel`, `tekla`.
-- `mcpCommands`: ordered list of MCP command calls.
-- `preflightChecks`: validation checks before execution.
-- `resultSchema`: the exact shape of the returned result.
-- `failurePolicy`: what happens when execution fails or partially succeeds.
-- `testCases`: minimal examples proving repeatable behavior.
+- `settingsLayout`, `executionSteps`, `settings`, `actions`: render the settings and execution UI.
+- `requiredServers` and `mcpCommands`: tell the app and bridge which MCP server and command are needed.
+- `preflightChecks`: block unsafe execution before calling MCP.
+- `outputs` and `resultSchema`: let the app and Custom Flow understand returned data.
+- `failurePolicy`: tells the user what happens on failure.
+- `testCases`: proves repeatable behavior.
 
-`mcpCommands.status` should be:
+## Settings Rules
+
+Only create visible `settings` for meaningful user choices.
+
+Do not create settings for:
+
+- Fixed constants, such as increment `1`.
+- Single-option select values.
+- Values derived from preview, such as detected title block count.
+- The clicked button state, such as preview vs apply.
+
+Use:
+
+- `fixed constants` in body text or MCP params.
+- `derived preview values` in result schema or row summary metadata.
+- `runtime actions` in `actions` and `mcpCommands.condition`.
+
+## Field Types
+
+Supported common types:
+
+- `text`, `textarea`, `number`, `checkbox`
+- `select`, `multi-select`
+- `file`, `folder`
+- `scope-picker`
+- `object-selection`, `element-selection`, `range-selection`
+- `coordinate`, `coordinate-system`, `color`, `unit`, `tolerance`
+- `layer`, `level`, `family-type`, `parameter`
+- `repeatable-list`, `mapping-table`, `filter-builder`, `sort-rule`, `naming-template`
+- `overwrite-policy`, `conflict-policy`, `backup-policy`, `transaction-policy`
+- `version-compatibility`
+
+If a field type is too specific, use the closest generic type and explain the exact behavior in `description`.
+
+## Execution Steps
+
+Use `executionSteps` to describe the page flow.
+
+Good pattern for safe analysis then modification:
+
+1. `설정 입력`: user-editable settings.
+2. `미리보기`: calls preview/analyze action without changing original data.
+3. `후보 확인`: shown only when detected candidates must be selected.
+4. `실행`: applies changes after preview and confirmation.
+
+Each step should have one purpose. Do not duplicate the top `실행 단계` row inside the selected-step panel.
+
+## Actions
+
+Use actions for buttons.
+
+For risky apply actions:
+
+- `requiresPreview: true`
+- `confirm: true`
+- `runtimeAction: apply` or a specific action name
+
+Use `미리보기` and `실행` as default labels unless another domain phrase is clearer.
+
+## MCP Commands
+
+`mcpCommands.status`:
 
 - `available`: command exists and can be called now.
-- `planned`: command name and parameters are designed, but implementation is not confirmed yet.
-- `manual`: user must perform this step manually for now.
+- `planned`: command name and parameters are designed but implementation is not confirmed.
+- `manual`: user must do the step manually for now.
+
+Every command server should appear in `requiredServers`.
+
+Every `settings.<id>` param reference must point to an existing visible setting.
 
 Example:
 
 ```yaml
 mcpCommands:
-  - server: revit
-    command: revit.collect_elements
+  - server: cad
+    command: cad.inspect_title_blocks
     status: planned
     params:
-      category: settings.category
-      scope: settings.selection_scope
-  - server: excel
-    command: excel.write_table
+      files: settings.dwg_files
+    condition: runtime.action == "preview"
+  - server: cad
+    command: cad.apply_title_block_numbers
     status: planned
     params:
-      path: settings.export_path
-      rows: previous.result.rows
+      files: settings.dwg_files
+      startNumber: settings.start_number
+    condition: runtime.action == "apply"
 ```
 
-## Preflight Checks
+## Repeatable File Lists
 
-Preflight checks prevent unsafe or confusing execution.
-
-Required keys:
-
-- `id`: stable key.
-- `label`: Korean UI label.
-- `severity`: `error`, `warning`, or `info`.
-- `message`: Korean message shown to the user.
-
-Recommended optional keys:
-
-- `condition`: machine-readable condition when possible.
-- `fix`: suggested action.
-- `blocksExecution`: `true` or `false`.
-
-Common checks:
-
-- MCP server connected.
-- Target program open.
-- Active document/model available.
-- Required selection exists.
-- Required file path exists.
-- Output folder exists.
-- Unit and coordinate basis selected.
-- Overwrite confirmation accepted.
-
-## Result Schema
-
-Define the result so Custom Flow can pass it to the next node.
-
-Recommended result types:
-
-- `text`
-- `number`
-- `boolean`
-- `table`
-- `json`
-- `file`
-- `folder`
-- `cad_object_handles`
-- `revit_element_ids`
-- `excel_range`
-- `log`
-
-Example:
-
-```yaml
-resultSchema:
-  type: table
-  fields:
-    - id: handle
-      label: CAD 객체 핸들
-      type: text
-    - id: layer
-      label: 레이어
-      type: text
-    - id: x
-      label: X 좌표
-      type: number
-```
-
-## Settings Schema
-
-Every settings field should be explicit enough for the UI to render it and for another user to reproduce the same result.
-
-Only user-editable choices belong in `settings`. Before adding a setting, classify the value:
-
-- `visible setting`: the user can choose or edit it, and different choices are meaningful.
-- `fixed constant`: the tool always uses this value, such as increment `1`, Text/MText target types, or a fixed tolerance.
-- `single-option value`: a select-like value with only one possible option.
-- `derived result`: the UI displays it after analysis, such as `미분석`, `미리보기 필요`, 도곽 수, or 번호 범위.
-- `runtime action`: the value comes from the clicked button, such as `분석 미리보기` versus `원본에 적용`.
-
-Only `visible setting` belongs in frontmatter `settings`. Fixed constants belong in MCP params/body text, derived results belong in row summaries/result schema, and runtime actions belong in command conditions or runtime parameter mapping.
-
-Do not create select/select-like settings with only one option. They cannot be meaningfully chosen and should not take space in the settings window.
-
-Required keys:
-
-- `id`: stable machine-readable key in snake_case or kebab-case.
-- `label`: Korean UI label.
-- `type`: field type.
-- `required`: `true` or `false`.
-- `default`: default value. Use `""`, `false`, `0`, or `[]` when empty.
-- `description`: short help text.
-
-Recommended optional keys:
-
-- `placeholder`: input placeholder.
-- `options`: select or multi-select choices.
-- `min`, `max`, `step`: number constraints.
-- `accept`: file extensions such as `.dwg,.dxf`.
-- `itemType`: for `repeatable-list`, use `file` when each list row should be added from a file picker.
-- `itemLabel`: optional per-row label for repeated list items.
-- `valueKey`: for `repeatable-list`, the key used to store each row's value. Use `file_path` for file path lists that MCP commands need to read.
-- `showItemSummary`: for `repeatable-list` file rows, show calculated per-file summary badges next to each file.
-- `summaryCountKey`: row key for a count badge, such as `title_block_count`.
-- `summaryRangeKey`: row key for a range badge, such as `number_range`.
-- `pendingSummaryLabel`, `pendingRangeLabel`: labels shown before analysis/preview fills the summary values.
-- `program`: `cad`, `revit`, `excel`, `tekla`, `common`.
-- `visibleWhen`: condition for conditional display.
-- `validationMessage`: message when the value is missing or invalid.
-- `section`: settings section id.
-- `advanced`: `true` when the field should be hidden under advanced settings.
-- `preview`: `true` when the value should appear in the execution summary.
-- `confirmOnChange`: `true` when changing the field can make the result dangerous.
-
-Supported field types:
-
-- `text`: short text.
-- `textarea`: long text, prompt, memo, rule description.
-- `number`: numeric value.
-- `checkbox`: true/false option.
-- `dry-run`: exceptional safe test-run checkbox. Prefer separate actions such as `분석 미리보기` and `원본에 적용` for preview/apply workflows; use `dry-run` only when the user truly needs one execution button with a selectable preview-only mode.
-- `select`: choose one option.
-- `multi-select`: choose multiple options.
-- `file`: file path.
-- `folder`: folder path.
-- `scope-picker`: current selection/current view/whole model/file/previous node source.
-- `object-selection`: CAD/model object selection.
-- `element-selection`: Revit element selection.
-- `range-selection`: Excel/table range.
-- `coordinate`: X/Y/Z or point.
-- `coordinate-system`: internal origin/project base/survey/user coordinate basis.
-- `color`: color or CAD/Revit display color.
-- `unit`: mm, m, inch, or project-specific unit.
-- `tolerance`: numeric tolerance for proximity, duplicate, or coordinate matching.
-- `layer`: CAD layer.
-- `level`: Revit level.
-- `family-type`: Revit family/type.
-- `parameter`: Revit or object parameter.
-- `repeatable-list`: repeated rows such as mapping tables.
-- `mapping-table`: source-to-target mapping such as Excel column to Revit parameter.
-- `filter-builder`: one or more filter rules.
-- `sort-rule`: sorting/grouping rules for reports or exports.
-- `naming-template`: generated file/view/layer/name pattern.
-- `overwrite-policy`: skip, overwrite, rename, or ask.
-- `conflict-policy`: stop, skip, overwrite, or report on conflicts.
-- `backup-policy`: whether to create backup before execution.
-- `transaction-policy`: rollback/keep-success/manual review for model changes.
-- `version-compatibility`: program/add-in version compatibility choice.
-
-If a very specific field type is not listed, use the closest generic type (`text`, `textarea`, `select`, `repeatable-list`) and explain the intended behavior in `description`.
-
-For a repeatable file list, do not model `항목 추가` as a blank text row. It should open a file picker and store selected paths in the list:
+For a list of files, use `repeatable-list` with `itemType: file`.
 
 ```yaml
 settings:
@@ -317,177 +262,52 @@ settings:
     pendingRangeLabel: 미리보기 필요
     required: true
     default: []
-    description: 항목 추가를 누르면 DWG 파일 선택창을 열고 선택한 경로를 목록에 저장합니다.
+    description: 항목 추가 버튼으로 DWG 파일을 선택합니다.
 ```
 
-When a tool previews per-file results, fill each row with those summary keys. For example, a CAD drawing-number tool can update each row to `{ file_path, title_block_count, number_range }` so the UI shows `도곽 2개` and `P-101~P-102` beside that DWG.
+Preview can fill rows with:
 
-For tools that modify user data after preview, model preview/apply as actions:
-
-```yaml
-actions:
-  - id: preview
-    label: 분석 미리보기
-    runtimeAction: preview
-    primary: true
-    description: 원본을 수정하지 않고 변경 예정 목록만 계산합니다.
-  - id: apply
-    label: 원본에 적용
-    runtimeAction: apply
-    requiresPreview: true
-    confirm: true
-    description: 미리보기 결과 확인 후 원본에 저장합니다.
-mcpCommands:
-  - server: cad
-    command: cad.update_text_values
-    status: planned
-    params:
-      previewOnly: 'runtime.action == "preview"'
-  - server: cad
-    command: cad.save_dwg
-    status: planned
-    condition: 'runtime.action == "apply"'
+```json
+{
+  "file_path": "C:/drawings/A-101.dwg",
+  "title_block_count": 2,
+  "number_range": "001~002"
+}
 ```
 
-## Settings Layout
+## Custom Flow Ports
 
-Use `settingsLayout` to keep complex tools understandable. Prefer a simple layout for simple tools and grouped layouts for tools with many settings.
+Use `inputs` and `outputs` so a tool can be used as a Custom Flow node.
 
-Supported modes:
+Common port types:
 
-- `simple`: one short settings panel.
-- `sections`: grouped sections such as 입력, 필터, 실행 옵션, 결과, 고급 설정.
-- `steps`: step-by-step settings for workflows where order matters.
-- `table`: repeatable row-based settings, usually with `repeatable-list`.
+- `text`
+- `number`
+- `boolean`
+- `table`
+- `json`
+- `file`
+- `folder`
+- `cad_object_handles`
+- `revit_element_ids`
+- `excel_range`
+- `log`
 
-Choose the layout by actual workflow, especially for AI CAD/Revit add-ins:
+## Safety Checklist
 
-- Use `simple` for read-only checks, quick exports, report generation, or one-shot create tools with only a few inputs.
-- Use `sections` when the user edits several independent groups of settings.
-- Use `actions` with a workflow panel (`입력` → `분석 미리보기` → `원본에 적용`) when the tool analyzes a drawing/model first and then modifies original CAD/Revit data.
-- Use `steps` only when later choices depend on earlier choices and the order is truly required.
-- Never expose fixed add-in choices as settings just to fill the page.
+Before finalizing:
 
-Recommended section labels:
+- Every visible setting is meaningful.
+- No select-like setting has only one option.
+- Every id is unique.
+- Every action and section reference is valid.
+- Every command server is declared in `requiredServers`.
+- Risky actions require preview or confirmation.
+- Executable tools define outputs and at least one test case.
+- Destructive or broad changes have preflight checks and failure policy.
+- Candidate workflows do not invent candidates. They must use MCP/program data.
 
-- `입력`
-- `필터`
-- `실행 옵션`
-- `결과`
-- `고급 설정`
-- `안전 확인`
-
-Example:
-
-```yaml
-settingsLayout:
-  mode: sections
-  sections:
-    - id: input
-      label: 입력
-      defaultOpen: true
-    - id: filter
-      label: 필터
-      defaultOpen: true
-    - id: advanced
-      label: 고급 설정
-      defaultOpen: false
-settings:
-  - id: selection_scope
-    label: 선택 범위
-    type: select
-    section: input
-    required: true
-    default: current_selection
-    preview: true
-    options:
-      - value: current_selection
-        label: 현재 선택
-      - value: current_view
-        label: 현재 뷰 전체
-    description: 작업할 대상 범위를 선택합니다.
-```
-
-Example:
-
-```yaml
-settings:
-  - id: selection_scope
-    label: 선택 범위
-    type: select
-    required: true
-    default: current_selection
-    options:
-      - value: current_selection
-        label: 현재 선택
-      - value: current_view
-        label: 현재 뷰 전체
-      - value: whole_model
-        label: 전체 모델
-    description: 작업할 대상 범위를 선택합니다.
-
-  - id: export_excel
-    label: Excel로 저장
-    type: checkbox
-    required: false
-    default: true
-    description: 결과를 Excel 파일로 저장합니다.
-
-  - id: export_path
-    label: 저장 경로
-    type: folder
-    required: true
-    default: ""
-    visibleWhen:
-      field: export_excel
-      equals: true
-    description: Excel 결과 파일을 저장할 폴더입니다.
-```
-
-## Settings Mockup Confirmation
-
-Before creating a final MD tool, show a mockup of the settings panel to the user. This confirmation should be written in Korean and should look like the actual app panel, not YAML.
-
-Use this shape:
-
-```text
-설정창 목업
-
-[입력]
-- 선택 범위: 현재 선택
-- 객체 타입: Line, Polyline, Block
-
-[결과]
-- 저장 위치: 폴더 선택
-- 파일명 규칙: mcp_result_{date}.xlsx
-
-[고급 설정]
-- 단위: mm
-- 허용 오차: 0
-
-실행 전 점검
-- CAD MCP 연결 확인
-- 저장 폴더 확인
-```
-
-Then ask whether to proceed, add fields, remove fields, or reorganize sections. For destructive or broad tools, ask for one explicit risk confirmation even if the user approved the mockup.
-
-## Learning Log
-
-`learningLog` is optional metadata for improving the tool-building skills later. AI Program must not use it to decide how a tool executes.
-
-Use it when the creation conversation revealed useful patterns:
-
-- `observedFriction`: where the user got stuck, corrected the agent, or needed repeated clarification.
-- `suggestedOptions`: option sets proposed by the agent, including the recommended option.
-- `selectedOptions`: options the user chose, changed, or rejected.
-- `deferredImprovements`: improvements worth reviewing in a later skill upgrade.
-
-Keep entries short and anonymized. Do not store secrets, personal chat excerpts, tokens, file contents, or Codex session IDs.
-
-## Body Template
-
-Use this current body structure even if older examples below mention `작동 원리` or a separate `설정` panel:
+## Markdown Body Template
 
 ```markdown
 # Tool Name
@@ -500,160 +320,44 @@ Use this current body structure even if older examples below mention `작동 원
 
 ### 1. 설정 입력
 
-필요한 파일, 선택 객체, 범위, 레이어, 파라미터, 사용자 설정값을 정리합니다.
+필요한 파일, 선택 범위, 기준값을 입력합니다.
 
 ### 2. 미리보기
 
-원본을 바꾸기 전에 예상 결과, 후보, 경고를 확인합니다.
+원본을 바꾸기 전에 예상 결과와 후보를 확인합니다.
 
-### 3. 적용
+### 3. 실행
 
-확정된 설정과 후보를 MCP 명령 또는 Codex orchestration으로 넘깁니다.
+미리보기 결과가 맞으면 MCP 명령으로 실제 작업을 실행합니다.
 
-## 단계별 설정
+## 설정 안내
 
-설정 schema는 frontmatter의 `settings`에 정의합니다. 특정 단계에서 보여야 하는 설정은 `settings[].section`을 지정하고 `executionSteps[].section`과 연결합니다.
-```
-
-```markdown
-# Tool Name
-
-## 목적
-
-이 툴이 무엇을 하고 언제 사용하는지 설명합니다.
-
-## 작동 원리
-
-### 1. 입력 수집
-
-필요한 파일, 선택 객체, 범위, 레이어, 파라미터, 사용자 설정값을 정리합니다.
-
-### 2. MCP 명령 연결
-
-준비된 입력값을 어떤 MCP 명령 또는 향후 구현할 명령으로 넘기는지 설명합니다.
-
-### 3. 결과 확인
-
-사용자가 실행 후 무엇을 보고, 무엇이 저장되고, 무엇이 로그에 남는지 설명합니다.
-
-## 설정
-
-설정 schema는 frontmatter의 `settings`에 정의합니다. 본문에는 사용자 설명을 적습니다.
+주요 설정값과 선택 기준을 설명합니다.
 
 ## MCP 명령 계획
 
-- Required servers:
-- Command sequence:
-- Parameter mapping:
-- Fallback/manual step:
-
-## 입력 포트
-
-- Custom Flow에서 받을 입력 포트와 타입을 설명합니다.
-
-## 출력 포트
-
-- 다음 노드로 넘길 결과 포트와 타입을 설명합니다.
-
-## 실행 조건
-
-- Required MCP server:
-- Required program state:
-- Required file/selection:
-- Preflight checks:
-
-## 주의사항
-
-- 원본을 바꾸는 작업이면 변경 범위와 확인 메시지를 명확히 적습니다.
-- 안전한 읽기/정리 작업이면 “원본 데이터를 변경하지 않습니다.”라고 적습니다.
-
-## 예상 결과
-
-- 생성, 수정, 반환, 표시, 저장되는 결과를 적습니다.
+필요 서버, 명령 순서, 파라미터 매핑, 미구현 명령을 설명합니다.
 
 ## 실패 처리
 
-- 입력 누락:
-- MCP 미연결:
-- 잘못된 설정값:
-- 실행 중 오류:
-- 일부 성공:
-- 되돌리기/로그:
-
-## 테스트 예시
-
-- 입력:
-- 설정:
-- 예상 결과:
+연결 실패, 입력 누락, 일부 성공, 롤백/백업 정책을 설명합니다.
 ```
 
-## Determinism Checklist
+## Learning Log
 
-Before finalizing, verify:
+`learningLog` is optional and non-executable.
 
-- Same input values produce the same output.
-- Every `settings` item is a meaningful user-editable choice.
-- No select-like `settings` item has only one possible option.
-- Fixed constants, derived preview badges, and runtime button states are not modeled as settings.
-- Required fields are marked `required: true`.
-- Defaults are explicit.
-- Selection scope is explicit.
-- Units are explicit.
-- File overwrite behavior is explicit.
-- Result path and result type are explicit.
-- Risk and confirmation behavior are explicit.
-- Required MCP servers are explicit.
-- MCP commands and parameter mapping are explicit or marked `planned`.
-- Preflight checks are explicit.
-- Result schema is explicit.
-- At least one test case exists for non-trivial tools.
-- Failure and partial-success behavior are explicit.
+Use it for anonymized observations:
 
-## AI Revit Add-in Conversion
+- repeated confusion
+- user corrections
+- useful option sets
+- future skill improvements
 
-When converting Revit add-ins to MD tools, look for:
+Do not include:
 
-- Revit version and required add-in version.
-- Active model path or current model.
-- Current view, selected view, or view template.
-- Category, family, type, level, workset, phase, design option.
-- Selection scope: current selection, current view, whole model, category filter.
-- Parameter names, shared parameter file, value mapping, units.
-- Create/update/delete behavior.
-- Transaction name and undo behavior.
-- Failure handling and warnings.
-- Output: element IDs, changed count, report, Excel/CSV/JSON path.
-
-Missing information to ask:
-
-- “어떤 요소 범위에 적용하나요?”
-- “기존 값을 덮어쓰나요, 비어 있는 값만 입력하나요?”
-- “실행 전 확인창이 필요한 변경인가요?”
-- “결과를 Revit 안에서만 보여주나요, 파일로 저장하나요?”
-
-Use the workflow/action pattern for Revit tools that collect elements, preview affected IDs/parameter values, and then write to the model. Use simple or sectioned settings for read-only schedules, exports, clash checks, report generation, or tools that only create an external file.
-
-## AI CAD Add-in Conversion
-
-When converting CAD add-ins or AutoLISP tools to MD tools, look for:
-
-- AutoCAD version.
-- Active DWG or file path.
-- Model Space / Paper Space.
-- Selection scope and object types.
-- Layer, color, linetype, block name, text style.
-
-Use the workflow/action pattern for CAD tools that scan a drawing, show affected handles/text/block counts, and then modify or save the DWG. Use simple or sectioned settings for read-only inspection, selection reports, layer/object exports, block counts, or tools that only create a separate output file.
-- Coordinate basis, units, tolerance.
-- Duplicate or proximity threshold.
-- Whether to only mark results or modify/delete/move objects.
-- Result layer name and color.
-- Export format and path.
-- Undo/original preservation behavior.
-
-Missing information to ask:
-
-- “작업 대상 객체는 무엇인가요?”
-- “레이어/블록명/텍스트 조건이 있나요?”
-- “허용 오차나 거리 기준은 몇인가요?”
-- “원본 객체를 수정하나요, 새 레이어에 표시만 하나요?”
+- secrets
+- tokens
+- personal chat excerpts
+- full file contents
+- Codex thread IDs

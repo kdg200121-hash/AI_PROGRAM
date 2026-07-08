@@ -176,7 +176,7 @@ logs
 - `결과 미리보기` 노드는 출력 포트가 없고, 펼쳤을 때 실행 결과를 노드 내부에 표시할 미리보기 영역을 가집니다.
 - `활성 파일` 노드는 입력 포트 없이 현재 열려 있는 파일 값을 출력하는 보조 노드로 표시합니다.
 - `프롬프트` 노드는 입력/출력 포트가 없고, 선으로 연결하지 않습니다. 노드 아래쪽으로 드래그해 다른 노드에 붙이면 해당 대상 노드 실행 시 프롬프트 문장을 추가하는 용도로 저장됩니다.
-- Custom Flow 실행은 아직 실제 MCP 실행 엔진 연결 전 UI 단계입니다. 일괄 실행을 누르면 모든 노드가 동시에 초록색이 되는 것이 아니라, 순서대로 한 노드씩 파란색 실행 테두리로 지나갑니다. 흐름 점검에서 오류/경고가 있는 노드는 해당 노드에 별도 배지와 테두리가 표시됩니다.
+- Custom Flow 실행은 `window.toolExecution.run`을 통해 실제 MCP 실행 요청을 보냅니다. 일괄 실행을 누르면 연결선 기준 순서대로 한 노드씩 실행되고, 각 노드의 실제 MCP 응답값이 다음 노드 입력으로 전달됩니다. 흐름 점검에서 오류/경고가 있는 노드는 해당 노드에 별도 배지와 테두리가 표시됩니다.
 - 기본도구의 `연결값 도구` 탭 항목은 Input 또는 Output 포트 영역에 드롭하면 커스텀 포트를 추가합니다. `텍스트`는 공용이고, `경로`/`활성파일`은 input, `결과`는 output 전용으로 표시합니다.
 - `연결값 도구`에는 텍스트, 숫자, 좌표, 객체, 테이블, 파일, 폴더, 참/거짓, 활성파일, 선택 요소, 결과, 로그, 오류, 리포트가 있습니다. 가능한 항목은 공용 포트로 두고, 선택 요소/활성파일은 input, 결과/로그/오류/리포트는 output 전용으로 표시합니다.
 - 출력 포트를 선택해 연결 대기 상태가 되면 입력 포트가 초록색 또는 붉은색으로 미리 강조됩니다. 초록색은 타입 호환, 붉은색은 연결은 가능하지만 타입 경고가 생길 수 있다는 의미입니다.
@@ -188,8 +188,8 @@ logs
 - Custom Flow의 포트/노드/저장/드래그 직렬화 모델은 `packages/desktop/src/customFlowModel.ts`로 분리되어 있습니다. UI 렌더링은 아직 `App.tsx`의 `WorkflowView`에 남아 있습니다.
 - MD 툴 frontmatter의 `settings`, `inputs`, `outputs`, `requiredServers`, `mcpCommands`, `preflightChecks`, `resultSchema`, `failurePolicy`는 `packages/desktop/src/toolSettingsSchema.ts`에서 파싱합니다. Custom Tools / Market에서 읽은 schema는 Custom Flow 노드로 전달되고, 노드의 `설정` 탭에서 자동 설정창으로 표시됩니다.
 - schema의 정의 오류, 필수 설정값 누락, 예정 MCP 명령 파라미터 해석은 `packages/desktop/src/toolRuntimeValidation.ts`가 담당합니다. Custom Tool 등록창에서는 설정창 미리보기/검증/테스트 실행 요약을 보여주고, Custom Flow 검증은 노드별 필수 설정 누락을 흐름 점검에 포함합니다.
-- Custom Flow 기본 CAD/Excel/Revit 노드에는 `mcpCommands.status: planned` 명령 계획이 들어 있습니다. 실제 MCP 호출 엔진을 붙일 때는 `buildToolExecutionPlan(schema, node.settingsValues)` 결과의 `commands`를 서버 호출 큐로 넘기면 됩니다.
-- Custom Flow 실행 범위, 실행 로그, 노드별 미리보기, 그룹 툴 schema 생성 로직은 `packages/desktop/src/customFlowRunModel.ts`에 있습니다. 실제 MCP 실행 엔진을 붙일 때는 이 모델의 `buildFlowRunRecords`가 만드는 예상 결과를 실제 실행 응답으로 대체하면 됩니다.
+- Custom Flow 기본 CAD/Excel/Revit 노드에는 `mcpCommands.status: planned` 명령 계획이 들어 있습니다. 실행 버튼은 `packages/desktop/src/customFlowExecutionModel.ts`에서 노드별 요청을 만들고 `App.tsx`의 `runFlow`가 순서대로 `window.toolExecution.run`을 호출합니다.
+- Custom Flow 실행 범위, 실행 로그, 노드별 미리보기, 그룹 툴 schema 생성 로직은 `packages/desktop/src/customFlowRunModel.ts`에 있습니다. 실제 MCP 응답 정규화, 앞 노드 결과 전달, 실패/부분성공 처리 모델은 `packages/desktop/src/customFlowExecutionModel.ts`에 있습니다.
 - `/make`와 `/save` 스킬은 설정창 구성이 어느 정도 잡히면 한글 목업을 먼저 보여주고 승인받은 뒤 MD 파일을 만들도록 되어 있습니다. 앱 내 스킬 리소스와 `C:\Users\Donggeon\.codex\skills` 로컬 스킬이 동기화되어 있습니다.
 - 현재 설정창 렌더링은 2차 UI입니다. `mapping-table`, `filter-builder`, `sort-rule`, `repeatable-list`는 행 추가/삭제 방식으로 편집할 수 있습니다. 다음 단계에서는 실제 CAD/Revit/Excel 서버 상태를 읽어 레이어, 레벨, 패밀리, 파라미터 선택지를 동적으로 채우는 작업이 필요합니다.
 - 상단 탭이 공간을 넘치면 `+` 대신 `...` 버튼이 나타나며, 화면에 보이지 않는 탭만 목록에 표시하고 목록 하단에서 새 탭을 만들 수 있습니다.
@@ -215,22 +215,35 @@ logs
 - Custom Flow에서 저장하지 않고 나갈 때는 브라우저 기본 `confirm`을 쓰지 않고 앱 디자인에 맞춘 확인 모달을 사용해야 합니다.
 - Custom Flow 기본 도구 창의 `툴`/`연결값 도구` 탭은 스크롤 중에도 상단에 고정합니다. 연결값 도구는 프로그램 필터와 공용/입력/출력 필터를 함께 지원합니다.
 - Custom Flow `연결값 도구` 필터는 기본 접힘 상태가 기준입니다. 도구 목록이 좁아 보이지 않도록 현재 필터 요약만 보이고, 사용자가 눌렀을 때만 작은 필터 칩을 펼칩니다.
+- Custom Flow 출시 전 시뮬레이션 회귀 테스트는 `packages/desktop/src/customFlowPreRelease.test.ts`입니다. 기본 CAD -> Excel 흐름의 검증, 실행 순서, 예상 실행 로그, 그룹 삽입, 재사용 가능한 custom-flow schema 생성까지 확인합니다.
+- Custom Flow 그룹을 툴 schema로 저장할 때는 내부 노드 설정을 `nodeId__settingId`로 namespacing하고, MCP command의 `settings.*` 참조도 같은 ID로 재매핑해야 합니다. 이 매핑이 빠지면 runtime validation에서 없는 설정 참조 에러가 납니다.
+- 현재 Custom Flow `실행` 버튼은 실제 MCP 서버 호출 경로와 연결되어 있습니다. 출시 기준으로 남은 핵심 작업은 AutoCAD/Revit/Excel 브리지의 실제 SDK 명령 구현, 위험 작업 롤백/보상 명령 정책, 실제 bridge별 `available` 명령 자동 검증입니다.
 - 기본 전체 창 크기는 1440x900입니다. 사용자가 캔버스 작업 공간이 작다고 했기 때문에 임의로 다시 줄이지 마세요.
 - Settings에는 `AI 연결` 탭이 없습니다. 이 앱은 현재 OpenAI API 키를 저장하거나 직접 OpenAI로 툴 실행을 보내지 않고, 등록된 MCP 서버/명령 기준으로만 실행 통로를 둡니다.
 - `/등록` 스킬은 MCP 서버 등록/검증, 브리지 스캐폴드 생성, URL/포트/명령 목록 확인 기준으로 안내합니다. AI API 키 설정 안내를 다시 추가하지 마세요.
 - Custom Flow 입력/출력 포트 안쪽에는 타입 아이콘을 표시하지 않습니다. 포트 타입 구분은 포트 네모와 연결선 색상을 주된 신호로 사용합니다.
 - Custom Flow 연결선 좌표는 렌더링된 `.flowPortConnector` DOM의 실제 중심을 측정해 사용합니다. `customFlowModel.ts`의 `flowConnectionEndpoint`/`flowPortLocalY`는 측정값이 아직 없는 첫 렌더 시점의 fallback입니다.
 - 포트 행 높이, 노드 헤더 여백, compact/expanded 레이아웃을 바꿔도 연결선은 DOM 측정값을 따라가야 합니다. 다시 고정 숫자만으로 선 좌표를 맞추면 같은 중심 어긋남이 재발할 수 있습니다.
-- 다음 우선순위는 실제 AutoCAD/Revit/Excel 브리지에서 안전한 읽기 명령 1개씩 검증한 뒤 Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결하는 작업입니다.
+- 다음 우선순위는 실제 AutoCAD/Revit/Excel 브리지에서 안전한 읽기 명령 1개씩 구현/검증하고, Custom Flow가 그 응답을 노드 간에 제대로 전달하는지 실제 프로그램으로 확인하는 작업입니다.
 - `App.tsx`는 여전히 큽니다. 이번에는 `MonitorView`, Process Monitor 타입, Custom Flow 검증 로직을 먼저 분리했습니다. 이후에는 `WorkflowView`, `ToolMarketDialog`, `TabStrip`, Settings 세부 패널 순서로 계속 분리하는 것이 좋습니다.
 - `node_modules` 안에 100MB 이상 Electron 실행 파일이 있으나 Git 제외 대상입니다.
 - Codex 채팅 기록은 GitHub로 넘어가지 않습니다. 중요한 내용은 `WORK_LOG.md`, `TODO.md`, `README_HANDOFF.md`에 남겨야 합니다.
 - 앱 내장 `/등록` 스킬(`program-mcp-registrar`)은 MCP 등록값만 안내하지 않고, 브리지 스캐폴드 생성, AI Program 등록, URL/포트 확인, 명령 목록 확인, 안전한 읽기 테스트까지 진행하는 기준으로 작성되어 있습니다. 단, 실제 AutoCAD/Revit/Excel SDK 호출 브리지 템플릿은 아직 TODO로 남아 있으므로 스킬 실행 시 검증된 단계와 미검증 단계를 분리해서 보고해야 합니다.
+- AutoCAD 기본 브리지는 `tools/mcp-bridges/program-bridge/program-mcp-bridge.ps1`에서 실제 AutoCAD COM 세션을 읽습니다. 현재 실기 검증된 안전 명령은 `cad.get_active_document`, `cad.list_layers`입니다. `cad.detect_title_block_candidates`는 종이공간/layout 블록 기준으로 빠르게 검사하며, `scope=selection`이면 사용자가 AutoCAD에서 선택한 블록 참조를 후보로 반환합니다.
+- `cad.read_objects`는 현재 AutoCAD 선택 객체만 읽는 `available` 명령입니다. `scope: selection/current_selection/selected`만 허용하며, 선택이 없으면 `ok:false`, `code: selectionRequired`를 반환합니다. 모델 공간 전체 순회와 AutoCAD SelectionSet 전체 스캔은 큰 DWG에서 COM bridge를 막을 수 있어 사용하지 않습니다. 다음 단계는 사용자가 지정한 안전 window/range와 실제 Text/MText 위치 추출입니다.
+- AI Program 앱 실행 기준은 MCP bridge 직접 호출입니다. Codex CLI 연결은 `/등록` 자동화나 Codex 채팅에서 MCP를 직접 쓰는 보조 경로로 유지하고, 앱 버튼 실행의 필수 조건으로 보지 않습니다.
+- AutoCAD가 실행 중이 아니거나 COM 연결이 불가능하면 브리지는 가짜 성공을 반환하지 않고 `ok:false`, `connectedToProgram:false`로 실패를 반환합니다. 이 실패는 툴 실행 단계 완료로 처리하면 안 됩니다.
+- 브리지 HTTP 파서는 JSON-RPC `tools/call` POST body를 `Content-Length` 기준으로 끝까지 읽어야 합니다. 이 처리가 빠지면 `/tools/{command}`는 동작하지만 `/mcp` JSON-RPC 호출에서 command가 빈 값으로 들어가는 문제가 재발합니다.
+- MD `mcpCommands[].runtimeAction`은 `preview`/`apply` 같은 실행 단계 필터입니다. `buildToolExecutionRequest`는 현재 runtime action과 맞는 명령만 보내므로, 미리보기에서 `open_dwg`/쓰기 명령이 먼저 호출되지 않게 유지해야 합니다.
 - 삭제한 GitHub 원본 툴은 localStorage tombstone(`mcp-registry:deleted-github-tool-paths`)으로 다시 표시되지 않게 막습니다. 단, 원격 저장소에서 실제 파일 삭제가 실패하면 다른 컴퓨터에서는 해당 파일이 다시 보일 수 있으므로, 장기적으로는 관리자 삭제 PR/commit 흐름이 필요합니다.
 - Electron main과 보안 경로 검증 파일에 깨진 한글 문자열이 재발하지 않도록, 큰 수정 뒤에는 `rg -n '쨌|�|濡|寃|뚯|젣|꾩|媛|鍮|紐|醫|愼' packages/desktop/electron/main.ts packages/desktop/src packages/core/src packages/shared/src`를 확인하세요.
 - GitHub 로그인 scope는 `read:user repo`입니다. 기존 `public_repo` 토큰으로 로그인된 상태에서 툴 등록이 `git/refs` 404로 실패하면 앱에서 로그아웃 후 다시 GitHub 로그인을 해야 합니다.
 - GitHub 원격 삭제는 직접 삭제가 막히면 삭제 PR을 생성합니다. 삭제한 툴은 현재 PC에서는 tombstone으로 즉시 숨겨지지만, 다른 PC에서 안 보이려면 PR이 머지되어야 합니다.
 - 툴 MD의 `learningLog` frontmatter는 `/save`/`/make` 사용 경험 개선용 메타데이터입니다. 앱 실행 로직은 이 값을 사용하지 않아야 하며, 사용자가 막힌 지점, 제시된 선택지, 실제 선택, 추후 개선점을 익명 요약으로만 기록합니다.
+- `mcp-tool-builder`와 `save-tool` 번들 스킬은 UTF-8 한글 기준으로 다시 정리되어 있습니다. `/make`/`/save`는 스무고개식 질문 -> 전체 사양 승인 -> HTML 설정창 목업 승인 -> MD 생성 순서를 기준으로 합니다.
+- 스킬 설치 IPC는 번들 `SKILL.md`와 참고 MD에 깨진 인코딩 패턴이 있으면 설치를 막습니다. 로컬 `C:\Users\DONG KIM\.codex\skills`에 오래된 깨진 스킬이 남아 있으면 앱에서 스킬 설치 버튼을 다시 누르거나 번들 스킬을 복사해 갱신하세요.
+- `packages/desktop/src/toolRuntimeValidation.ts`는 이제 MD schema의 교차참조를 강하게 검사합니다. 중복 설정/액션/단계 ID, 없는 `actionId`, 없는 섹션, 없는 `settings.*` MCP 파라미터, requiredServers 누락, 하나뿐인 select 설정, 위험 action의 preview/confirm 부족, 출력/testCases 누락은 등록/설정창 검증에서 표시됩니다.
+- `toolExecutionFailureMessage`는 `raw.mcp`로 감싸진 MCP 응답까지 검사합니다. MCP 브리지가 `ok:false`, `success:false`, `errors`, `failures`, `issues severity=error` 같은 구조를 반환하면 실행 단계가 완료로 넘어가지 않아야 합니다.
 - 저장한 설정 프리셋은 실제 설정값이 현재 값과 같을 때 선택 상태로 표시됩니다. Custom Flow 노드는 노드 ID와 실제 툴 ID를 함께 조회해 일반 툴 페이지에서 저장한 설정도 불러올 수 있어야 합니다.
 - 설정 프리셋은 중첩 배열/객체까지 깊은 복사로 저장해야 합니다. DWG 목록, 행 순서, 매핑표처럼 사용자가 저장 시점에 만든 설정은 저장 뒤 화면에서 바뀌어도 저장본이 같이 변하면 안 됩니다.
 - 툴 페이지, Player view, Custom Flow 노드의 설정 프리셋 UI 기준은 동일합니다. 설정 헤더 오른쪽에 `저장` split 버튼, 화살표의 `다른 이름으로 저장`, `불러오기` 버튼을 두고, 저장본 선택/이름 변경/삭제는 불러오기 dialog에서 처리합니다.

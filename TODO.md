@@ -31,7 +31,7 @@
 - [x] 실행/중지 버튼을 실제 프로세스 관리 기능과 연결
 - [x] Process Monitor에 실행 로그와 상태 갱신 연결
 - [x] MCP 서버 연결 상태 확인 로직을 실제 포트/URL 점검으로 확장
-- [ ] Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결
+- [x] Custom Flow 노드 그래프를 실제 MCP 툴 실행 엔진과 연결
 - [x] Custom Flow 저장 그래프의 포트 호환성/누락 입력 검증 UI 추가
 - [x] MD 툴의 settings/inputs/outputs schema를 읽어 Custom Flow 노드 설정창에 표시
 - [x] Custom Tool 등록창에서 MD 설정창 미리보기, schema 검증, MCP 실행 계획 표시
@@ -41,22 +41,26 @@
 - [x] Custom Flow 실행 범위 선택(전체/선택/선택까지/선택부터)과 단계별 실행 UI 보강
 - [x] Custom Flow 실행 범위를 노드 배열 순서가 아니라 연결선 기준 순서로 계산
 - [x] Custom Flow 그룹을 `MY Flow`로 저장하는 1차 기능 추가
-- [ ] Custom Flow 실제 실행 시 노드별 settingsValues를 MCP 명령 파라미터로 넘기는 실행 엔진 구현
+- [x] Custom Flow 실제 실행 시 노드별 settingsValues를 MCP 명령 파라미터로 넘기는 실행 엔진 구현
 - [x] 저장한 Custom Flow를 다른 캔버스에 그룹으로 삽입하는 UX 연결
-- [ ] 실행 로그의 예상 중간결과를 실제 MCP/AI 응답값으로 교체하고 결과 미리보기 노드와 연결
+- [x] 실행 로그의 예상 중간결과를 실제 MCP 응답값으로 교체하고 결과 미리보기 노드와 연결
 - [x] Custom Flow 메인 페이지에서 공유 플로우 샘플과 내 저장 플로우 목록을 분리 표시
 - [x] Custom Flow 노드 설정 탭에서 툴 설정값 프리셋 저장/불러오기 지원
 - [x] 툴 페이지/Player view/Custom Flow 노드 설정 프리셋을 저장 시점 전체 스냅샷 기준으로 저장하고 공통 불러오기 창으로 관리
 - [x] MD action 버튼을 `미리보기`/`실행` 기준으로 표준화하고 도곽 후보 선택 흐름을 설정 UI에 표시
 - [x] Settings `AI 연결` 탭과 OpenAI 직접 실행 fallback 제거, MCP 연결 기준으로 단순화
 - [x] 공유 Custom Flow 목록을 GitHub `flows/` 폴더에서 받아오는 기능 연결
+- [x] Custom Flow 출시 전 시뮬레이션 테스트 추가: 기본 CAD->Excel 흐름, 그룹 삽입, custom-flow schema 생성 검증
 - [ ] 공유 Custom Flow 승인/삭제/버전 관리 정책을 커스텀툴 수준으로 확장
-- [ ] CAD/Revit MCP 브리지에 현재 활성 파일명을 반환하는 endpoint(`/active-file` 또는 `/status`) 구현
+- [x] AutoCAD MCP 브리지에 현재 활성 문서, 레이어, 종이공간 도곽 후보 안전 읽기 명령 구현
+- [x] AutoCAD MCP 브리지에 ActiveSelection/사용자 지정 블록명 기반의 빠른 객체/도곽 후보 읽기 구현
+- [ ] AutoCAD MCP 브리지에 사용자가 지정한 안전 범위/window 기반 객체 읽기와 실제 텍스트 위치 추출 구현
+- [ ] Revit/Excel MCP 브리지에 현재 활성 파일명을 반환하는 endpoint(`/active-file` 또는 `/status`) 구현
 - [x] `/등록` program-mcp-registrar 스킬을 MCP 브리지 생성/등록/연결/검증 흐름으로 강화
 - [x] `/등록` program-mcp-registrar 스킬을 AI 연결 안내 없이 MCP 브리지 등록/검증 기준으로 정리
 - [x] AutoCAD/Revit/Excel MCP 연결 확인용 로컬 브리지 스캐폴드 추가
 - [x] Codex CLI `~/.codex/config.toml`에 AI Program AutoCAD/Revit/Excel MCP 서버 등록
-- [ ] AutoCAD/Revit/Excel MCP 브리지의 실제 SDK/애드인 제어 명령 구현
+- [ ] AutoCAD/Revit/Excel MCP 브리지의 실제 SDK/애드인 쓰기/수정 명령 구현
 - [ ] Custom Flow 노드 드래그, 그룹 해제, 메모 삭제, 흐름 점검 팝업, 도구창 스크롤을 실제 UI 자동 테스트로 검증
 - [x] Custom Tools 로컬 MD 파일 읽기/복사/비교/업로드 IPC를 사용자가 선택한 툴 폴더 안으로 제한
 - [x] GitHub 토큰이 safeStorage 없이 평문 저장되지 않도록 차단
@@ -67,3 +71,8 @@
 - [ ] 계정/닉네임 중복 방지를 GitHub 또는 서버 중앙 데이터로 동기화
 - [x] Settings 관리 화면에 회원/툴/플로우/스킬 데이터 탭 추가
 - [x] MD 툴 `learningLog`를 관리자 대시보드에서 보고 스킬 업데이트 초안을 만들 수 있게 연결
+- [x] MD 툴 schema 교차검증 강화: 중복 ID, 끊어진 action/section/settings 참조, MCP 서버 선언 누락, 위험 action 보호 부족, 출력/testCases 누락 감지
+- [x] `/make`/`/save` 번들 스킬 문서 UTF-8 재작성 및 스킬 설치 전 깨진 인코딩 검사 추가
+- [ ] 실제 AutoCAD/Revit/Excel 브리지별 `available` MCP 명령 목록을 앱에서 조회해 MD의 `planned`/`available` 상태와 자동 비교
+- [x] Custom Flow 실제 실행 엔진에서 노드별 MCP 결과를 다음 노드 입력으로 전달하고 실패/부분성공 정책을 적용
+- [ ] Custom Flow 실제 실행 엔진에 위험 작업 롤백/보상 명령 정책 추가

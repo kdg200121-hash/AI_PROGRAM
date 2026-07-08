@@ -2478,6 +2478,17 @@ tbody tr {
   min-width: 0;
 }
 
+.submenuConfigPanel > .panelHeader {
+  gap: 12px;
+}
+
+.submenuConfigPanel > .panelHeader .schemaPresetControls {
+  display: flex;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
 .submenuLayout .panelHeaderNote {
   margin-left: 0;
   font-size: 12px;
@@ -2639,21 +2650,31 @@ tbody tr {
   color: #1d4ed8;
 }
 
-.executionStepButton.activeCurrent {
-  border-color: #2563eb;
-  background: #eaf3ff;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16), 0 10px 22px rgba(37, 99, 235, 0.13);
+.executionStepButton.currentStep {
+  border-color: #f59e0b;
+  background: #fff7ed;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18), 0 10px 22px rgba(180, 83, 9, 0.12);
 }
 
-.executionStepButton.activeCurrent strong {
-  border-color: #1d4ed8;
-  background: #2563eb;
+.executionStepButton.currentStep strong {
+  border-color: #d97706;
+  background: #f59e0b;
   color: #ffffff;
 }
 
 .executionStepButton.complete strong {
   background: #dcfce7;
   color: #15803d;
+}
+
+.executionStepButton.complete {
+  border-color: #86d39a;
+  background: #f0fdf4;
+  box-shadow: 0 8px 18px rgba(21, 128, 61, 0.08);
+}
+
+.executionStepButton.complete span {
+  color: #14532d;
 }
 
 .executionStepSummary {
@@ -9730,6 +9751,33 @@ button.toolRiskBadge:focus-visible {
 
 .darkMode .compactToolRunnerHeader small {
   color: #aab5c5;
+}
+
+.darkMode .executionStepButton.complete {
+  border-color: #2f8f58;
+  background: #14291f;
+  box-shadow: 0 8px 18px rgba(34, 197, 94, 0.08);
+}
+
+.darkMode .executionStepButton.complete strong {
+  background: #1d6d43;
+  color: #dcfce7;
+}
+
+.darkMode .executionStepButton.complete span {
+  color: #dff7e8;
+}
+
+.darkMode .executionStepButton.currentStep {
+  border-color: #d97706;
+  background: #2d2112;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.16), 0 10px 22px rgba(0, 0, 0, 0.2);
+}
+
+.darkMode .executionStepButton.currentStep strong {
+  border-color: #fbbf24;
+  background: #d97706;
+  color: #fff7ed;
 }
 
 .darkMode .compactToolRunnerActions {

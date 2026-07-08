@@ -47,6 +47,7 @@ import {
   type ServerDraft
 } from "./registryEditor";
 import { AppIcon, type AppIconName } from "./uiIcons";
+import { mergeGithubCustomTools } from "./customToolSync";
 import {
   createAppNotification,
   type AppNotificationInput,
@@ -136,6 +137,13 @@ import {
   type FlowRunRecord,
   type FlowRunScope
 } from "./customFlowRunModel";
+import {
+  buildFlowNodeExecutionRequest,
+  flowInputResultsForNode,
+  flowResultPayload,
+  shouldContinueAfterFlowNodeFailure,
+  syntheticFlowNodeResult
+} from "./customFlowExecutionModel";
 import { validateFlowGraph, type FlowValidationIssue } from "./customFlowValidation";
 import {
   buildSkillUpdateDraft,
@@ -155,6 +163,7 @@ import {
 import { buildToolPreviewSummary } from "./toolActionPreview";
 import {
   buildToolExecutionRequest,
+  toolExecutionFailureMessage,
   type TitleBlockCandidate
 } from "./toolExecutionModel";
 import {
@@ -2859,39 +2868,24 @@ export function App() {
           groupedTools.set(groupKey, group);
         });
 
-        return [
-          ...[...groupedTools.values()].map((tool) => {
-            const versions = [...tool.versions].sort((left, right) =>
-              compareToolVersionDesc(left.version, right.version)
-            );
-            const activeVersion = versions[0];
-            const existing = existingGithubItems.find(
-              (item) => item.sectionId === tool.sectionId && item.name === tool.name
-            );
+        const groups = [...groupedTools.values()].map((tool) => {
+          const versions = [...tool.versions].sort((left, right) =>
+            compareToolVersionDesc(left.version, right.version)
+          );
+          return {
+            sectionId: tool.sectionId,
+            name: tool.name,
+            versions
+          };
+        });
 
-            return {
-              id: existing?.id ?? `github-tool-${hashString(`${tool.sectionId}:${tool.name}`)}`,
-              sectionId: tool.sectionId,
-              name: tool.name,
-              description: activeVersion.description,
-              version: activeVersion.version,
-              author: activeVersion.author || githubToolSource.owner,
-              createdAt: existing?.createdAt ?? new Date().toISOString(),
-              usageCount: existing?.usageCount ?? 0,
-              pinned: existing?.pinned ?? false,
-              registered: existing?.registered ?? false,
-              approvalStatus: existing?.approvalStatus ?? "approved",
-              isToolLike: activeVersion.isToolLike,
-              riskWarnings: activeVersion.riskWarnings,
-              toolSchema: activeVersion.toolSchema,
-              learningLog: activeVersion.learningLog,
-              sourcePath: activeVersion.sourcePath,
-              installedPath: activeVersion.installedPath,
-              reviewUrl: existing?.reviewUrl,
-              versions: [activeVersion]
-            };
-          })
-        ];
+        return mergeGithubCustomTools({
+          items,
+          groups,
+          githubToolPathPrefix,
+          nowIso: new Date().toISOString(),
+          makeId: (tool) => `github-tool-${hashString(`${tool.sectionId}:${tool.name}`)}`
+        }) as CustomToolItem[];
       });
       setGithubToolStatus("");
     } catch {
@@ -5374,6 +5368,7 @@ export function App() {
           <SubmenuPage
             menuLabel={sidebarLabel(displaySubmenuInfo.sectionId)}
             submenu={displaySubmenuItem}
+            onNotify={pushAppNotification}
           />
         ) : null}
 
@@ -5438,6 +5433,7 @@ export function App() {
                 ? setActiveCompactSection(displaySidebarSection)
                 : openSubmenu(displaySidebarSection, submenuId)
             }
+            onNotify={pushAppNotification}
           />
         ) : null}
 
@@ -7223,40 +7219,60 @@ function useStandaloneToolPresets(
   toolId: string,
   toolName: string,
   values: Record<string, ToolSettingValue>,
-  setValues: React.Dispatch<React.SetStateAction<Record<string, ToolSettingValue>>>
+  setValues: React.Dispatch<React.SetStateAction<Record<string, ToolSettingValue>>>,
+  onSaved?: (presetName: string) => void
 ) {
   const [presets, setPresets] = useState<SettingPreset[]>(() => loadSettingPresets());
+  const [activePresetId, setActivePresetId] = useState("");
 
   useEffect(() => {
     saveSettingPresets(presets);
   }, [presets]);
 
   const savePreset = (options?: { presetId?: string; name?: string }) => {
+    if (!options?.presetId && !options?.name) {
+      return;
+    }
+    const currentExisting = options?.presetId
+      ? presets.find((preset) => preset.id === options.presetId)
+      : undefined;
+    const savedPresetName =
+      options?.name ??
+      currentExisting?.name ??
+      `${toolName} 설정 ${new Date().toLocaleString("ko-KR")}`;
+    const createdPreset = options?.presetId
+      ? undefined
+      : createSettingPreset(toolId, savedPresetName, values);
+    const savedPresetId = options?.presetId ?? createdPreset?.id ?? "";
     setPresets((items) => {
       const existing = options?.presetId
         ? items.find((preset) => preset.id === options.presetId)
         : undefined;
-      const presetName =
-        options?.name ??
-        existing?.name ??
-        `${toolName} 설정 ${new Date().toLocaleString("ko-KR")}`;
       const preset = existing
         ? {
             ...existing,
-            name: presetName,
+            name: savedPresetName,
             values: cloneSettingValues(values)
           }
-        : createSettingPreset(toolId, presetName, values);
+        : createdPreset!;
 
       return upsertSettingPreset(items, preset);
     });
+    if (savedPresetId) {
+      setActivePresetId(savedPresetId);
+    }
+    onSaved?.(savedPresetName);
   };
 
   const loadPreset = (preset: SettingPreset) => {
+    setActivePresetId(preset.id);
     setValues(cloneSettingValues(preset.values));
   };
 
   const deletePreset = (presetId: string) => {
+    if (activePresetId === presetId) {
+      setActivePresetId("");
+    }
     setPresets((items) => removeSettingPreset(items, presetId));
   };
 
@@ -7266,6 +7282,8 @@ function useStandaloneToolPresets(
 
   return {
     presets: listSettingPresetsForTool(presets, toolId),
+    activePresetId,
+    setActivePresetId,
     savePreset,
     loadPreset,
     deletePreset,
@@ -7282,7 +7300,8 @@ function ToolWorkspaceView({
   disabledReason,
   onAddCustomTool,
   onCustomToolContext,
-  onOpenTool
+  onOpenTool,
+  onNotify
 }: {
   menuLabel: string;
   tools: ReturnType<typeof getToolsForWorkspace>;
@@ -7293,6 +7312,7 @@ function ToolWorkspaceView({
   onAddCustomTool: () => void;
   onCustomToolContext: (event: MouseEvent<HTMLButtonElement>, toolId: string) => void;
   onOpenTool: (submenuId: SubmenuId) => void;
+  onNotify?: (notification: AppNotificationInput) => void;
 }) {
   const [compactToolId, setCompactToolId] = useState<SubmenuId | null>(null);
   const shareCompactTools = tools.map((tool) => ({
@@ -7356,6 +7376,7 @@ function ToolWorkspaceView({
           onOpenTool={openWorkspaceTool}
           selectedCompactToolId={isCompact ? compactToolId : null}
           compactTools={shareCompactTools}
+          onNotify={onNotify}
         />
         <CustomToolSection
           customTools={customTools}
@@ -7367,6 +7388,7 @@ function ToolWorkspaceView({
           onOpenTool={openWorkspaceTool}
           selectedCompactToolId={isCompact ? compactToolId : null}
           compactTools={customCompactTools}
+          onNotify={onNotify}
         />
       </div>
       <div className="toolWorkspaceGrid">
@@ -7426,18 +7448,27 @@ type CompactToolRunnerTool = {
 function CompactToolRunner({
   tool,
   isMcpReady,
-  disabledReason
+  disabledReason,
+  onNotify
 }: {
   tool: CompactToolRunnerTool;
   isMcpReady: boolean;
   disabledReason: string;
+  onNotify?: (notification: AppNotificationInput) => void;
 }) {
   const [settingValues, setSettingValues] = useState<Record<string, ToolSettingValue>>({});
   const settingPresetControls = useStandaloneToolPresets(
     tool.id,
     tool.name,
     settingValues,
-    setSettingValues
+    setSettingValues,
+    (presetName) =>
+      onNotify?.({
+        title: "설정 저장됨",
+        message: presetName,
+        variant: "save-toast",
+        autoDismissMs: 2200
+      })
   );
 
   useEffect(() => {
@@ -7485,10 +7516,13 @@ function CompactToolRunner({
               }))
             }
             presets={settingPresetControls.presets}
+            activePresetId={settingPresetControls.activePresetId}
+            onActivePresetChange={settingPresetControls.setActivePresetId}
             onSavePreset={settingPresetControls.savePreset}
             onLoadPreset={settingPresetControls.loadPreset}
             onDeletePreset={settingPresetControls.deletePreset}
             onRenamePreset={settingPresetControls.renamePreset}
+            onNotify={onNotify}
           />
         ) : (
           <div className="configForm compactToolFallbackSettings">
@@ -7513,10 +7547,12 @@ function CompactToolRunner({
 
 function SubmenuPage({
   menuLabel,
-  submenu
+  submenu,
+  onNotify
 }: {
   menuLabel: string;
   submenu: SubmenuItem;
+  onNotify?: (notification: AppNotificationInput) => void;
 }) {
   const [settingValues, setSettingValues] = useState<Record<string, ToolSettingValue>>({});
   const executionSteps = useMemo(
@@ -7529,8 +7565,38 @@ function SubmenuPage({
       ),
     [menuLabel, submenu.description, submenu.label, submenu.settingsSchema]
   );
+  const [completedActionIds, setCompletedActionIds] = useState<string[]>([]);
+  const previewActionCompleted = useMemo(() => {
+    const actions = submenu.settingsSchema
+      ? normalizeToolRuntimeSchemaForRender(submenu.settingsSchema).actions
+      : [];
+    return actions.some(
+      (action) => action.runtimeAction === "preview" && completedActionIds.includes(action.id)
+    );
+  }, [completedActionIds, submenu.settingsSchema]);
+  const displayExecutionSteps = useMemo(() => {
+    const actions = submenu.settingsSchema
+      ? normalizeToolRuntimeSchemaForRender(submenu.settingsSchema).actions
+      : [];
+    return executionSteps.map((step) => {
+      if (!step.actionId) {
+        if (previewActionCompleted && step.state === "active") {
+          return { ...step, state: "complete" as const };
+        }
+        return step;
+      }
+      const action = actions.find((item) => item.id === step.actionId);
+      if (completedActionIds.includes(step.actionId)) {
+        return { ...step, state: "complete" as const };
+      }
+      if (action?.requiresPreview && previewActionCompleted) {
+        return { ...step, state: "active" as const };
+      }
+      return step;
+    });
+  }, [completedActionIds, executionSteps, previewActionCompleted, submenu.settingsSchema]);
   const [activeStepId, setActiveStepId] = useState(() => activeExecutionStepId(executionSteps));
-  const activeStep = executionSteps.find((step) => step.id === activeStepId) ?? executionSteps[0];
+  const activeStep = displayExecutionSteps.find((step) => step.id === activeStepId) ?? displayExecutionSteps[0];
   const activeStepSchema = submenu.settingsSchema && activeStep
     ? schemaForExecutionStep(submenu.settingsSchema, activeStep)
     : submenu.settingsSchema;
@@ -7538,20 +7604,50 @@ function SubmenuPage({
     submenu.id,
     submenu.label,
     settingValues,
-    setSettingValues
+    setSettingValues,
+    (presetName) =>
+      onNotify?.({
+        title: "설정 저장됨",
+        message: presetName,
+        variant: "save-toast",
+        autoDismissMs: 2200
+      })
   );
 
   useEffect(() => {
     setSettingValues(
       submenu.settingsSchema ? defaultSettingValuesForSchema(submenu.settingsSchema) : {}
     );
+    setCompletedActionIds([]);
   }, [submenu.id, submenu.settingsSchema]);
 
   useEffect(() => {
-    if (!executionSteps.some((step) => step.id === activeStepId)) {
-      setActiveStepId(activeExecutionStepId(executionSteps));
+    if (!displayExecutionSteps.some((step) => step.id === activeStepId)) {
+      setActiveStepId(activeExecutionStepId(displayExecutionSteps));
     }
-  }, [activeStepId, executionSteps]);
+  }, [activeStepId, displayExecutionSteps]);
+
+  const handleRuntimeActionComplete = (action: ToolRuntimeSchema["actions"][number]) => {
+    setCompletedActionIds((items) =>
+      items.includes(action.id) ? items : [...items, action.id]
+    );
+    if (action.runtimeAction === "preview") {
+      const nextActionStep = executionSteps.find((step) => {
+        if (!step.actionId || step.actionId === action.id) {
+          return false;
+        }
+        const matchedAction = submenu.settingsSchema
+          ? normalizeToolRuntimeSchemaForRender(submenu.settingsSchema).actions.find(
+              (item) => item.id === step.actionId
+            )
+          : undefined;
+        return matchedAction?.requiresPreview;
+      });
+      if (nextActionStep) {
+        setActiveStepId(nextActionStep.id);
+      }
+    }
+  };
 
   return (
     <section className="sectionView submenuPage">
@@ -7567,7 +7663,7 @@ function SubmenuPage({
             <ToolRiskBadges schema={submenu.settingsSchema} />
           </div>
           <ExecutionStepSelector
-            steps={executionSteps}
+            steps={displayExecutionSteps}
             activeStepId={activeStep?.id ?? ""}
             onSelect={setActiveStepId}
           />
@@ -7589,6 +7685,8 @@ function SubmenuPage({
               <SettingPresetControls
                 presets={settingPresetControls.presets}
                 values={settingValues}
+                activePresetId={settingPresetControls.activePresetId}
+                onActivePresetChange={settingPresetControls.setActivePresetId}
                 onSavePreset={settingPresetControls.savePreset}
                 onLoadPreset={settingPresetControls.loadPreset}
                 onDeletePreset={settingPresetControls.deletePreset}
@@ -7615,7 +7713,12 @@ function SubmenuPage({
                     [key]: value
                   }))
                 }
+                previewCompleted={previewActionCompleted}
+                onRuntimeActionComplete={handleRuntimeActionComplete}
+                onNotify={onNotify}
                 presets={settingPresetControls.presets}
+                activePresetId={settingPresetControls.activePresetId}
+                onActivePresetChange={settingPresetControls.setActivePresetId}
                 onSavePreset={settingPresetControls.savePreset}
                 onLoadPreset={settingPresetControls.loadPreset}
                 onDeletePreset={settingPresetControls.deletePreset}
@@ -7773,7 +7876,8 @@ function ToolLibrarySection({
   disabledReason,
   onOpenTool,
   selectedCompactToolId,
-  compactTools
+  compactTools,
+  onNotify
 }: {
   title: string;
   description: string;
@@ -7783,6 +7887,7 @@ function ToolLibrarySection({
   onOpenTool?: (submenuId: SubmenuId) => void;
   selectedCompactToolId?: SubmenuId | null;
   compactTools?: CompactToolRunnerTool[];
+  onNotify?: (notification: AppNotificationInput) => void;
 }) {
   return (
     <section className="panel toolLibrarySection">
@@ -7820,6 +7925,7 @@ function ToolLibrarySection({
                   tool={compactTool}
                   isMcpReady={isMcpReady}
                   disabledReason={disabledReason}
+                  onNotify={onNotify}
                 />
               ) : null}
             </Fragment>
@@ -7839,7 +7945,8 @@ function CustomToolSection({
   onCustomToolContext,
   onOpenTool,
   selectedCompactToolId,
-  compactTools
+  compactTools,
+  onNotify
 }: {
   customTools: CustomToolItem[];
   isCompact: boolean;
@@ -7850,6 +7957,7 @@ function CustomToolSection({
   onOpenTool: (submenuId: SubmenuId) => void;
   selectedCompactToolId?: SubmenuId | null;
   compactTools?: CompactToolRunnerTool[];
+  onNotify?: (notification: AppNotificationInput) => void;
 }) {
   const [pendingWarningTool, setPendingWarningTool] = useState<CustomToolItem | null>(null);
   const warningMessages = pendingWarningTool
@@ -7933,6 +8041,7 @@ function CustomToolSection({
                       tool={compactTool}
                       isMcpReady={isMcpReady}
                       disabledReason={disabledReason}
+                      onNotify={onNotify}
                     />
                   ) : null}
                 </Fragment>
@@ -8266,8 +8375,9 @@ function ExecutionStepSelector({
           className={[
             "executionStepButton",
             activeStepId === step.id ? "active" : "",
-            activeStepId === step.id ? "activeCurrent" : "",
-            step.state
+            step.state === "active" ? "currentStep" : "",
+            step.state === "complete" ? "complete" : "",
+            `state-${step.state}`
           ]
             .filter(Boolean)
             .join(" ")}
@@ -8559,12 +8669,18 @@ function ToolExecutionActions({
   schema,
   values,
   onRuntimeValueChange,
+  previewCompleted = false,
+  onRuntimeActionComplete,
+  onNotify,
   toolName = "MCP 툴",
   menuName = "MCP"
 }: {
   schema: ToolRuntimeSchema;
   values?: Record<string, ToolSettingValue>;
   onRuntimeValueChange?: (key: string, value: ToolSettingValue) => void;
+  previewCompleted?: boolean;
+  onRuntimeActionComplete?: (action: ToolRuntimeSchema["actions"][number]) => void;
+  onNotify?: (notification: AppNotificationInput) => void;
   toolName?: string;
   menuName?: string;
 }) {
@@ -8574,7 +8690,8 @@ function ToolExecutionActions({
   const [titleBlockCandidates, setTitleBlockCandidates] = useState<TitleBlockCandidate[]>([]);
   const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
   const actions = safeSchema.actions;
-  const previewRows = previewGenerated ? buildToolPreviewSummary(safeSchema, values) : [];
+  const hasPreviewResult = previewGenerated || previewCompleted;
+  const previewRows = hasPreviewResult ? buildToolPreviewSummary(safeSchema, values) : [];
   const usesTitleBlockCandidates = isTitleBlockCandidateSchema(safeSchema);
   const candidateOptions = usesTitleBlockCandidates ? titleBlockCandidates : [];
   const selectedCandidateId = valueAsText(values?.[titleBlockCandidateValueKey]);
@@ -8589,8 +8706,17 @@ function ToolExecutionActions({
 
     if (!window.toolExecution?.run) {
       if (action.runtimeAction === "preview") {
-        setPreviewGenerated(true);
+        setPreviewGenerated(!usesTitleBlockCandidates);
         setTitleBlockCandidates([]);
+        if (!usesTitleBlockCandidates) {
+          onRuntimeActionComplete?.(action);
+        } else {
+          onNotify?.({
+            title: "도곽 후보를 확인할 수 없습니다",
+            message: "AI/MCP 실행 통로가 연결되지 않아 CAD 도곽 후보를 받아오지 못했습니다.",
+            autoDismissMs: 5200
+          });
+        }
       }
       setActionMessage("AI/MCP 실행 통로가 아직 연결되지 않았습니다. 실행 요청은 만들 수 있지만 실제 프로그램 호출은 비활성 상태입니다.");
       return;
@@ -8599,11 +8725,63 @@ function ToolExecutionActions({
     setIsRunningAction(true);
     try {
       const result = await window.toolExecution.run(request);
-      if (action.runtimeAction === "preview") {
-        setPreviewGenerated(result.status === "preview" || result.status === "completed");
-        setTitleBlockCandidates(result.titleBlockCandidates ?? []);
+      const failureMessage = toolExecutionFailureMessage(result);
+      if (failureMessage) {
+        setPreviewGenerated((current) => (action.runtimeAction === "preview" ? false : current));
+        setActionMessage(failureMessage);
+        onNotify?.({
+          title: action.runtimeAction === "preview" ? "미리보기를 완료할 수 없습니다" : "실행을 완료할 수 없습니다",
+          message: failureMessage,
+          autoDismissMs: 6200
+        });
+        return;
       }
-      setActionMessage(result.message);
+      if (action.runtimeAction === "preview") {
+        const isPreviewReady = result.status === "preview" || result.status === "completed";
+        const nextTitleBlockCandidates = result.titleBlockCandidates ?? [];
+        const hasRequiredPreviewResult =
+          isPreviewReady && (!usesTitleBlockCandidates || nextTitleBlockCandidates.length > 0);
+        setPreviewGenerated(hasRequiredPreviewResult);
+        setTitleBlockCandidates(nextTitleBlockCandidates);
+        if (hasRequiredPreviewResult) {
+          onRuntimeActionComplete?.(action);
+        } else if (isPreviewReady && usesTitleBlockCandidates) {
+          onNotify?.({
+            title: "도곽 후보를 찾지 못했습니다",
+            message: "CAD에서 도곽 블록 후보가 반환되지 않았습니다. 기준 DWG와 도곽 블록을 확인해 주세요.",
+            autoDismissMs: 5200
+          });
+        } else if (!isPreviewReady) {
+          const blockedMessage =
+            result.status === "needs-ai"
+              ? "AI 확인 또는 추가 처리가 필요해 미리보기를 완료하지 못했습니다."
+              : result.message || "미리보기 결과가 완료 상태로 반환되지 않았습니다.";
+          setActionMessage(blockedMessage);
+          onNotify?.({
+            title: "미리보기를 완료할 수 없습니다",
+            message: blockedMessage,
+            autoDismissMs: 5200
+          });
+        }
+      }
+      if (action.runtimeAction === "apply") {
+        if (result.status === "completed") {
+          onRuntimeActionComplete?.(action);
+        } else {
+          const blockedMessage =
+            result.status === "needs-ai"
+              ? "AI 확인 또는 추가 처리가 필요해 실행을 완료하지 못했습니다."
+              : result.message || "실행 결과가 완료 상태로 반환되지 않았습니다.";
+          onNotify?.({
+            title: "실행을 완료할 수 없습니다",
+            message: blockedMessage,
+            autoDismissMs: 5200
+          });
+        }
+      }
+      if (result.message) {
+        setActionMessage(result.message);
+      }
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "툴 실행 요청 중 오류가 발생했습니다.");
     } finally {
@@ -8623,14 +8801,14 @@ function ToolExecutionActions({
       </header>
       <div className="schemaActionButtons">
         {actions.map((action) => {
-          const blockedByPreview = action.requiresPreview && !previewGenerated;
+          const blockedByPreview = action.requiresPreview && !hasPreviewResult;
           const blockedByCandidate =
             action.runtimeAction === "apply" &&
-            previewGenerated &&
+            hasPreviewResult &&
             usesTitleBlockCandidates &&
             !selectedCandidateId;
           const isPrimary =
-            action.runtimeAction === "apply" ? previewGenerated : action.primary;
+            action.runtimeAction === "apply" ? hasPreviewResult : action.primary;
 
           return (
             <button
@@ -8664,7 +8842,7 @@ function ToolExecutionActions({
         })}
       </div>
       <div className="schemaActionResult">
-        {previewGenerated ? (
+        {hasPreviewResult ? (
           previewRows.length > 0 ? (
             <div className="schemaPreviewResultRows">
               {previewRows.map((row) => (
@@ -8682,7 +8860,7 @@ function ToolExecutionActions({
           <p>미리보기를 누르면 파일별 도곽 수와 배정 번호 범위를 먼저 확인합니다.</p>
         )}
       </div>
-      {previewGenerated && candidateOptions.length > 0 ? (
+      {hasPreviewResult && candidateOptions.length > 0 ? (
         <div className="schemaCandidatePanel">
           <header>
             <span>도곽 후보 선택</span>
@@ -8706,13 +8884,13 @@ function ToolExecutionActions({
           ) : null}
         </div>
       ) : null}
-      {previewGenerated && usesTitleBlockCandidates && candidateOptions.length === 0 ? (
+      {hasPreviewResult && usesTitleBlockCandidates && candidateOptions.length === 0 ? (
         <p className="schemaActionHint">
           CAD MCP에서 도곽 블록 후보가 아직 반환되지 않았습니다. 실제 블록명/배치명을 받으면 여기에 표시됩니다.
         </p>
       ) : null}
       {actionMessage ? <p className="schemaActionHint">{actionMessage}</p> : null}
-      {actions.some((action) => action.requiresPreview) && !previewGenerated ? (
+      {actions.some((action) => action.requiresPreview) && !hasPreviewResult ? (
         <p className="schemaActionHint">미리보기 결과가 생성되면 실행 버튼이 활성화됩니다.</p>
       ) : null}
     </section>
@@ -8936,6 +9114,8 @@ function SettingPresetLoadDialog({
 function SettingPresetControls({
   presets,
   values,
+  activePresetId,
+  onActivePresetChange,
   onSavePreset,
   onLoadPreset,
   onDeletePreset,
@@ -8945,6 +9125,8 @@ function SettingPresetControls({
 }: {
   presets: SettingPreset[];
   values?: Record<string, ToolSettingValue>;
+  activePresetId?: string;
+  onActivePresetChange?: (presetId: string) => void;
   onSavePreset?: (options?: SettingPresetSaveOptions) => void;
   onLoadPreset?: (preset: SettingPreset) => void;
   onDeletePreset?: (presetId: string) => void;
@@ -8952,19 +9134,28 @@ function SettingPresetControls({
   showCurrentNote?: boolean;
   inline?: boolean;
 }) {
-  const [activePresetId, setActivePresetId] = useState("");
+  const [localActivePresetId, setLocalActivePresetId] = useState("");
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false);
   const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState("");
+  const selectedPresetId = activePresetId ?? localActivePresetId;
+  const setSelectedPresetId = (presetId: string) => {
+    if (onActivePresetChange) {
+      onActivePresetChange(presetId);
+      return;
+    }
+    setLocalActivePresetId(presetId);
+  };
   const selectedPreset =
-    presets.find((preset) => preset.id === activePresetId) ??
+    presets.find((preset) => preset.id === selectedPresetId) ??
     presets.find((preset) => areSettingValuesEqual(values, preset.values));
   const saveCurrentPreset = () => {
-    onSavePreset?.(selectedPreset ? { presetId: selectedPreset.id } : undefined);
-    if (selectedPreset) {
-      setActivePresetId(selectedPreset.id);
+    if (!selectedPreset) {
+      return;
     }
+    onSavePreset?.({ presetId: selectedPreset.id });
+    setSelectedPresetId(selectedPreset.id);
   };
   const saveAsPreset = () => {
     onSavePreset?.({
@@ -8975,7 +9166,7 @@ function SettingPresetControls({
     setIsSaveMenuOpen(false);
   };
   const loadPreset = (preset: SettingPreset) => {
-    setActivePresetId(preset.id);
+    setSelectedPresetId(preset.id);
     onLoadPreset?.(preset);
   };
 
@@ -8987,8 +9178,8 @@ function SettingPresetControls({
             className="primaryAction schemaPresetSaveButton"
             type="button"
             onClick={saveCurrentPreset}
-            disabled={!onSavePreset}
-            title={selectedPreset ? `${selectedPreset.name}에 덮어쓰기` : "현재 설정을 새 저장본으로 저장"}
+            disabled={!onSavePreset || !selectedPreset}
+            title={selectedPreset ? `${selectedPreset.name}에 덮어쓰기` : "새 저장본은 저장 옵션에서 다른 이름으로 저장을 사용하세요."}
           >
             저장
           </button>
@@ -9031,7 +9222,7 @@ function SettingPresetControls({
             선택됨: <strong>{selectedPreset.name}</strong>
           </p>
         ) : (
-          <p className="schemaPresetEmpty">저장 후 불러오기에서 저장본을 관리할 수 있습니다.</p>
+          <p className="schemaPresetEmpty">새 저장본은 저장 옵션에서 다른 이름으로 저장을 사용하세요.</p>
         )
       ) : null}
       {isSaveAsOpen ? (
@@ -9070,7 +9261,7 @@ function SettingPresetControls({
         <SettingPresetLoadDialog
           presets={presets}
           values={values}
-          activePresetId={activePresetId}
+          activePresetId={selectedPresetId}
           onClose={() => setIsPresetDialogOpen(false)}
           onLoadPreset={loadPreset}
           onDeletePreset={onDeletePreset}
@@ -9090,7 +9281,12 @@ function FlowNodeSchemaSettings({
   onLoadPreset,
   onDeletePreset,
   onRenamePreset,
+  activePresetId,
+  onActivePresetChange,
   onRuntimeValueChange,
+  previewCompleted = false,
+  onRuntimeActionComplete,
+  onNotify,
   showRiskBar = false,
   showPresetControls = true
 }: {
@@ -9102,10 +9298,25 @@ function FlowNodeSchemaSettings({
   onLoadPreset?: (preset: SettingPreset) => void;
   onDeletePreset?: (presetId: string) => void;
   onRenamePreset?: (presetId: string, name: string) => void;
+  activePresetId?: string;
+  onActivePresetChange?: (presetId: string) => void;
   onRuntimeValueChange?: (key: string, value: ToolSettingValue) => void;
+  previewCompleted?: boolean;
+  onRuntimeActionComplete?: (action: ToolRuntimeSchema["actions"][number]) => void;
+  onNotify?: (notification: AppNotificationInput) => void;
   showRiskBar?: boolean;
   showPresetControls?: boolean;
 }) {
+  const settingsRootRef = useRef<HTMLDivElement | null>(null);
+  const [localActivePresetId, setLocalActivePresetId] = useState("");
+  const selectedPresetId = activePresetId ?? localActivePresetId;
+  const setSelectedPresetId = (presetId: string) => {
+    if (onActivePresetChange) {
+      onActivePresetChange(presetId);
+      return;
+    }
+    setLocalActivePresetId(presetId);
+  };
   const safeSchema = normalizeToolRuntimeSchemaForRender(schema);
   const visibleFields = safeSchema.settings.filter((field) =>
     !field.hidden && isSettingVisible(field, safeSchema.settings, values)
@@ -9135,15 +9346,56 @@ function FlowNodeSchemaSettings({
     { id: "tests" as const, label: "테스트 요약", icon: "customTools" as AppIconName, count: safeSchema.testCases.length }
   ];
 
+  useEffect(() => {
+    if (!onSavePreset) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) {
+        return;
+      }
+      if (event.key.toLowerCase() !== "s") {
+        return;
+      }
+
+      const root = settingsRootRef.current;
+      if (!root) {
+        return;
+      }
+
+      event.preventDefault();
+      const presetToSave =
+        presets.find((preset) => preset.id === selectedPresetId) ??
+        presets.find((preset) => areSettingValuesEqual(values, preset.values));
+      if (!presetToSave) {
+        return;
+      }
+
+      onSavePreset({ presetId: presetToSave.id });
+      setSelectedPresetId(presetToSave.id);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onSavePreset, presets, selectedPresetId, values]);
+
   return (
     <>
-    <div className="flowSchemaSettings" onPointerDown={(event) => event.stopPropagation()}>
+    <div
+      className="flowSchemaSettings"
+      ref={settingsRootRef}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
       {showRiskBar ? <ToolRiskSummary schema={safeSchema} /> : null}
 
       <ToolExecutionActions
         schema={safeSchema}
         values={values}
         onRuntimeValueChange={onRuntimeValueChange}
+        previewCompleted={previewCompleted}
+        onRuntimeActionComplete={onRuntimeActionComplete}
+        onNotify={onNotify}
       />
 
       {sections.map((section, sectionIndex) => {
@@ -9178,8 +9430,13 @@ function FlowNodeSchemaSettings({
                 <SettingPresetControls
                   presets={presets}
                   values={values}
+                  activePresetId={selectedPresetId}
+                  onActivePresetChange={setSelectedPresetId}
                   onSavePreset={onSavePreset}
-                  onLoadPreset={onLoadPreset}
+                  onLoadPreset={(preset) => {
+                    setSelectedPresetId(preset.id);
+                    onLoadPreset?.(preset);
+                  }}
                   onDeletePreset={onDeletePreset}
                   onRenamePreset={onRenamePreset}
                   showCurrentNote={false}
@@ -10338,7 +10595,7 @@ function WorkflowView({
   } | null>(null);
   const [isHistoryMenuOpen, setIsHistoryMenuOpen] = useState(false);
   const [runningNodeIds, setRunningNodeIds] = useState<string[]>([]);
-  const runTimersRef = useRef<number[]>([]);
+  const flowRunSequenceRef = useRef(0);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<string[]>([]);
   const [highlightedConnectionIds, setHighlightedConnectionIds] = useState<string[]>([]);
   const [flowRunIssues, setFlowRunIssues] = useState<FlowValidationIssue[]>([]);
@@ -11419,24 +11676,33 @@ function WorkflowView({
     options?: { presetId?: string; name?: string }
   ) => {
     const toolId = primaryPresetToolIdForFlowNode(node);
+    const currentExisting = options?.presetId
+      ? settingPresets.find((preset) => preset.id === options.presetId)
+      : undefined;
+    const savedPresetName =
+      options?.name ??
+      currentExisting?.name ??
+      `${node.name} 설정 ${new Date().toLocaleString("ko-KR")}`;
     setSettingPresets((presets) => {
       const existing = options?.presetId
         ? presets.find((preset) => preset.id === options.presetId)
         : undefined;
-      const presetName =
-        options?.name ??
-        existing?.name ??
-        `${node.name} 설정 ${new Date().toLocaleString("ko-KR")}`;
       const preset = existing
         ? {
             ...existing,
             toolId,
-            name: presetName,
+            name: savedPresetName,
             values: cloneSettingValues(node.settingsValues ?? {})
           }
-        : createSettingPreset(toolId, presetName, node.settingsValues ?? {});
+        : createSettingPreset(toolId, savedPresetName, node.settingsValues ?? {});
 
       return upsertSettingPreset(presets, preset);
+    });
+    onNotify?.({
+      title: "설정 저장됨",
+      message: savedPresetName,
+      variant: "save-toast",
+      autoDismissMs: 2200
     });
   };
 
@@ -11724,14 +11990,6 @@ function WorkflowView({
   useEffect(() => {
     setFlowRunIssues((current) => (current.length > 0 ? [] : current));
   }, [flowConnections, flowNodes]);
-
-  useEffect(
-    () => () => {
-      runTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-      runTimersRef.current = [];
-    },
-    []
-  );
 
   useEffect(() => {
     const handleFlowKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -13001,7 +13259,7 @@ function WorkflowView({
     [basicPortFilter]
   );
 
-  const runFlow = () => {
+  const runFlow = async () => {
     const nodeIds = resolveFlowRunNodeIds(
       flowNodes,
       flowConnections,
@@ -13013,8 +13271,8 @@ function WorkflowView({
       return;
     }
 
-    runTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-    runTimersRef.current = [];
+    const runSequence = flowRunSequenceRef.current + 1;
+    flowRunSequenceRef.current = runSequence;
     setRunningNodeIds([]);
     setFlowRunRecords([]);
 
@@ -13045,39 +13303,133 @@ function WorkflowView({
 
     setFlowRunIssues((current) => (current.length > 0 ? [] : current));
     setFlowRunRecords(buildFlowRunRecords(flowNodes, flowConnections, nodeIds));
-    nodeIds.forEach((nodeId, index) => {
-      const startTimerId = window.setTimeout(() => {
-        setRunningNodeIds([nodeId]);
-        setFlowRunRecords((records) =>
-          records.map((record) =>
-            record.nodeId === nodeId
-              ? { ...record, status: "running", message: "실행 중입니다." }
-              : record
-          )
-        );
-      }, index * 520);
-      const finishTimerId = window.setTimeout(() => {
-        setFlowRunRecords((records) =>
-          records.map((record) =>
-            record.nodeId === nodeId
-              ? {
-                  ...record,
-                  status: "success",
-                  message: "실행 완료. 중간 결과를 확인하세요."
-                }
-              : record
-          )
-        );
-      }, index * 520 + 380);
-      runTimersRef.current.push(startTimerId);
-      runTimersRef.current.push(finishTimerId);
-    });
 
-    const clearTimerId = window.setTimeout(() => {
+    const nodeMap = new Map(flowNodes.map((node) => [node.nodeId, node]));
+    const resultsByNodeId = new Map<string, unknown>();
+    const updateRunRecord = (
+      nodeId: string,
+      status: FlowRunRecord["status"],
+      message: string
+    ) => {
+      setFlowRunRecords((records) =>
+        records.map((record) =>
+          record.nodeId === nodeId ? { ...record, status, message } : record
+        )
+      );
+    };
+    const markRemainingNodesSkipped = (fromIndex: number, message: string) => {
+      const skippedIds = new Set(nodeIds.slice(fromIndex));
+      setFlowRunRecords((records) =>
+        records.map((record) =>
+          skippedIds.has(record.nodeId) && record.status === "queued"
+            ? { ...record, status: "warning", message }
+            : record
+        )
+      );
+    };
+    const reportNodeFailure = (node: FlowNode, message: string) => {
+      const nextIssue: FlowValidationIssue = {
+        id: `run-failed-${runSequence}-${node.nodeId}`,
+        severity: "error",
+        title: `${node.name} 실행 실패`,
+        message,
+        nodeId: node.nodeId
+      };
+      setFlowRunIssues((current) =>
+        areFlowValidationIssuesEqual(current, [nextIssue]) ? current : [nextIssue]
+      );
+      setIsFlowValidationPinned(true);
+      setHighlightedNodeIds([node.nodeId]);
+      setHighlightedConnectionIds([]);
+      onNotify?.({
+        title: `${node.name} 실행 실패`,
+        message,
+        autoDismissMs: 6200
+      });
+    };
+
+    for (let index = 0; index < nodeIds.length; index += 1) {
+      if (flowRunSequenceRef.current !== runSequence) {
+        return;
+      }
+
+      const nodeId = nodeIds[index];
+      const node = nodeMap.get(nodeId);
+      if (!node) {
+        continue;
+      }
+
+      const inputResults = flowInputResultsForNode(node, flowConnections, resultsByNodeId);
+      setRunningNodeIds([nodeId]);
+      updateRunRecord(nodeId, "running", "MCP 실행 요청 중입니다.");
+
+      const request = buildFlowNodeExecutionRequest({
+        node,
+        menuName: "Custom Flow",
+        runtimeAction: "apply",
+        inputResults
+      });
+
+      if (!request) {
+        resultsByNodeId.set(nodeId, syntheticFlowNodeResult(node, inputResults));
+        updateRunRecord(nodeId, "success", "보조 노드 결과를 다음 노드로 전달했습니다.");
+        continue;
+      }
+
+      if (!window.toolExecution?.run) {
+        const message = "AI/MCP 실행 통로가 연결되지 않았습니다.";
+        updateRunRecord(nodeId, "error", message);
+        reportNodeFailure(node, message);
+        markRemainingNodesSkipped(index + 1, "이전 노드 실패로 실행하지 않았습니다.");
+        break;
+      }
+
+      try {
+        const result = await window.toolExecution.run(request);
+        if (flowRunSequenceRef.current !== runSequence) {
+          return;
+        }
+
+        const failureMessage = toolExecutionFailureMessage(result);
+        const isSuccessfulResult = result.status === "completed" || result.status === "preview";
+        if (failureMessage || !isSuccessfulResult) {
+          const message =
+            failureMessage ||
+            (result.status === "needs-ai"
+              ? "AI 확인 또는 추가 처리가 필요해 이 노드를 완료하지 못했습니다."
+              : result.message || "실행 결과가 완료 상태로 반환되지 않았습니다.");
+          updateRunRecord(nodeId, "error", message);
+          reportNodeFailure(node, message);
+          if (!shouldContinueAfterFlowNodeFailure(node)) {
+            markRemainingNodesSkipped(index + 1, "이전 노드 실패로 실행하지 않았습니다.");
+            break;
+          }
+          continue;
+        }
+
+        resultsByNodeId.set(nodeId, flowResultPayload(result));
+        updateRunRecord(
+          nodeId,
+          "success",
+          result.message || "MCP 실행 완료. 중간 결과를 확인하세요."
+        );
+      } catch (error) {
+        if (flowRunSequenceRef.current !== runSequence) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : "툴 실행 요청 중 오류가 발생했습니다.";
+        updateRunRecord(nodeId, "error", message);
+        reportNodeFailure(node, message);
+        if (!shouldContinueAfterFlowNodeFailure(node)) {
+          markRemainingNodesSkipped(index + 1, "이전 노드 실패로 실행하지 않았습니다.");
+          break;
+        }
+      }
+    }
+
+    if (flowRunSequenceRef.current === runSequence) {
       setRunningNodeIds([]);
-      runTimersRef.current = [];
-    }, nodeIds.length * 520 + 420);
-    runTimersRef.current.push(clearTimerId);
+    }
   };
 
   const focusFlowIssue = (issue: (typeof flowValidationIssues)[number]) => {
@@ -14033,6 +14385,7 @@ function WorkflowView({
                                 onLoadPreset={(preset) => loadFlowNodePreset(node.nodeId, preset)}
                                 onDeletePreset={deleteFlowNodePreset}
                                 onRenamePreset={renameFlowNodePreset}
+                                onNotify={onNotify}
                               />
                             ) : (
                               <>
@@ -14448,8 +14801,10 @@ function WorkflowView({
             <button
               className="flowRunButton"
               type="button"
-              onClick={runFlow}
-              disabled={flowNodes.length === 0}
+              onClick={() => {
+                void runFlow();
+              }}
+              disabled={flowNodes.length === 0 || runningNodeIds.length > 0}
               aria-label="실행"
               title={flowRunMode === "step" ? "단계별 실행" : "일괄 실행"}
             >

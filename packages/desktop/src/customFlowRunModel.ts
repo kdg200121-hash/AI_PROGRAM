@@ -2,7 +2,9 @@ import type { FlowConnection, FlowGroup, FlowNode } from "./customFlowModel";
 import {
   defaultToolRuntimeSchema,
   flowPortTypeFromToolType,
-  type ToolRuntimeSchema
+  type ToolMcpCommand,
+  type ToolRuntimeSchema,
+  type ToolSettingField
 } from "./toolSettingsSchema";
 import { buildToolExecutionPlan } from "./toolRuntimeValidation";
 
@@ -177,8 +179,8 @@ function previewForNode(node: FlowNode): FlowNodePreview {
         { label: "출력", value: outputLabels }
       ],
       rows: [
-        { 항목: "레이어", 값: "A-WALL, A-DOOR" },
-        { 항목: "객체", 값: "Line, Polyline, Block" }
+        { "항목": "레이어", "값": "A-WALL, A-DOOR" },
+        { "항목": "객체", "값": "Line, Polyline, Block" }
       ]
     };
   }
@@ -192,8 +194,8 @@ function previewForNode(node: FlowNode): FlowNodePreview {
         { label: "출력", value: outputLabels }
       ],
       rows: [
-        { 항목: "파일명", 값: "설정값 기준 생성" },
-        { 항목: "처리", 값: "표 형식 정리" }
+        { "항목": "파일명", "값": "설정값 기준 생성" },
+        { "항목": "처리", "값": "표 형식 정리" }
       ]
     };
   }
@@ -207,8 +209,8 @@ function previewForNode(node: FlowNode): FlowNodePreview {
         { label: "출력", value: outputLabels }
       ],
       rows: [
-        { 항목: "패밀리/타입", 값: "설정값 사용" },
-        { 항목: "레벨", 값: "설정값 사용" }
+        { "항목": "패밀리 타입", "값": "설정값 사용" },
+        { "항목": "레벨", "값": "설정값 사용" }
       ]
     };
   }
@@ -220,7 +222,7 @@ function previewForNode(node: FlowNode): FlowNodePreview {
       { label: "결과 형태", value: resultType },
       { label: "출력", value: outputLabels }
     ],
-    rows: [{ 항목: "상태", 값: "실행 후 실제 결과 표시 예정" }]
+    rows: [{ "항목": "상태", "값": "실행 후 실제 결과 표시 예정" }]
   };
 }
 
@@ -290,6 +292,51 @@ function strongestRisk(nodes: FlowNode[]): ToolRuntimeSchema["risk"] {
   }, "read");
 }
 
+function nodeSettingPrefix(node: FlowNode) {
+  return node.nodeId.replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
+function groupSettingId(node: FlowNode, settingId: string) {
+  return `${nodeSettingPrefix(node)}__${settingId}`;
+}
+
+function remapSettingReference(value: string, node: FlowNode) {
+  const match = value.match(/^settings\.([A-Za-z0-9_-]+)$/);
+  return match ? `settings.${groupSettingId(node, match[1])}` : value;
+}
+
+function remapOptionalSettingReference(value: string | undefined, node: FlowNode) {
+  return value ? remapSettingReference(value, node) : undefined;
+}
+
+function cloneGroupSetting(node: FlowNode, field: ToolSettingField): ToolSettingField {
+  const section = `node-${nodeSettingPrefix(node)}`;
+  return {
+    ...field,
+    id: groupSettingId(node, field.id),
+    label: `${node.name} / ${field.label}`,
+    section,
+    visibleWhen: field.visibleWhen
+      ? {
+          ...field.visibleWhen,
+          field: groupSettingId(node, field.visibleWhen.field)
+        }
+      : undefined
+  };
+}
+
+function cloneGroupCommand(node: FlowNode, command: ToolMcpCommand): ToolMcpCommand {
+  return {
+    ...command,
+    params: command.params
+      ? Object.fromEntries(
+          Object.entries(command.params).map(([key, value]) => [key, remapSettingReference(value, node)])
+        )
+      : undefined,
+    condition: remapOptionalSettingReference(command.condition, node)
+  };
+}
+
 export function buildFlowGroupToolSchema(
   group: FlowGroup,
   nodes: FlowNode[],
@@ -309,7 +356,9 @@ export function buildFlowGroupToolSchema(
   const requiredServers = Array.from(
     new Set(groupNodes.flatMap((node) => node.settingsSchema?.requiredServers ?? []))
   );
-  const mcpCommands = groupNodes.flatMap((node) => node.settingsSchema?.mcpCommands ?? []);
+  const mcpCommands = groupNodes.flatMap((node) =>
+    (node.settingsSchema?.mcpCommands ?? []).map((command) => cloneGroupCommand(node, command))
+  );
   const externalInputPortIds = new Set(
     connections
       .filter((connection) => groupNodeIds.has(connection.toNodeId) && !groupNodeIds.has(connection.fromNodeId))
@@ -343,6 +392,16 @@ export function buildFlowGroupToolSchema(
       ? outputs
       : (lastNode?.outputs ?? []).map((port) => ({ id: port.id, label: port.label, type: port.type }));
   const resultType = fallbackOutputs[0]?.type ?? "text";
+  const settings = groupNodes.flatMap((node) =>
+    (node.settingsSchema?.settings ?? []).map((field) => cloneGroupSetting(node, field))
+  );
+  const sections = groupNodes
+    .filter((node) => (node.settingsSchema?.settings ?? []).length > 0)
+    .map((node) => ({
+      id: `node-${nodeSettingPrefix(node)}`,
+      label: node.name,
+      defaultOpen: true
+    }));
 
   return {
     ...defaultToolRuntimeSchema,
@@ -360,9 +419,11 @@ export function buildFlowGroupToolSchema(
     },
     settingsLayout: {
       mode: "sections",
-      sections: [{ id: "subflow", label: "서브플로우", defaultOpen: true }]
+      sections: sections.length > 0
+        ? sections
+        : [{ id: "subflow", label: "서브플로우", defaultOpen: true }]
     },
-    settings: [],
+    settings,
     inputs: fallbackInputs.map((port) => ({
       id: port.id,
       label: port.label,

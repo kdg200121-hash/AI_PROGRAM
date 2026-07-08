@@ -74,6 +74,7 @@ function looksLikeTitleBlockTool(schema: ToolRuntimeSchema) {
   return (
     text.includes("도곽") ||
     text.includes("title_block") ||
+    text.includes("titleblock") ||
     (text.includes("title") && text.includes("block"))
   );
 }
@@ -97,22 +98,24 @@ export function buildToolExecutionRequest({
 }: BuildToolExecutionRequestInput): ToolExecutionRequest {
   const resolvedValues = fieldValues(schema, values);
   const titleBlockTool = looksLikeTitleBlockTool(schema);
-  const commands = schema.mcpCommands.map<ToolExecutionRequestCommand>((command) => ({
-    server: command.server,
-    command: command.command,
-    status: command.status,
-    runtimeAction,
-    params: commandParams(command, resolvedValues),
-    condition: command.condition
-  }));
+  const commands = schema.mcpCommands
+    .filter((command) => !command.runtimeAction || command.runtimeAction === runtimeAction)
+    .map<ToolExecutionRequestCommand>((command) => ({
+      server: command.server,
+      command: command.command,
+      status: command.status,
+      runtimeAction,
+      params: commandParams(command, resolvedValues),
+      condition: command.condition
+    }));
 
   const aiInstruction = [
     `${menuName} 메뉴의 "${toolName}" 툴을 ${runtimeAction === "preview" ? "미리보기" : "실행"}합니다.`,
-    "사용자가 입력한 설정값을 기준으로 MD 툴 설명과 MCP 명령 계획을 해석합니다.",
+    "사용자가 입력한 설정값을 기준으로 MD 설명과 MCP 명령 계획을 해석합니다.",
     titleBlockTool
-      ? "도곽 후보는 CAD 도면 안의 실제 블록명, 배치명, 핸들, 개수를 분석해서 반환해야 하며 앱이 임의 후보를 만들지 않습니다."
-      : "필요한 MCP 서버에 명령을 전달하고 결과와 오류를 구조화해서 반환합니다.",
-    "AI는 설정값을 검토한 뒤 필요한 MCP 명령 순서와 파라미터를 확정합니다."
+      ? "도곽 후보는 CAD 도면 안의 실제 블록명, 배치명, 핸들, 개수를 분석해서 반환해야 하며 임의의 후보를 만들지 않습니다."
+      : "필요한 MCP 서버와 명령을 전달하고 결과와 오류를 구조화해서 반환합니다.",
+    "AI가 필요한 경우 설정값을 검토한 뒤 필요한 MCP 명령 순서와 파라미터를 확정합니다."
   ].join("\n");
 
   return {
@@ -133,8 +136,105 @@ function firstString(...values: unknown[]) {
 }
 
 function firstNumber(...values: unknown[]) {
-  const value = values.find((item) => Number.isFinite(typeof item === "number" ? item : Number(item)));
-  return value === undefined ? undefined : Number(value);
+  for (const value of values) {
+    const numberValue = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(numberValue)) {
+      return numberValue;
+    }
+  }
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function firstErrorText(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+    const record = asRecord(value);
+    if (record) {
+      const nested = firstErrorText(
+        record.message,
+        record.error,
+        record.reason,
+        record.detail,
+        record.description
+      );
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return "";
+}
+
+function issueHasErrorSeverity(issue: unknown) {
+  const record = asRecord(issue);
+  if (!record) {
+    return false;
+  }
+  return [record.severity, record.level, record.type, record.status].some(
+    (value) => typeof value === "string" && ["error", "failed", "failure"].includes(value.toLowerCase())
+  );
+}
+
+function payloadErrorMessage(payload: unknown): string {
+  const record = asRecord(payload);
+  if (!record) {
+    return "";
+  }
+  if (record.ok === false || record.success === false) {
+    return firstErrorText(record.message, record.error, record.reason, record.detail) || "툴 실행 결과가 실패로 반환되었습니다.";
+  }
+  for (const key of ["errors", "errorMessages", "failures"]) {
+    const value = record[key];
+    if (Array.isArray(value) && value.length > 0) {
+      return firstErrorText(value[0]) || "툴 실행 중 오류가 반환되었습니다.";
+    }
+  }
+  for (const key of ["issues", "diagnostics"]) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      const errorIssue = value.find(issueHasErrorSeverity);
+      if (errorIssue) {
+        return firstErrorText(errorIssue) || "툴 실행 결과에 오류 항목이 포함되어 있습니다.";
+      }
+    }
+  }
+  return "";
+}
+
+export function toolExecutionFailureMessage(result: ToolExecutionResult): string {
+  if (result.status === "error") {
+    return result.message || "툴 실행 중 오류가 발생했습니다.";
+  }
+
+  const directFailure = payloadErrorMessage(result);
+  if (directFailure) {
+    return directFailure;
+  }
+
+  const rawFailure = payloadErrorMessage(result.raw);
+  if (rawFailure) {
+    return rawFailure;
+  }
+
+  const rawRecord = asRecord(result.raw);
+  if (rawRecord) {
+    for (const key of ["mcp", "result", "data", "response"]) {
+      const nestedFailure = payloadErrorMessage(rawRecord[key]);
+      if (nestedFailure) {
+        return nestedFailure;
+      }
+    }
+  }
+
+  return "";
 }
 
 function candidateArrays(payload: unknown): unknown[] {

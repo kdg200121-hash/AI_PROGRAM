@@ -85,6 +85,7 @@ export interface ToolMcpCommand {
   status: "available" | "planned" | "manual";
   params?: Record<string, string>;
   condition?: string;
+  runtimeAction?: string;
 }
 
 export interface ToolExecutionAction {
@@ -718,7 +719,8 @@ export function parseToolRuntimeSchema(content: string): ToolRuntimeSchema {
         ? (String(item.status) as ToolMcpCommand["status"])
         : "planned",
       params: normalizeStringRecord(item.params),
-      condition: item.condition ? String(item.condition) : undefined
+      condition: item.condition ? String(item.condition) : undefined,
+      runtimeAction: item.runtimeAction ? String(item.runtimeAction) : undefined
     })),
     preflightChecks: parseObjectArray(content, "preflightChecks").map((item) => ({
       id: String(item.id ?? ""),

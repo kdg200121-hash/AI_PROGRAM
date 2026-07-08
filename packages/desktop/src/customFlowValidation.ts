@@ -38,7 +38,7 @@ export function validateFlowGraph(
         id: `missing-node-${connection.id}`,
         severity: "error",
         title: "없는 노드 연결",
-        message: "삭제된 노드를 가리키는 연결이 남아 있습니다.",
+        message: "삭제된 노드를 가리키는 연결선이 남아 있습니다.",
         connectionId: connection.id
       });
       continue;
@@ -51,7 +51,7 @@ export function validateFlowGraph(
         id: `missing-port-${connection.id}`,
         severity: "error",
         title: "없는 포트 연결",
-        message: "삭제된 입력/출력 포트를 가리키는 연결이 남아 있습니다.",
+        message: "삭제된 입력/출력 포트를 가리키는 연결선이 남아 있습니다.",
         connectionId: connection.id
       });
       continue;
