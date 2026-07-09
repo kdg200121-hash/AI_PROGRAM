@@ -21,7 +21,7 @@ export function createServerDraft(target: McpTarget): ServerDraft {
       target === "cad"
         ? "http://localhost:5100/mcp"
         : target === "revit"
-          ? "http://localhost:5001/mcp"
+          ? "http://localhost:5101/mcp"
           : target === "excel"
             ? "http://localhost:5200/mcp"
             : target === "tekla"
@@ -31,7 +31,7 @@ export function createServerDraft(target: McpTarget): ServerDraft {
       target === "cad"
         ? "5100"
         : target === "revit"
-          ? "5001"
+          ? "5101"
           : target === "excel"
             ? "5200"
             : target === "tekla"
@@ -94,7 +94,7 @@ export function validateServerDraft(draft: ServerDraft): string[] {
     errors.push("포트는 1-65535 사이여야 합니다.");
   }
 
-  if (!input.launchCommand) {
+  if (!input.launchCommand && (input.connectionType === "stdio" || errors.length > 0)) {
     errors.push("실행 명령을 입력하세요.");
   }
 

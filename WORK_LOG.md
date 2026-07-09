@@ -2087,3 +2087,191 @@
 - Custom Flow 기본 CAD 객체 읽기 노드는 `cad.read_objects`를 `available`로 표시하되 선택 기반 읽기라는 제한을 유지한다.
 - 앱 실행 기준은 `AI Program -> MCP bridge -> AutoCAD COM` 직접 호출이다. Codex CLI 연결은 `/등록` 자동화나 Codex 채팅에서 MCP를 직접 호출할 때 쓰는 보조 경로로 분리한다.
 - 검증 완료: PowerShell parser `OK`, `pnpm test` 40개 파일/183개 테스트, `pnpm typecheck`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 브리지를 직접 띄워 JSON-RPC `cad.read_objects`가 선택 객체 없을 때 `ok:false`, `code: selectionRequired`, `connectedToProgram:true`를 즉시 반환하는 것을 확인했고, 최신 `release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`를 실행했다.
+
+## 2026-07-09 추가 238
+
+- 파일 꼬임 방지를 위해 이번 작업 기준을 `C:\CodexProjects\AI_PROGRAM`, `codex/mcp-registry-desktop`, 커밋 `8c5fa43`로 고정하고 시작했다. 기존 로컬 백업 stash는 건드리지 않았다.
+- AutoCAD bridge의 `cad.read_objects`에 `scope=window/range`를 추가했다. 전체 ModelSpace 스캔은 계속 금지하고, 사용자가 지정한 두 좌표 `point1`, `point2`로 AutoCAD `SelectionSet.Select(0, point1, point2)`만 실행한다.
+- 좌표 입력은 객체 `{x,y,z}`, 배열 `[x,y,z]`, 문자열 `0,0,0` / `0 0 0` 형식을 모두 받을 수 있게 했다.
+- Custom Flow 기본 CAD 객체 읽기 노드에 `범위 시작 좌표`, `범위 끝 좌표` 설정을 추가하고, MCP 파라미터 `point1`, `point2`로 전달되도록 연결했다.
+- 관련 회귀 테스트를 추가했다. `cad.read_objects`가 window 읽기를 지원해도 `foreach ($entity in $doc.ModelSpace)`와 `$selection.Select(5)` 같은 전체 도면 스캔 경로가 다시 들어오지 않도록 막는다.
+- 검증 완료: PowerShell parser `OK`, `pnpm test` 40개 파일/184개 테스트, `pnpm typecheck`, `git diff --check`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 exe는 `C:\CodexProjects\AI_PROGRAM\release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`에 생성됐다.
+
+## 2026-07-09 추가 239
+
+- 공통 `program-mcp-bridge.ps1`의 `/status`, `/active-file`, `active-file` MCP 명령이 더 이상 AutoCAD COM만 기준으로 판단하지 않도록 target별 분기를 추가했다.
+- Excel target은 `Excel.Application` COM의 `ActiveWorkbook`을 읽어 `activeFile`, `workbook.name`, `workbook.fullName`, `workbook.path`를 반환한다.
+- Revit target은 일반 PowerShell 브리지에서 활성 문서명까지 직접 읽을 수 없으므로, Revit 프로세스 감지는 `connectedToProgram`으로 표시하고 `/active-file`은 `Revit add-in bridge`가 필요하다는 명확한 실패 응답을 반환한다.
+- `revit.get_active_document`, `excel.get_active_workbook` 명령명을 catalog와 command normalize 경로에 추가했다.
+- 임시 포트 smoke test 완료: Excel bridge `/status`, `/active-file`은 `target=excel`로 응답했고, Excel 미실행 상태에서 `Excel is not running or no active workbook is available.` 메시지를 반환했다. Revit bridge는 현재 Revit 프로세스를 감지해 `connectedToProgram=true`를 반환하되 활성 문서명은 전용 애드인 필요 메시지로 구분했다.
+- 검증 완료: PowerShell parser `OK`, `pnpm test` 40개 파일/185개 테스트, `pnpm typecheck`, `git diff --check`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 exe는 `C:\CodexProjects\AI_PROGRAM\release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`에 다시 생성됐다.
+
+## 2026-07-09 추가 240
+
+- 앱의 활성 파일 감지 경로에서 Excel MCP 서버가 누락되어 있던 문제를 수정했다. 기존 Electron main의 `activeFileProgramForTarget`은 `cad`, `revit`만 허용해 Excel 서버를 순회하지 않았다.
+- `activeFileProgramForTarget`을 `activeFileDetection.ts` 공통 함수로 옮기고 `excel` target을 지원하게 했다. Electron main은 이 공통 함수를 사용한다.
+- Excel bridge가 `workbook.fullName`/`workbook.name` 형태로 응답해도 활성 파일 후보로 인식되도록 `workbook` 후보와 `fullName` 경로 키를 추가했다.
+- 활성 파일 새로고침 실패 안내 문구를 `CAD/Revit`에서 `CAD/Revit/Excel` 기준으로 수정했다.
+- 검증 완료: `pnpm test packages/desktop/src/activeFileDetection.test.ts`, 관련 bridge 테스트, `pnpm typecheck`, `pnpm test` 40개 파일/187개 테스트, `git diff --check`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 exe는 `C:\CodexProjects\AI_PROGRAM\release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`에 다시 생성됐다.
+
+## 2026-07-09 추가 241
+
+- Revit 전용 애드인 브리지 1차 소스를 `tools/mcp-bridges/revit-addin-bridge`에 추가했다.
+- Revit API는 Revit 메인 스레드에서만 안전하게 접근해야 하므로, HTTP listener 스레드가 직접 `ActiveUIDocument`를 읽지 않고 `ExternalEvent` + `IExternalEventHandler`로 Revit API 스레드에 요청을 넘기도록 구성했다.
+- `/active-file`, `/mcp/active-file`, `/current-file`, `/status`, `/mcp/status` 요청을 처리하며, 활성 문서가 있으면 `activeFile`과 `document.name/fullName/path`에 `ActiveUIDocument.Document.PathName`/`Title`을 반환한다.
+- `RevitMcpBridge.addin.template`와 `scripts/install-addin.ps1`을 추가했다. 빌드 후 install script가 `%APPDATA%\Autodesk\Revit\Addins\{year}\RevitMcpBridge.addin` manifest를 생성한다.
+- `dotnet build tools\mcp-bridges\revit-addin-bridge\RevitMcpBridge.csproj -c Release`가 Revit 2025 API DLL 기준으로 경고/오류 없이 통과했다. 빌드 산출물 `bin/obj`는 Git에 넣지 않도록 `.gitignore`에 `tools/**/bin/`, `tools/**/obj/`를 추가하고 로컬 산출물은 정리했다.
+- 검증 완료: `pnpm test` 41개 파일/189개 테스트, `pnpm typecheck`, `dotnet build tools\mcp-bridges\revit-addin-bridge\RevitMcpBridge.csproj -c Release`, `git diff --check`, `pnpm --filter @mcp-registry/desktop package:win` 통과. 최신 exe는 `C:\CodexProjects\AI_PROGRAM\release\AI_PROGRAM-win32-x64\AI_PROGRAM.exe`에 다시 생성됐다.
+
+## 2026-07-09 추가 242
+
+- Revit 전용 애드인 브리지가 Revit 기본 `Add-Ins` 탭, 한글 UI 기준 `애드인` 탭에 `AI Program` 패널과 `AI Program MCP` 상태 확인 버튼을 추가하도록 수정했다.
+- 상태 확인 버튼은 Revit 안에서 현재 Revit MCP bridge endpoint `http://127.0.0.1:5001/active-file`를 안내하는 `TaskDialog`를 띄운다. 실제 활성 문서명/경로 조회는 기존 `/active-file` endpoint가 계속 담당한다.
+- CAD는 현재 AutoCAD COM 브리지로 활성 문서/레이어/선택 객체/window 범위 읽기가 가능하므로 이번 단계에서는 별도 CAD add-in을 추가하지 않는다. 추후 AutoCAD 리본 UI, 이벤트 감지, 대량 쓰기/롤백 같은 기능이 필요할 때 CAD 플러그인을 별도 검토한다.
+
+## 2026-07-09 추가 243
+
+- Revit `AI Program MCP` 버튼 실행 시 `트랜잭션 속성이 지정되지 않아 애드인을 실행할 수 없습니다` 오류가 발생하는 원인을 확인했다.
+- Revit `IExternalCommand` 구현체에는 `Autodesk.Revit.Attributes.Transaction` 속성이 필요하므로 `ShowBridgeStatusCommand`에 `[Transaction(TransactionMode.Manual)]`을 추가했다.
+- 동일 문제가 재발하지 않도록 `revitAddinBridgeTemplate.test.ts`에 `Autodesk.Revit.Attributes`와 `[Transaction(TransactionMode.Manual)]` 검증을 추가했다.
+- 이미 실행 중인 Revit이 기존 DLL을 잠그고 있어 `bin\Release\RevitMcpBridge.dll` 덮어쓰기는 실패했다. 즉시 검증 가능한 새 DLL은 `%APPDATA%\AI Program\RevitMcpBridge\20260709-transaction-fix\RevitMcpBridge.dll`에 빌드했고, `%APPDATA%\Autodesk\Revit\Addins\2025\RevitMcpBridge.addin` manifest가 이 DLL을 보도록 갱신했다.
+- 이후 `.addin` manifest가 사라진 상태를 확인했다. DLL은 남아 있었지만 Revit Addins 폴더의 `RevitMcpBridge.addin`이 없어 Revit 탭에서 애드인이 사라진 것이 원인이었다.
+- `scripts/install-addin.ps1`에 `-AssemblyPath` 옵션을 추가해, Revit이 잠글 수 있는 개발 `bin\Release` DLL 대신 안정 배포 DLL 경로를 직접 manifest에 기록할 수 있게 했다.
+- 현재 설치 manifest는 `%APPDATA%\AI Program\RevitMcpBridge\20260709-transaction-fix\RevitMcpBridge.dll`을 가리키도록 재설치했다.
+
+## 2026-07-09 추가 244
+
+- Revit 재시작 후 애드인이 보이는 상태에서 `http://127.0.0.1:5001/status`와 `/active-file`을 직접 호출해 실제 열린 RVT 파일 경로를 읽는 것을 확인했다.
+- 확인된 활성 파일은 `C:\Users\Donggeon\Desktop\평택통복하수처리장_교대반응조_분리됨.rvt`이며, `/active-file` 응답은 `document.name/fullName/path`를 정상 반환했다.
+- 앱 registry의 Revit 서버 설정을 일반 PowerShell bridge 실행 방식에서 Revit 애드인이 직접 제공하는 HTTP endpoint 확인 방식으로 정리했다. Revit 서버의 `launchCommand`와 `workingDirectory`는 비워 두고 `http://localhost:5001/mcp` 상태만 확인한다.
+- `registryEditor` 검증 로직도 HTTP 서버는 외부 프로그램/애드인이 띄울 수 있으므로 `launchCommand`를 필수로 요구하지 않게 바꿨다. `stdio` 서버만 실행 명령을 필수로 검증한다.
+- Revit journal에서 `RevitMcpBridge.addin` 파일명이 사용자 Addins 폴더와 `C:\ProgramData\Autodesk\Revit\Addins\2025`에 중복된 것을 확인했다. ProgramData 쪽은 다른 `Seesum AI` add-in이므로 건드리지 않고, AI Program manifest 파일명을 `AIProgramRevitMcpBridge.addin`으로 변경해 중복 파일명 충돌을 피했다.
+
+## 2026-07-09 추가 245
+
+- Revit 애드인 MCP 브리지의 다음 안전 읽기 명령으로 `revit.list_levels`를 구현했다.
+- `/commands`, `/mcp` JSON-RPC `tools/call`, `/tools/revit.list_levels` 경로를 지원한다. AI Program의 `window.toolExecution.run`은 `/mcp tools/call`을 먼저 시도하므로 Revit 애드인 브리지와 앱 실행 경로가 맞아진다.
+- `revit.list_levels`는 Revit API 메인 스레드에서 `ExternalEvent`를 통해 실행되고, `FilteredElementCollector(doc).OfClass(typeof(Level))`로 레벨 이름과 높이(`elevationFeet`)만 읽는다. 모델 수정/트랜잭션은 하지 않는다.
+- 현재 실행 중인 Revit이 기존 DLL을 잠그고 있어 새 DLL은 `%APPDATA%\AI Program\RevitMcpBridge\20260709-list-levels-v2\RevitMcpBridge.dll`로 빌드했고, `AIProgramRevitMcpBridge.addin` manifest가 이 DLL을 가리키도록 갱신했다. Revit 재시작 후 실제 `/tools/revit.list_levels` 실기 검증이 필요하다.
+
+## 2026-07-09 추가 246
+
+- Revit 재시작 후 `http://127.0.0.1:5001/status`, `/commands`, `/tools/revit.list_levels`, `/mcp` JSON-RPC `tools/call` 경로를 실제 열린 RVT 모델에서 검증했다.
+- 활성 파일은 `C:\Users\Donggeon\Desktop\평택통복하수처리장_교대반응조_분리됨.rvt`로 감지됐다.
+- `revit.list_levels`는 실제 모델에서 레벨 3개를 반환했다: `벽체 하부슬래브copy`, `벽체 상부슬래브 copy`, `상부슬래브`.
+- 이 단계까지는 읽기 전용 안전 명령만 검증했다. Revit 요소 생성/수정 명령은 아직 구현하지 않았다.
+
+## 2026-07-09 추가 247
+
+- Custom Flow에서 바로 사용할 수 있도록 `Revit 레벨 읽기` 기본 Revit 노드를 추가했다.
+- 이 노드는 입력 포트 없이 현재 열린 Revit 활성 모델을 읽고, 출력 포트 `레벨`로 다음 노드에 전달한다.
+- 노드 실행 요청은 Revit MCP 서버의 `revit.list_levels` available 명령으로 생성된다. Custom Flow `도구` 메뉴에서 클릭/드래그로 캔버스에 추가할 수 있다.
+- 회귀 테스트를 추가해 노드 팔레트 순서, `revit.list_levels` 명령 연결, 실행 요청 생성을 확인했다.
+- 검증 완료: `pnpm test` 41개 파일/191개 테스트, `pnpm typecheck` 통과.
+
+## 2026-07-09 추가 248
+
+- `Revit 레벨 읽기` 노드 실행 로그/결과 미리보기가 일반 표가 아니라 `Revit 레벨 목록` 작업으로 보이도록 보강했다.
+- Custom Flow 실행 요청과 같은 JSON-RPC `tools/call` 형태로 실제 Revit MCP endpoint를 호출해 레벨 3개 응답을 다시 확인했다.
+- 검증 완료: Revit MCP 실기 호출 성공, `pnpm test` 41개 파일/192개 테스트, `pnpm typecheck` 통과.
+
+## 2026-07-09 추가 249
+
+- Custom Flow 실행 성공 후 실제 MCP payload를 실행 로그/결과 미리보기 표에 반영하도록 연결했다.
+- `revit.list_levels` 응답의 `levels` 배열은 `레벨 ID`, `레벨 이름`, `높이(ft)` 열을 가진 표로 변환된다.
+- `결과 미리보기` 보조 노드도 앞 노드에서 받은 실제 payload를 같은 방식으로 표로 보여준다.
+- 회귀 테스트를 추가해 실제 Revit 레벨 MCP payload가 미리보기 표 rows/metrics로 변환되는지 확인했다.
+- 검증 완료: `pnpm test` 41개 파일/193개 테스트, `pnpm typecheck` 통과.
+
+## 2026-07-09 추가 250
+
+- Revit 시작 시 `AI Program Revit MCP Bridge` 외부 응용프로그램 오류가 뜨는 원인을 확인했다.
+- 원인은 이전 Revit/HTTP.sys listener가 `127.0.0.1:5001`을 잡은 상태에서 새 Revit 애드인이 같은 포트를 다시 열려고 하면서 `OnStartup` 예외가 발생한 것이다.
+- `RevitMcpBridgeApp.OnStartup`에서 HTTP listener 시작 실패를 잡아도 Revit 애드인 로드 자체는 `Result.Succeeded`로 끝나도록 방어했다. 이제 포트 중복이 있어도 Revit 전체 애드인 시작 오류창으로 번지지 않고, 애드인 버튼에서 상태 메시지를 확인할 수 있다.
+- 수정 DLL은 `%APPDATA%\AI Program\RevitMcpBridge\20260709-port-guard\RevitMcpBridge.dll`에 빌드했고, Revit 2025 manifest `AIProgramRevitMcpBridge.addin`이 이 DLL을 가리키도록 갱신했다.
+- PowerShell 5 `Get-Content/Set-Content`로 UTF-8 한글 TypeScript 파일을 다시 저장하면 mojibake가 발생할 수 있어, `customFlowModel.ts`는 Git 원본 기준으로 Node UTF-8 처리 방식으로 복구했다.
+
+## 2026-07-09 추가 251
+
+- Revit Journal과 HTTP.sys 상태를 확인해 `Seesum AI` 등 다른 Revit 애드인이 `127.0.0.1:5001`을 이미 잡을 수 있음을 확인했다.
+- AI Program Revit MCP 포트를 `5001`에서 `5101`로 변경했다. 앱 registry 기본값, Electron fallback, UI fallback, program-mcp-registrar 스킬 문서, Codex CLI `~/.codex/config.toml`, Revit add-in source/test를 모두 `5101` 기준으로 맞췄다.
+- 새 DLL은 `%APPDATA%\AI Program\RevitMcpBridge\20260709-port-5101\RevitMcpBridge.dll`에 빌드했고, Revit 2025 manifest가 이 DLL을 가리키도록 갱신했다.
+
+## 2026-07-09 추가 252
+
+- 앱 사용자 registry `%APPDATA%\ai-program\registry.json`에 기존 `revit-default` 서버가 `5001`로 남아 있어 앱에서는 Revit이 미연결로 보일 수 있음을 확인했다.
+- Electron `ensureBundledProgramBridgeServers`가 기존 서버를 찾았을 때 `url`/`port` 변경을 업데이트 조건에 포함하지 않아 기본 포트 변경이 기존 사용자 설정으로 마이그레이션되지 않는 것이 원인이었다.
+- `url`과 `port`도 변경 감지 대상에 포함해, 이후 기존 `revit-default`가 있어도 `5101`로 자동 보정되게 수정했다.
+- 현재 컴퓨터의 `%APPDATA%\ai-program\registry.json`도 즉시 `http://localhost:5101/mcp`, port `5101`로 갱신했다.
+
+## 2026-07-09 추가 253
+
+- 앱 실행 후 Revit MCP `5101` registry 보정은 정상이며, `revit.list_levels` 명령은 실제 모델에서 레벨 3개를 계속 반환하는 것을 확인했다.
+- `/status`는 Revit ExternalEvent 응답을 2초만 기다려 Revit이 바쁜 순간 timeout이 날 수 있음을 확인했다.
+- Revit add-in bridge의 active-file/status 및 command wait 시간을 8초로 늘려 상태 확인 안정성을 높였다.
+- 새 DLL은 `%APPDATA%\AI Program\RevitMcpBridge\20260709-port-5101-wait8\RevitMcpBridge.dll`에 빌드했고, Revit 2025 manifest가 이 DLL을 가리키도록 갱신했다. 적용은 Revit 재시작 후부터다.
+
+## 2026-07-09 추가 254
+
+- Revit 보안창에서 `AI Program Revit MCP Bridge`를 `항상 로드` 처리한 뒤 Revit MCP `5101` 연결과 실제 모델 레벨 3개 읽기를 다시 확인했다.
+- Revit 레벨 데이터를 Excel 내보내기로 넘기는 과정에서 PowerShell 브리지의 `Get-ExcelSourceRows`가 배열을 1개 객체로 다시 감싸 Excel에 1행만 저장하는 문제를 확인했다.
+- `Get-ExcelSourceRows`가 IEnumerable을 실제 행 목록으로 펼치도록 수정했고, 실행 중인 release 브리지 스크립트에도 같은 수정 적용 후 5100 브리지를 재시작했다.
+- 고정 데이터 기준 Excel 내보내기 3행/3열 저장을 확인했고, 실제 Revit 레벨 값으로 `revit_levels_verified_export_20260709_122922.xlsx` 파일을 생성해 3행 저장을 확인했다.
+- Revit이 선택/수정 상태일 때 `ExternalEvent`가 타이밍에 따라 `Timed out while reading Revit model data.`를 반환할 수 있어, Custom Flow 실행에서 Revit timeout 결과는 최대 2회 재시도하도록 보완했다.
+
+## 2026-07-09 추가 255
+
+- 실제 Revit 모델에서 `revit.list_levels` → `excel.write_table` 흐름을 다시 실행해 `revit_levels_custom_flow_20260709_124434.xlsx` 파일에 3행/3열 저장을 확인했다.
+- Revit이 선택/수정 명령 상태이면 `ExternalEvent`가 처리되지 않아 타임아웃이 나는 것을 재현했다. ESC로 Revit 명령 상태를 해제하면 즉시 회복되는 것도 확인했다.
+- Revit 애드인 브리지 timeout 응답에 `code: revitBusyOrBlocked`, `retryable: true`, `Press ESC in Revit...` 안내를 추가하고 wait 시간을 12초로 늘렸다.
+- Custom Flow 실행 실패 메시지도 같은 Revit busy/blocked 상황이면 한국어로 `Revit에서 ESC를 눌러 현재 명령을 취소한 뒤 다시 실행하세요.`라고 표시되도록 보강했다.
+- Revit 2025 add-in manifest를 새 빌드 DLL `C:\CodexProjects\AI_PROGRAM\tools\mcp-bridges\revit-addin-bridge\bin\Release\RevitMcpBridge.dll`로 갱신했다. 적용은 Revit 재시작 후부터다.
+
+## 2026-07-09 추가 256
+
+- Revit에서 발견한 timeout 문제를 Revit 전용 예외 처리로만 두지 않고, Custom Flow 전체 실행 공통 안정성 처리로 확장했다.
+- MCP 실행이 8초 이상 걸리면 실행 타임라인에 `큰 파일 처리`, `외부 프로그램 선택/수정 상태`, `MCP 서버 응답 지연` 가능성을 안내한다.
+- `toolExecutionRecoveryMessage`를 추가해 Revit busy, MCP 연결 실패, 일반 timeout, 앞 노드 결과 없음(`emptySource`) 같은 공통 실패를 사용자에게 이해하기 쉬운 문장으로 변환한다.
+- Custom Flow의 실행 실패/예외 처리도 이 공통 복구 메시지를 우선 사용하도록 연결했다. 이후 다른 툴이나 플로우에서도 같은 유형의 문제는 조용히 실패하지 않고 원인과 조치가 표시된다.
+
+## 2026-07-09 추가 257
+
+- AutoCAD program bridge의 도곽 후보 판정 문자열에 깨진 한글(`?꾧낸`, `?쒖젣`)이 남아 있어 실제 도곽/표제 블록 자동 인식에 영향을 줄 수 있음을 확인했다.
+- `Looks-LikeTitleBlockName`을 정상 한글 `도곽`, `표제` 기준으로 복구했고, 후보 상세 문자열의 깨진 구분자(`쨌`)도 `/` 구분자로 정리했다.
+- `programBridgeScript.test.ts`에 해당 깨진 문자열이 다시 들어오면 실패하는 회귀 테스트를 추가했다.
+- `toolExecutionModel.test.ts`도 정상 한글 테스트 데이터 기준으로 정리해 AI/MCP 실행 지시문과 복구 메시지의 한글 품질을 유지하도록 했다.
+
+## 2026-07-09 추가 258
+
+- AutoCAD MCP 브리지에 실제 수정 명령의 첫 단계로 `cad.renumber_selected_text`를 추가했다.
+- 이 명령은 도면 전체를 훑지 않고, 사용자가 AutoCAD에서 미리 선택한 TEXT/MTEXT 객체만 대상으로 삼는다.
+- 기본은 미리보기이며 실제 도면 수정은 `apply=true`와 `confirmApply=true`가 둘 다 들어온 경우에만 실행한다. 자동 저장은 하지 않는다.
+- 순번은 선택된 텍스트를 위에서 아래, 왼쪽에서 오른쪽 순서로 정렬한 뒤 `prefix`, `suffix`, `startNumber`, `padding` 설정을 적용해 만든다.
+- 회귀 테스트를 추가해 선택영역 기반 처리, 명시적 적용 확인, 자동 저장 금지, 전체 ModelSpace 순회 금지를 확인했다.
+
+## 2026-07-09 추가 259
+
+- Custom Flow 도구 팔레트에 `CAD 선택 문자 순번 변경` 노드를 추가했다.
+- 이 노드는 CAD 입력 포트를 받고, `cad.renumber_selected_text` MCP 명령으로 `prefix`, `suffix`, `startNumber`, `padding`, `apply`, `confirmApply` 설정값을 전달한다.
+- 기본 설정은 실제 도면을 바꾸지 않는 미리보기이며, 사용자가 `실제 도면에 적용`과 `적용 확인`을 둘 다 켠 경우에만 브리지에서 수정이 실행된다.
+- 실행 결과 미리보기에서 `oldText/newText/applied` 원시 필드를 그대로 보여주지 않고 `기존 문자`, `변경 문자`, `적용 여부` 표로 표시하도록 보강했다.
+
+## 2026-07-09 추가 260
+
+- `cad.renumber_selected_text` 실행 시 선택 객체가 없거나 선택 객체 안에 TEXT/MTEXT가 없을 때 사용자에게 바로 이해되는 복구 안내가 나오도록 공통 MCP 실패 메시지를 보강했다.
+- `confirmApplyRequired` 응답도 `적용 확인`을 켜야 실제 도면 수정이 된다는 안내로 변환한다.
+- 이 안내는 Custom Flow 실행 로그와 노드 오류 표시에서 함께 사용되므로, CAD 순번 변경 노드가 조용히 실패하지 않고 다음 행동을 알려준다.
+
+## 2026-07-09 추가 261
+
+- `tools/CAD_선택_문자_순번_변경_1.0.0.md`를 추가해 Custom Flow 노드뿐 아니라 CAD 툴 페이지에서도 같은 `cad.renumber_selected_text` 명령을 사용할 수 있게 했다.
+- 새 MD 툴은 `미리보기`와 `적용` action을 분리하고, 적용 action은 미리보기 이후 확인을 요구한다.
+- MCP 파라미터는 `preview`에서는 `apply=false`, `confirmApply=false`, `apply`에서는 `apply=true`, `confirmApply=true`로 나뉜다.
+- `toolSettingsSchema.test.ts`에 새 MD 파일 파싱/런타임 스키마 검증 테스트를 추가했다.
+
+## 2026-07-09 추가 262
+
+- `package-win.mjs`가 `tools/mcp-bridges`만 복사하고 루트의 `tools/*.md` 툴 파일은 release app에 포함하지 않는 문제를 확인했다.
+- 이 때문에 새로 추가한 CAD MD 툴이 exe 패키지 안에 들어가지 않았다.
+- 패키징 스크립트에 `copyToolMarkdownFiles`를 추가해 `tools` 루트의 `.md` 파일을 `resources/app/tools`로 복사하도록 수정했다.
+- `packageWinScript.test.ts`를 추가해 이 누락이 다시 생기면 테스트가 실패하도록 했다.

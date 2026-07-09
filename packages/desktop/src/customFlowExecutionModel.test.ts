@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultFlowConnections, defaultFlowNodes } from "./customFlowModel";
+import { defaultFlowConnections, defaultFlowNodes, flowToolPalette } from "./customFlowModel";
 import {
   buildFlowNodeExecutionRequest,
   flowInputResultsForNode,
@@ -43,6 +43,111 @@ describe("customFlowExecutionModel", () => {
 
     expect(flowInputResultsForNode(nodes[1], defaultFlowConnections(), resultsByNodeId)).toEqual({
       objects: { rows: [{ handle: "A1" }] }
+    });
+  });
+
+  it("builds an executable MCP request for reading Revit levels", () => {
+    const tool = flowToolPalette.find((item) => item.id === "revit-list-levels");
+    expect(tool).toBeDefined();
+
+    const request = buildFlowNodeExecutionRequest({
+      node: {
+        ...tool!,
+        nodeId: "node-revit-list-levels",
+        x: 0,
+        y: 0
+      },
+      menuName: "Custom Flow",
+      runtimeAction: "apply"
+    });
+
+    expect(request).toMatchObject({
+      requiredServers: ["revit"],
+      commands: [
+        {
+          server: "revit",
+          command: "revit.list_levels",
+          status: "available",
+          params: {}
+        }
+      ]
+    });
+  });
+
+  it("builds an executable MCP request for selected AutoCAD text renumbering", () => {
+    const tool = flowToolPalette.find((item) => item.id === "cad-renumber-selected-text");
+    expect(tool).toBeDefined();
+
+    const previewRequest = buildFlowNodeExecutionRequest({
+      node: {
+        ...tool!,
+        nodeId: "node-cad-renumber",
+        x: 0,
+        y: 0,
+        settingsValues: {
+          prefix: "A-",
+          suffix: "",
+          start_number: 1,
+          padding: 3,
+          apply_changes: false,
+          confirm_apply: false
+        }
+      },
+      menuName: "Custom Flow",
+      runtimeAction: "preview"
+    });
+
+    expect(previewRequest?.commands[0]).toMatchObject({
+      server: "cad",
+      command: "cad.renumber_selected_text",
+      status: "available",
+      runtimeAction: "preview",
+      params: {
+        prefix: "A-",
+        suffix: "",
+        startNumber: 1,
+        padding: 3,
+        apply: false,
+        confirmApply: false
+      }
+    });
+
+    const request = buildFlowNodeExecutionRequest({
+      node: {
+        ...tool!,
+        nodeId: "node-cad-renumber",
+        x: 0,
+        y: 0,
+        settingsValues: {
+          prefix: "A-",
+          suffix: "",
+          start_number: 1,
+          padding: 3,
+          apply_changes: false,
+          confirm_apply: false
+        }
+      },
+      menuName: "Custom Flow",
+      runtimeAction: "apply"
+    });
+
+    expect(request).toMatchObject({
+      requiredServers: ["cad"],
+      commands: [
+        {
+          server: "cad",
+          command: "cad.renumber_selected_text",
+          status: "available",
+          params: {
+            prefix: "A-",
+            suffix: "",
+            startNumber: 1,
+            padding: 3,
+            apply: true,
+            confirmApply: true
+          }
+        }
+      ]
     });
   });
 

@@ -71,4 +71,14 @@ describe("registryEditor", () => {
       })
     ).toEqual(["서버 이름을 입력하세요.", "URL 형식을 확인하세요.", "포트는 1-65535 사이여야 합니다.", "실행 명령을 입력하세요."]);
   });
+  it("allows HTTP servers that are started by a host add-in", () => {
+    expect(
+      validateServerDraft({
+        ...createServerDraft("revit"),
+        name: "Revit MCP Bridge",
+        launchCommand: "",
+        workingDirectory: ""
+      })
+    ).toEqual([]);
+  });
 });

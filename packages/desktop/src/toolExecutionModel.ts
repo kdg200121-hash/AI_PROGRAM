@@ -57,6 +57,12 @@ function fieldValues(schema: ToolRuntimeSchema, values?: Record<string, ToolSett
 function resolveParamValue(raw: string, values: Record<string, ToolSettingValue>) {
   const settingMatch = raw.match(/^settings\.([A-Za-z0-9_-]+)$/);
   if (!settingMatch) {
+    if (raw === "true") {
+      return true;
+    }
+    if (raw === "false") {
+      return false;
+    }
     return raw;
   }
   return values[settingMatch[1]] ?? "";
@@ -235,6 +241,38 @@ export function toolExecutionFailureMessage(result: ToolExecutionResult): string
   }
 
   return "";
+}
+
+function executionSearchText(result: ToolExecutionResult) {
+  return [toolExecutionFailureMessage(result), result.message, JSON.stringify(result.raw ?? {})]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function toolExecutionRecoveryMessage(result: ToolExecutionResult): string {
+  const message = executionSearchText(result);
+  if (/revitBusyOrBlocked|Press ESC in Revit|Timed out while reading Revit|Revit.*timed out/i.test(message)) {
+    return "Revit이 현재 명령/선택 상태라 응답하지 않습니다. Revit에서 ESC를 눌러 현재 명령을 취소한 뒤 다시 실행하세요.";
+  }
+  if (/textSelectionRequired|Selected objects do not include AutoCAD TEXT or MTEXT/i.test(message)) {
+    return "선택한 객체 안에 TEXT/MTEXT 문자가 없습니다. AutoCAD에서 변경할 문자 객체만 다시 선택한 뒤 실행하세요.";
+  }
+  if (/selectionRequired|Select AutoCAD TEXT or MTEXT objects first|Select the CAD objects/i.test(message)) {
+    return "AutoCAD에서 문자 객체를 먼저 선택한 뒤 다시 실행하세요. 이 명령은 선택된 TEXT/MTEXT만 처리합니다.";
+  }
+  if (/confirmApplyRequired|confirmApply=true|Preview is ready/i.test(message)) {
+    return "미리보기는 완료됐지만 실제 도면 수정은 막혀 있습니다. 실제로 바꾸려면 노드 설정에서 적용 확인을 켜고 다시 실행하세요.";
+  }
+  if (/emptySource|no rows to write|has no rows/i.test(message)) {
+    return "앞 노드 결과가 비어 있어 다음 노드로 넘길 데이터가 없습니다. 연결선과 이전 노드 실행 결과를 확인하세요.";
+  }
+  if (/ECONNREFUSED|connection refused|fetch failed|Failed to fetch|connect ECONN/i.test(message)) {
+    return "MCP 서버에 연결하지 못했습니다. 해당 프로그램이 켜져 있는지, MCP 서버가 실행 중인지, 포트가 맞는지 확인하세요.";
+  }
+  if (/timeout|timed out|operation has timed out/i.test(message)) {
+    return "응답 시간이 초과되었습니다. 큰 파일을 처리 중이거나 외부 프로그램이 다른 명령 상태일 수 있습니다. 잠시 기다린 뒤 다시 실행하세요.";
+  }
+  return toolExecutionFailureMessage(result);
 }
 
 function candidateArrays(payload: unknown): unknown[] {

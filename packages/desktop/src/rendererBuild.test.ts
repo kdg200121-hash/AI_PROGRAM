@@ -256,7 +256,12 @@ describe("renderer build config", () => {
     );
 
     expect(runFlowBlock).toContain("buildFlowNodeExecutionRequest");
-    expect(runFlowBlock).toContain("window.toolExecution.run(request)");
+    expect(appSource).toContain("window.toolExecution!.run(request)");
+    expect(runFlowBlock).toContain("runToolExecutionWithReliabilityNotices(request");
+    expect(appSource).toContain("revitBusyRecoveryMessage");
+    expect(appSource).toContain("flowSlowExecutionMessage");
+    expect(appSource).toContain("toolExecutionRecoveryMessage");
+    expect(runFlowBlock).toContain("revitBusyRecoveryMessage");
     expect(runFlowBlock).toContain("flowResultPayload(result)");
     expect(runFlowBlock).not.toContain("setTimeout");
   });

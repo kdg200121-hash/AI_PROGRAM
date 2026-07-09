@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>AI Program Revit MCP Bridge</Name>
+    <Assembly>{{ASSEMBLY_PATH}}</Assembly>
+    <AddInId>7C5B9975-8E15-4828-98B6-0F7809739F6E</AddInId>
+    <FullClassName>RevitMcpBridge.RevitMcpBridgeApp</FullClassName>
+    <VendorId>AIPG</VendorId>
+    <VendorDescription>AI Program local MCP bridge for Revit</VendorDescription>
+  </AddIn>
+</RevitAddIns>

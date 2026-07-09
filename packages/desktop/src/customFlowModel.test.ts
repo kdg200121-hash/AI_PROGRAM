@@ -16,14 +16,18 @@ import {
 } from "./customFlowModel";
 
 describe("customFlowModel", () => {
-  it("uses readable Korean labels for the built-in flow tools", () => {
-    expect(flowToolPalette.map((tool) => tool.name)).toEqual([
-      "CAD 객체 읽기",
-      "Excel 내보내기",
-      "Revit 배치"
+  it("exposes the built-in flow tools in the expected order", () => {
+    expect(flowToolPalette.map((tool) => tool.id)).toEqual([
+      "cad-read",
+      "excel-export",
+      "revit-list-levels",
+      "revit-place",
+      "cad-renumber-selected-text"
     ]);
-    expect(flowToolPalette[0].outputs.map((port) => port.label)).toEqual(["객체", "Excel"]);
-    expect(flowToolPalette[2].inputs.map((port) => port.label)).toEqual(["Excel", "좌표"]);
+    expect(flowToolPalette[0].outputs.map((port) => port.id)).toEqual(["objects", "excel-table"]);
+    expect(flowToolPalette[2].inputs).toEqual([]);
+    expect(flowToolPalette[2].outputs.map((port) => port.id)).toEqual(["levels"]);
+    expect(flowToolPalette[3].inputs.map((port) => port.id)).toEqual(["excel-file", "coordinates"]);
   });
 
   it("keeps built-in flow tools executable with settings schemas", () => {
@@ -36,10 +40,74 @@ describe("customFlowModel", () => {
     expect(flowToolPalette[0].settingsSchema?.settings.map((field) => field.id)).toContain(
       "selection_scope"
     );
+    expect(flowToolPalette[0].settingsSchema?.settings.map((field) => field.id)).toEqual(
+      expect.arrayContaining(["window_point1", "window_point2"])
+    );
+    expect(flowToolPalette[0].settingsSchema?.mcpCommands[0].params).toMatchObject({
+      point1: "settings.window_point1",
+      point2: "settings.window_point2"
+    });
     expect(flowToolPalette[1].settingsSchema?.settings.map((field) => field.type)).toContain(
       "overwrite-policy"
     );
-    expect(flowToolPalette[2].settingsSchema?.resultSchema.type).toBe("revit_element_ids");
+    expect(flowToolPalette[2].settingsSchema?.mcpCommands[0]).toMatchObject({
+      server: "revit",
+      command: "revit.list_levels",
+      status: "available"
+    });
+    expect(flowToolPalette[2].settingsSchema?.resultSchema.type).toBe("table");
+    expect(flowToolPalette[3].settingsSchema?.resultSchema.type).toBe("revit_element_ids");
+  });
+
+  it("exposes a safe selected AutoCAD text renumber tool", () => {
+    const tool = flowToolPalette.find((item) => item.id === "cad-renumber-selected-text");
+
+    expect(tool).toBeDefined();
+    expect(tool?.inputs.map((port) => port.id)).toEqual(["cad-source"]);
+    expect(tool?.outputs.map((port) => port.id)).toEqual(["renumbered-text"]);
+    expect(tool?.settingsSchema?.requiredServers).toEqual(["cad"]);
+    expect(tool?.settingsSchema?.risk).toBe("modify");
+    expect(tool?.settingsSchema?.actions.map((action) => action.runtimeAction)).toEqual([
+      "preview",
+      "apply"
+    ]);
+    expect(tool?.settingsSchema?.actions.find((action) => action.runtimeAction === "apply")).toMatchObject({
+      requiresPreview: true,
+      confirm: true
+    });
+    expect(tool?.settingsSchema?.executionSteps?.map((step) => step.label)).toEqual([
+      "순번 규칙 입력",
+      "미리보기 확인",
+      "도면에 적용"
+    ]);
+    expect(tool?.settingsSchema?.mcpCommands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          server: "cad",
+          command: "cad.renumber_selected_text",
+          runtimeAction: "preview",
+          status: "available",
+          params: expect.objectContaining({
+            prefix: "settings.prefix",
+            suffix: "settings.suffix",
+            startNumber: "settings.start_number",
+            padding: "settings.padding",
+            apply: "false",
+            confirmApply: "false"
+          })
+        }),
+        expect.objectContaining({
+          server: "cad",
+          command: "cad.renumber_selected_text",
+          runtimeAction: "apply",
+          status: "available",
+          params: expect.objectContaining({
+            apply: "true",
+            confirmApply: "true"
+          })
+        })
+      ])
+    );
   });
 
   it("connects lines to the center of the visible port connector", () => {

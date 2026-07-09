@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import {
   buildToolExecutionRequest,
   extractTitleBlockCandidates,
-  toolExecutionFailureMessage
+  toolExecutionFailureMessage,
+  toolExecutionRecoveryMessage
 } from "./toolExecutionModel";
 import type { ToolRuntimeSchema } from "./toolSettingsSchema";
 
@@ -101,6 +102,7 @@ describe("tool execution model", () => {
     expect(JSON.stringify(request.commands[0].params.files)).toContain("A-101.dwg");
     expect(request.aiInstruction).toContain("도곽 후보");
     expect(request.aiInstruction).toContain("블록명");
+    expect(request.aiInstruction).not.toMatch(/�|媛|紐|꾨|ㅽ/);
   });
 
   it("keeps only commands for the requested runtime action when commands are scoped", () => {
@@ -206,5 +208,55 @@ describe("tool execution model", () => {
         raw: { mcp: { ok: false, message: "도곽 후보를 찾지 못했습니다." } }
       })
     ).toBe("도곽 후보를 찾지 못했습니다.");
+  });
+
+  it("returns practical recovery messages for common MCP execution failures", () => {
+    expect(
+      toolExecutionRecoveryMessage({
+        status: "error",
+        message: "",
+        raw: { code: "revitBusyOrBlocked", suggestion: "Press ESC in Revit" }
+      })
+    ).toContain("Revit에서 ESC");
+    expect(
+      toolExecutionRecoveryMessage({
+        status: "error",
+        message: "fetch failed ECONNREFUSED 127.0.0.1:5101"
+      })
+    ).toContain("MCP 서버에 연결하지 못했습니다");
+    expect(
+      toolExecutionRecoveryMessage({
+        status: "error",
+        message: "The operation has timed out."
+      })
+    ).toContain("응답 시간이 초과");
+    expect(
+      toolExecutionRecoveryMessage({
+        status: "error",
+        message: "",
+        raw: { code: "emptySource", message: "Excel export has no rows to write." }
+      })
+    ).toContain("앞 노드 결과");
+    expect(
+      toolExecutionRecoveryMessage({
+        status: "error",
+        message: "",
+        raw: { code: "selectionRequired", message: "Select AutoCAD TEXT or MTEXT objects first." }
+      })
+    ).toContain("AutoCAD에서 문자 객체를 먼저 선택");
+    expect(
+      toolExecutionRecoveryMessage({
+        status: "error",
+        message: "",
+        raw: { code: "textSelectionRequired", message: "Selected objects do not include AutoCAD TEXT or MTEXT." }
+      })
+    ).toContain("TEXT/MTEXT");
+    expect(
+      toolExecutionRecoveryMessage({
+        status: "error",
+        message: "",
+        raw: { code: "confirmApplyRequired", message: "Run again with confirmApply=true." }
+      })
+    ).toContain("적용 확인");
   });
 });

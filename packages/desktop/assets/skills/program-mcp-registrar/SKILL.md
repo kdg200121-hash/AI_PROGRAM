@@ -81,14 +81,14 @@ Use these global Codex MCP names for the default AI Program bridges:
 | Program | Codex MCP name | URL |
 |---|---|---|
 | AutoCAD | `ai-program-cad` | `http://127.0.0.1:5100/mcp` |
-| Revit | `ai-program-revit` | `http://127.0.0.1:5001/mcp` |
+| Revit | `ai-program-revit` | `http://127.0.0.1:5101/mcp` |
 | Excel | `ai-program-excel` | `http://127.0.0.1:5200/mcp` |
 
 If missing, add them with:
 
 ```powershell
 codex mcp add ai-program-cad --url http://127.0.0.1:5100/mcp
-codex mcp add ai-program-revit --url http://127.0.0.1:5001/mcp
+codex mcp add ai-program-revit --url http://127.0.0.1:5101/mcp
 codex mcp add ai-program-excel --url http://127.0.0.1:5200/mcp
 ```
 
@@ -164,7 +164,7 @@ These values are defaults, not proof that the bridge exists.
 | Program | Target | Server name | URL | Port | Typical bridge |
 |---|---|---|---|---:|---|
 | AutoCAD | CAD | AutoCAD MCP Bridge | `http://localhost:5100/mcp` | 5100 | AutoCAD add-in, LISP wrapper, .NET/COM bridge |
-| Revit | Revit | Revit MCP Bridge | `http://localhost:5001/mcp` | 5001 | Revit add-in or ExternalEvent bridge |
+| Revit | Revit | Revit MCP Bridge | `http://localhost:5101/mcp` | 5101 | Revit add-in or ExternalEvent bridge |
 | Excel | Excel | Excel MCP Bridge | `http://localhost:5200/mcp` | 5200 | Office add-in, COM bridge, workbook automation bridge |
 | Tekla | Tekla | Tekla MCP Bridge | `http://localhost:5300/mcp` | 5300 | Tekla Open API bridge |
 | Dynamo | Revit | Dynamo MCP Bridge | `http://localhost:5400/mcp` | 5400 | Revit/Dynamo dependent bridge |

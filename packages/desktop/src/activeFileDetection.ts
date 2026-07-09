@@ -1,7 +1,21 @@
 import { basename } from "node:path";
 import type { FlowActiveFileSelection } from "./customFlowModel";
+import type { McpServerRecord } from "@mcp-registry/shared";
 
 type ActiveFileProgram = FlowActiveFileSelection["program"];
+
+export function activeFileProgramForTarget(target: McpServerRecord["target"]) {
+  if (target === "cad") {
+    return "cad" as const;
+  }
+  if (target === "revit") {
+    return "revit" as const;
+  }
+  if (target === "excel") {
+    return "excel" as const;
+  }
+  return null;
+}
 
 export function activeFileProbeUrls(serverUrl: string) {
   const normalizedUrl = serverUrl.trim();
@@ -60,7 +74,8 @@ function activeFileCandidates(payload: unknown): unknown[] {
     record.currentFile,
     record.current_file,
     record.file,
-    record.document
+    record.document,
+    record.workbook
   ].filter(Boolean);
   const arrayCandidates = [
     record.activeFiles,
@@ -97,6 +112,7 @@ function normalizeActiveFileCandidate(
   const record = candidate as Record<string, unknown>;
   const rawPath = firstString(
     record.path,
+    record.fullName,
     record.fullPath,
     record.full_path,
     record.filePath,

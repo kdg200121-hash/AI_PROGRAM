@@ -166,6 +166,8 @@ export const flowToolPalette: FlowTool[] = [
           status: "available",
           params: {
             scope: "settings.selection_scope",
+            point1: "settings.window_point1",
+            point2: "settings.window_point2",
             objectTypes: "settings.object_types",
             unit: "settings.unit",
             tolerance: "settings.tolerance"
@@ -188,6 +190,30 @@ export const flowToolPalette: FlowTool[] = [
           required: true,
           default: "current_selection",
           description: "읽어올 CAD 객체 범위를 선택합니다.",
+          section: "input",
+          preview: true
+        },
+        {
+          id: "window_point1",
+          label: "범위 시작 좌표",
+          type: "text",
+          required: false,
+          default: "",
+          description: "범위 선택 시 사용할 첫 좌표입니다. 예: 0,0,0",
+          placeholder: "0,0,0",
+          visibleWhen: { field: "selection_scope", equals: "window" },
+          section: "input",
+          preview: true
+        },
+        {
+          id: "window_point2",
+          label: "범위 끝 좌표",
+          type: "text",
+          required: false,
+          default: "",
+          description: "범위 선택 시 사용할 반대편 좌표입니다. 예: 1000,1000,0",
+          placeholder: "1000,1000,0",
+          visibleWhen: { field: "selection_scope", equals: "window" },
           section: "input",
           preview: true
         },
@@ -266,7 +292,7 @@ export const flowToolPalette: FlowTool[] = [
         {
           server: "excel",
           command: "excel.write_table",
-          status: "planned",
+          status: "available",
           params: {
             source: "previous.result",
             outputFolder: "settings.export_path",
@@ -327,6 +353,61 @@ export const flowToolPalette: FlowTool[] = [
       resultSchema: {
         type: "file",
         fields: [{ id: "path", label: "Excel 파일 경로", type: "file" }]
+      }
+    }
+  },
+  {
+    id: "revit-list-levels",
+    programIcon: "revit",
+    name: "Revit 레벨 읽기",
+    description: "현재 열린 Revit 모델의 레벨 이름과 높이를 읽어 다음 노드로 전달합니다.",
+    inputs: [],
+    outputs: [makeFlowPort("levels", "레벨", "object", "revit")],
+    settingsSchema: {
+      ...defaultToolRuntimeSchema,
+      risk: "read",
+      executionMode: "mcp",
+      requiredServers: ["revit"],
+      mcpCommands: [
+        {
+          server: "revit",
+          command: "revit.list_levels",
+          status: "available",
+          params: {}
+        }
+      ],
+      settingsLayout: {
+        mode: "sections",
+        sections: [{ id: "input", label: "입력", defaultOpen: true }]
+      },
+      settings: [
+        {
+          id: "source",
+          label: "대상 모델",
+          type: "text",
+          required: true,
+          default: "active_document",
+          description: "현재 Revit에서 열려 있는 활성 모델을 사용합니다.",
+          section: "input",
+          hidden: true
+        }
+      ],
+      preflightChecks: [
+        {
+          id: "revit_model_open",
+          label: "Revit 모델 열림",
+          severity: "error",
+          message: "Revit에서 모델이 열려 있어야 레벨을 읽을 수 있습니다.",
+          blocksExecution: true
+        }
+      ],
+      resultSchema: {
+        type: "table",
+        fields: [
+          { id: "id", label: "레벨 ID", type: "text" },
+          { id: "name", label: "레벨 이름", type: "text" },
+          { id: "elevationFeet", label: "높이(ft)", type: "number" }
+        ]
       }
     }
   },
@@ -419,6 +500,185 @@ export const flowToolPalette: FlowTool[] = [
       resultSchema: {
         type: "revit_element_ids",
         fields: [{ id: "element_id", label: "Revit 요소 ID", type: "text" }]
+      }
+    }
+  },
+  {
+    id: "cad-renumber-selected-text",
+    programIcon: "cad",
+    name: "CAD 선택 문자 순번 변경",
+    description: "AutoCAD에서 선택한 TEXT/MTEXT만 대상으로 순번 변경을 미리보기하거나 적용합니다.",
+    inputs: [makeFlowPort("cad-source", "CAD", "cad")],
+    outputs: [makeFlowPort("renumbered-text", "변경 결과", "table", "cad")],
+    settingsSchema: {
+      ...defaultToolRuntimeSchema,
+      risk: "modify",
+      executionMode: "mcp",
+      requiredServers: ["cad"],
+      mcpCommands: [
+        {
+          server: "cad",
+          command: "cad.renumber_selected_text",
+          status: "available",
+          runtimeAction: "preview",
+          params: {
+            prefix: "settings.prefix",
+            suffix: "settings.suffix",
+            startNumber: "settings.start_number",
+            padding: "settings.padding",
+            apply: "false",
+            confirmApply: "false"
+          }
+        },
+        {
+          server: "cad",
+          command: "cad.renumber_selected_text",
+          status: "available",
+          runtimeAction: "apply",
+          params: {
+            prefix: "settings.prefix",
+            suffix: "settings.suffix",
+            startNumber: "settings.start_number",
+            padding: "settings.padding",
+            apply: "true",
+            confirmApply: "true"
+          }
+        }
+      ],
+      settingsLayout: {
+        mode: "sections",
+        sections: [
+          { id: "numbering", label: "순번 규칙", defaultOpen: true },
+          { id: "safety", label: "적용 확인", defaultOpen: true }
+        ]
+      },
+      executionSteps: [
+        {
+          id: "numbering",
+          label: "순번 규칙 입력",
+          description: "앞 글자, 시작 번호, 자릿수를 입력합니다.",
+          section: "numbering",
+          state: "active"
+        },
+        {
+          id: "preview",
+          label: "미리보기 확인",
+          description: "선택한 문자에 들어갈 새 번호를 먼저 확인합니다.",
+          actionId: "preview",
+          state: "active"
+        },
+        {
+          id: "apply",
+          label: "도면에 적용",
+          description: "미리보기 결과를 확인한 뒤 실제 선택 문자에 적용합니다.",
+          actionId: "apply",
+          state: "waiting"
+        }
+      ],
+      settings: [
+        {
+          id: "prefix",
+          label: "앞 글자",
+          type: "text",
+          required: false,
+          default: "",
+          description: "숫자 앞에 붙일 문자입니다. 예: A-",
+          section: "numbering",
+          preview: true
+        },
+        {
+          id: "suffix",
+          label: "뒤 글자",
+          type: "text",
+          required: false,
+          default: "",
+          description: "숫자 뒤에 붙일 문자입니다.",
+          section: "numbering",
+          preview: true
+        },
+        {
+          id: "start_number",
+          label: "시작 번호",
+          type: "number",
+          required: true,
+          default: 1,
+          description: "첫 번째 선택 문자에 넣을 번호입니다.",
+          min: 0,
+          step: 1,
+          section: "numbering",
+          preview: true
+        },
+        {
+          id: "padding",
+          label: "자릿수",
+          type: "number",
+          required: true,
+          default: 0,
+          description: "0보다 크면 번호를 해당 자릿수로 맞춥니다. 예: 3 -> 001",
+          min: 0,
+          step: 1,
+          section: "numbering",
+          preview: true
+        },
+        {
+          id: "apply_changes",
+          label: "실제 도면에 적용",
+          type: "checkbox",
+          required: false,
+          default: false,
+          description: "꺼져 있으면 미리보기만 실행하고 도면은 바꾸지 않습니다.",
+          section: "safety",
+          confirmOnChange: true
+        },
+        {
+          id: "confirm_apply",
+          label: "적용 확인",
+          type: "checkbox",
+          required: false,
+          default: false,
+          description: "실제 변경을 하려면 이 항목도 켜야 합니다.",
+          section: "safety",
+          confirmOnChange: true
+        }
+      ],
+      actions: [
+        {
+          id: "preview",
+          label: "미리보기",
+          runtimeAction: "preview",
+          description: "선택한 TEXT/MTEXT에 적용될 새 문자값만 확인합니다.",
+          primary: true,
+          requiresPreview: false,
+          confirm: false
+        },
+        {
+          id: "apply",
+          label: "적용",
+          runtimeAction: "apply",
+          description: "미리보기 후 선택한 TEXT/MTEXT를 실제로 변경합니다.",
+          primary: true,
+          requiresPreview: true,
+          confirm: true
+        }
+      ],
+      preflightChecks: [
+        {
+          id: "cad_text_selected",
+          label: "CAD 문자 선택",
+          severity: "warning",
+          message: "AutoCAD에서 변경할 TEXT/MTEXT 객체를 먼저 선택해야 합니다.",
+          blocksExecution: false
+        }
+      ],
+      resultSchema: {
+        type: "table",
+        fields: [
+          { id: "handle", label: "핸들", type: "text" },
+          { id: "layer", label: "레이어", type: "text" },
+          { id: "oldText", label: "기존 문자", type: "text" },
+          { id: "newText", label: "변경 문자", type: "text" },
+          { id: "applied", label: "적용 여부", type: "boolean" }
+        ]
       }
     }
   }

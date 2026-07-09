@@ -35,6 +35,128 @@ export interface FlowRunRecord {
   preview: FlowNodePreview;
 }
 
+function payloadRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function displayValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+function objectRowsFromArray(values: unknown[]) {
+  return values.slice(0, 50).map((item, index) => {
+    const record = payloadRecord(item);
+    if (!record) {
+      return { 순서: String(index + 1), 값: displayValue(item) };
+    }
+
+    return Object.fromEntries(
+      Object.entries(record).map(([key, value]) => [key, displayValue(value)])
+    );
+  });
+}
+
+export function buildFlowResultPreviewFromPayload(
+  node: FlowNode,
+  payload: unknown,
+  fallback: FlowNodePreview
+): FlowNodePreview {
+  const record = payloadRecord(payload);
+  const levels = Array.isArray(record?.levels) ? record.levels : null;
+  if (levels) {
+    const count = Number(record?.count ?? levels.length);
+    return {
+      title: `${node.name} 실제 결과`,
+      summary: `Revit 모델에서 ${Number.isFinite(count) ? count : levels.length}개 레벨을 읽었습니다.`,
+      metrics: [
+        { label: "결과 형태", value: "Revit 레벨 목록" },
+        { label: "레벨 수", value: String(Number.isFinite(count) ? count : levels.length) }
+      ],
+      rows: levels.slice(0, 50).map((level, index) => {
+        const levelRecord = payloadRecord(level) ?? {};
+        return {
+          순서: String(index + 1),
+          "레벨 ID": displayValue(levelRecord.id),
+          "레벨 이름": displayValue(levelRecord.name),
+          "높이(ft)": displayValue(levelRecord.elevationFeet)
+        };
+      })
+    };
+  }
+
+  if (record?.command === "cad.renumber_selected_text" && Array.isArray(record.rows)) {
+    const rows = record.rows.slice(0, 50).map((row, index) => {
+      const rowRecord = payloadRecord(row) ?? {};
+      return {
+        순서: displayValue(rowRecord.index ?? index + 1),
+        핸들: displayValue(rowRecord.handle),
+        레이어: displayValue(rowRecord.layer),
+        "기존 문자": displayValue(rowRecord.oldText),
+        "변경 문자": displayValue(rowRecord.newText),
+        "적용 여부": rowRecord.applied === true ? "예" : "아니오"
+      };
+    });
+    return {
+      title: `${node.name} 실제 결과`,
+      summary: `AutoCAD 선택 문자 ${rows.length}개를 ${record.previewOnly === false ? "변경했습니다." : "미리보기로 확인했습니다."}`,
+      metrics: [
+        { label: "결과 형태", value: "CAD 문자 순번 변경" },
+        { label: "문자 수", value: String(rows.length) },
+        { label: "실행 방식", value: record.previewOnly === false ? "실제 적용" : "미리보기" }
+      ],
+      rows
+    };
+  }
+
+  const rows = Array.isArray(record?.rows)
+    ? objectRowsFromArray(record.rows)
+    : Array.isArray(payload)
+      ? objectRowsFromArray(payload)
+      : null;
+  if (rows && rows.length > 0) {
+    return {
+      title: `${node.name} 실제 결과`,
+      summary: `${rows.length}개 행을 받았습니다.`,
+      metrics: [
+        { label: "결과 형태", value: "표" },
+        { label: "행 수", value: String(rows.length) }
+      ],
+      rows
+    };
+  }
+
+  if (record) {
+    return {
+      title: `${node.name} 실제 결과`,
+      summary: "MCP 실행 결과를 받았습니다.",
+      metrics: [{ label: "결과 형태", value: "객체" }],
+      rows: Object.entries(record).map(([key, value]) => ({
+        항목: key,
+        값: displayValue(value)
+      }))
+    };
+  }
+
+  if (payload !== undefined) {
+    return {
+      title: `${node.name} 실제 결과`,
+      summary: "실행 결과 값을 받았습니다.",
+      metrics: [{ label: "결과 형태", value: typeof payload }],
+      rows: [{ 값: displayValue(payload) }]
+    };
+  }
+
+  return fallback;
+}
+
 const riskRank: Record<ToolRuntimeSchema["risk"], number> = {
   safe: 0,
   read: 1,
@@ -196,6 +318,21 @@ function previewForNode(node: FlowNode): FlowNodePreview {
       rows: [
         { "항목": "파일명", "값": "설정값 기준 생성" },
         { "항목": "처리", "값": "표 형식 정리" }
+      ]
+    };
+  }
+
+  if (node.id === "revit-list-levels") {
+    return {
+      title: `${node.name} 결과 미리보기`,
+      summary: "현재 열린 Revit 모델에서 읽은 레벨 이름과 높이 목록을 다음 노드로 전달합니다.",
+      metrics: [
+        { label: "결과 형태", value: "Revit 레벨 목록" },
+        { label: "출력", value: outputLabels }
+      ],
+      rows: [
+        { 항목: "레벨 이름", 값: "Revit 모델에서 실제 실행 시 표시" },
+        { 항목: "높이", 값: "elevationFeet 기준으로 반환" }
       ]
     };
   }

@@ -54,12 +54,24 @@
 - [ ] 공유 Custom Flow 승인/삭제/버전 관리 정책을 커스텀툴 수준으로 확장
 - [x] AutoCAD MCP 브리지에 현재 활성 문서, 레이어, 종이공간 도곽 후보 안전 읽기 명령 구현
 - [x] AutoCAD MCP 브리지에 ActiveSelection/사용자 지정 블록명 기반의 빠른 객체/도곽 후보 읽기 구현
-- [ ] AutoCAD MCP 브리지에 사용자가 지정한 안전 범위/window 기반 객체 읽기와 실제 텍스트 위치 추출 구현
-- [ ] Revit/Excel MCP 브리지에 현재 활성 파일명을 반환하는 endpoint(`/active-file` 또는 `/status`) 구현
+- [x] AutoCAD MCP 브리지에 사용자가 지정한 안전 범위/window 기반 객체 읽기와 실제 텍스트 위치 추출 구현
+- [x] Revit/Excel MCP 브리지에 현재 활성 파일명을 반환하는 endpoint(`/active-file` 또는 `/status`) 구현
+- [x] Revit 전용 애드인 브리지에서 실제 활성 문서명/경로를 `/active-file`로 반환하도록 소스 구현
+- [x] Revit 전용 애드인 브리지를 Revit 한글 UI 기준 `애드인` 탭의 `AI Program` 패널/버튼으로 표시
+- [x] Revit에 `RevitMcpBridge.addin` 설치 후 실제 모델에서 `/active-file` 응답 실기 검증
+- [x] Revit 애드인 MCP 브리지에 안전 읽기 명령 `revit.list_levels` 구현
+- [x] Revit 재시작 후 실제 모델에서 `revit.list_levels` 응답 실기 검증
+- [x] Custom Flow 도구 창에 `Revit 레벨 읽기` 노드 추가 및 `revit.list_levels` 실행 요청 연결
+- [x] Revit 레벨 결과를 Excel 내보내기 브리지로 전달해 xlsx 3행 저장 검증
+- [x] Excel 브리지의 배열 source 처리 버그 수정
+- [x] Custom Flow 실행에서 Revit busy/timeout 응답 재시도 처리
 - [x] `/등록` program-mcp-registrar 스킬을 MCP 브리지 생성/등록/연결/검증 흐름으로 강화
 - [x] `/등록` program-mcp-registrar 스킬을 AI 연결 안내 없이 MCP 브리지 등록/검증 기준으로 정리
 - [x] AutoCAD/Revit/Excel MCP 연결 확인용 로컬 브리지 스캐폴드 추가
 - [x] Codex CLI `~/.codex/config.toml`에 AI Program AutoCAD/Revit/Excel MCP 서버 등록
+- [x] AutoCAD MCP 브리지에 선택된 TEXT/MTEXT만 대상으로 하는 순번 변경 미리보기/적용 명령 구현
+- [x] Custom Flow 도구 팔레트에 AutoCAD 선택 문자 순번 변경 노드 추가
+- [x] CAD 툴 페이지용 `CAD 선택 문자 순번 변경` MD 툴 추가
 - [ ] AutoCAD/Revit/Excel MCP 브리지의 실제 SDK/애드인 쓰기/수정 명령 구현
 - [ ] Custom Flow 노드 드래그, 그룹 해제, 메모 삭제, 흐름 점검 팝업, 도구창 스크롤을 실제 UI 자동 테스트로 검증
 - [x] Custom Tools 로컬 MD 파일 읽기/복사/비교/업로드 IPC를 사용자가 선택한 툴 폴더 안으로 제한
@@ -75,4 +87,5 @@
 - [x] `/make`/`/save` 번들 스킬 문서 UTF-8 재작성 및 스킬 설치 전 깨진 인코딩 검사 추가
 - [ ] 실제 AutoCAD/Revit/Excel 브리지별 `available` MCP 명령 목록을 앱에서 조회해 MD의 `planned`/`available` 상태와 자동 비교
 - [x] Custom Flow 실제 실행 엔진에서 노드별 MCP 결과를 다음 노드 입력으로 전달하고 실패/부분성공 정책을 적용
+- [x] Revit 애드인 브리지에서 Revit 선택/수정 상태로 ExternalEvent가 지연될 때 사용자 안내와 자동 회복 UX 추가
 - [ ] Custom Flow 실제 실행 엔진에 위험 작업 롤백/보상 명령 정책 추가

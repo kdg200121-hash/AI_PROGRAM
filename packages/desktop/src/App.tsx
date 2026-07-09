@@ -132,6 +132,7 @@ import {
   type SmartGuideRect
 } from "./customFlowSmartGuides";
 import {
+  buildFlowResultPreviewFromPayload,
   buildFlowRunRecords,
   resolveFlowRunNodeIds,
   type FlowRunRecord,
@@ -164,7 +165,10 @@ import { buildToolPreviewSummary } from "./toolActionPreview";
 import {
   buildToolExecutionRequest,
   toolExecutionFailureMessage,
-  type TitleBlockCandidate
+  toolExecutionRecoveryMessage,
+  type TitleBlockCandidate,
+  type ToolExecutionRequest,
+  type ToolExecutionResult
 } from "./toolExecutionModel";
 import {
   buildToolExecutionPlan,
@@ -177,6 +181,52 @@ import {
   type ProcessSnapshot,
   type ServerProcessResult
 } from "./processMonitor";
+
+const flowExecutionRetryDelay = (milliseconds: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+
+const revitBusyRecoveryMessage =
+  "Revit이 현재 명령/선택 상태라 응답하지 않습니다. Revit에서 ESC를 눌러 현재 명령을 취소한 뒤 다시 실행하세요.";
+const flowSlowExecutionMessage =
+  "실행이 오래 걸리고 있습니다. 큰 파일 처리, 외부 프로그램의 선택/수정 상태, MCP 서버 응답 지연이 원인일 수 있습니다.";
+
+function isRetriableRevitTimeoutResult(result: ToolExecutionResult) {
+  const message = [toolExecutionFailureMessage(result), result.message, JSON.stringify(result.raw ?? {})]
+    .filter(Boolean)
+    .join(" ");
+  return /revitBusyOrBlocked|Timed out while reading Revit|Press ESC in Revit|Revit.*timeout|Revit.*timed out/i.test(message);
+}
+
+async function runToolExecutionWithRevitRetry(
+  request: ToolExecutionRequest,
+  onRetry: (attempt: number) => void
+) {
+  let result = await window.toolExecution!.run(request);
+  for (let attempt = 1; attempt <= 2 && isRetriableRevitTimeoutResult(result); attempt += 1) {
+    onRetry(attempt);
+    await flowExecutionRetryDelay(1400);
+    result = await window.toolExecution!.run(request);
+  }
+  return result;
+}
+
+async function runToolExecutionWithReliabilityNotices(
+  request: ToolExecutionRequest,
+  onNotice: (message: string) => void
+) {
+  const slowTimer = window.setTimeout(() => {
+    onNotice(flowSlowExecutionMessage);
+  }, 8000);
+  try {
+    return await runToolExecutionWithRevitRetry(request, (attempt) => {
+      onNotice(`Revit 응답이 늦어 ${attempt + 1}번째로 다시 시도합니다.`);
+    });
+  } finally {
+    window.clearTimeout(slowTimer);
+  }
+}
 
 function normalizeToolRuntimeSchemaForRender(schema: ToolRuntimeSchema): ToolRuntimeSchema {
   return {
@@ -232,6 +282,8 @@ const flowNoteColorOptions = [
   "#e0e7ff",
   "#fef3c7"
 ];
+const revitListLevelsFlowTool = flowToolPalette.find((tool) => tool.id === "revit-list-levels");
+
 const flowBasicTools: FlowTool[] = [
   {
     id: "basic-excel-export",
@@ -241,6 +293,7 @@ const flowBasicTools: FlowTool[] = [
     inputs: [{ id: "objects", label: "객체", type: "object", iconName: "objectData" }],
     outputs: [{ id: "excel-file", label: "Excel", type: "excel", iconName: "excel" }]
   },
+  ...(revitListLevelsFlowTool ? [revitListLevelsFlowTool] : []),
   {
     id: "basic-result-preview",
     programIcon: "preview",
@@ -1244,13 +1297,13 @@ const fallbackRegistry: RegistryFile = {
       name: "Revit MCP 브리지",
       target: "revit",
       connectionType: "http",
-      url: "http://localhost:5001/mcp",
-      port: 5001,
-      launchCommand: "revit-mcp-bridge.exe",
-      workingDirectory: "C:\\Tools\\RevitMcpBridge",
+      url: "http://localhost:5101/mcp",
+      port: 5101,
+      launchCommand: "",
+      workingDirectory: "",
       environment: {},
       status: "unknown",
-      notes: "Revit 연결 자리입니다. 이후 CAD 정보로 Revit 작업을 실행할 때 사용합니다.",
+      notes: "Revit 애드인에서 실행되는 MCP 브리지입니다. AI Program은 5101 endpoint를 확인합니다.",
       createdAt: "2026-07-03T00:00:00.000Z",
       updatedAt: "2026-07-03T00:00:00.000Z"
     },
@@ -11763,7 +11816,7 @@ function WorkflowView({
       const detectedFiles = await window.activeFiles.detect();
       if (detectedFiles.length === 0) {
         setActiveFileRefreshMessage(
-          "CAD/Revit MCP 서버에서 현재 파일명을 받지 못했습니다. MCP 서버가 실행 중인지 확인하세요."
+          "CAD/Revit/Excel MCP 서버에서 현재 파일명을 받지 못했습니다. MCP 서버와 대상 프로그램이 실행 중인지 확인하세요."
         );
         return;
       }
@@ -13309,11 +13362,27 @@ function WorkflowView({
     const updateRunRecord = (
       nodeId: string,
       status: FlowRunRecord["status"],
-      message: string
+      message: string,
+      payload?: unknown,
+      sourceNode?: FlowNode
     ) => {
       setFlowRunRecords((records) =>
         records.map((record) =>
-          record.nodeId === nodeId ? { ...record, status, message } : record
+          record.nodeId === nodeId
+            ? {
+                ...record,
+                status,
+                message,
+                preview:
+                  payload === undefined
+                    ? record.preview
+                    : buildFlowResultPreviewFromPayload(
+                        sourceNode ?? nodeMap.get(nodeId)!,
+                        payload,
+                        record.preview
+                      )
+              }
+            : record
         )
       );
     };
@@ -13371,8 +13440,9 @@ function WorkflowView({
       });
 
       if (!request) {
-        resultsByNodeId.set(nodeId, syntheticFlowNodeResult(node, inputResults));
-        updateRunRecord(nodeId, "success", "보조 노드 결과를 다음 노드로 전달했습니다.");
+        const payload = syntheticFlowNodeResult(node, inputResults);
+        resultsByNodeId.set(nodeId, payload);
+        updateRunRecord(nodeId, "success", "보조 노드 결과를 다음 노드로 전달했습니다.", payload, node);
         continue;
       }
 
@@ -13385,7 +13455,9 @@ function WorkflowView({
       }
 
       try {
-        const result = await window.toolExecution.run(request);
+        const result = await runToolExecutionWithReliabilityNotices(request, (message) => {
+          updateRunRecord(nodeId, "running", message);
+        });
         if (flowRunSequenceRef.current !== runSequence) {
           return;
         }
@@ -13393,7 +13465,11 @@ function WorkflowView({
         const failureMessage = toolExecutionFailureMessage(result);
         const isSuccessfulResult = result.status === "completed" || result.status === "preview";
         if (failureMessage || !isSuccessfulResult) {
+          const recoveryMessage = isRetriableRevitTimeoutResult(result)
+            ? revitBusyRecoveryMessage
+            : toolExecutionRecoveryMessage(result);
           const message =
+            recoveryMessage ||
             failureMessage ||
             (result.status === "needs-ai"
               ? "AI 확인 또는 추가 처리가 필요해 이 노드를 완료하지 못했습니다."
@@ -13407,17 +13483,22 @@ function WorkflowView({
           continue;
         }
 
-        resultsByNodeId.set(nodeId, flowResultPayload(result));
+        const payload = flowResultPayload(result);
+        resultsByNodeId.set(nodeId, payload);
         updateRunRecord(
           nodeId,
           "success",
-          result.message || "MCP 실행 완료. 중간 결과를 확인하세요."
+          result.message || "MCP 실행 완료. 중간 결과를 확인하세요.",
+          payload,
+          node
         );
       } catch (error) {
         if (flowRunSequenceRef.current !== runSequence) {
           return;
         }
-        const message = error instanceof Error ? error.message : "툴 실행 요청 중 오류가 발생했습니다.";
+        const rawMessage = error instanceof Error ? error.message : "툴 실행 요청 중 오류가 발생했습니다.";
+        const message =
+          toolExecutionRecoveryMessage({ status: "error", message: rawMessage }) || rawMessage;
         updateRunRecord(nodeId, "error", message);
         reportNodeFailure(node, message);
         if (!shouldContinueAfterFlowNodeFailure(node)) {

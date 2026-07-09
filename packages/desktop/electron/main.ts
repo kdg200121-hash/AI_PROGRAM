@@ -34,6 +34,7 @@ import {
   normalizeAllowedPath
 } from "../src/filePathSecurity";
 import {
+  activeFileProgramForTarget,
   activeFileProbeUrls,
   extractDetectedActiveFiles
 } from "../src/activeFileDetection";
@@ -422,16 +423,6 @@ async function updateGitHubNickname(nickname: string) {
 
   profile.nickname = nickname.trim() || profile.githubId;
   return saveGitHubAuthProfile(profile);
-}
-
-function activeFileProgramForTarget(target: McpServerRecord["target"]) {
-  if (target === "cad") {
-    return "cad" as const;
-  }
-  if (target === "revit") {
-    return "revit" as const;
-  }
-  return null;
 }
 
 async function fetchJsonWithTimeout(url: string, timeoutMs = 800) {
@@ -1958,6 +1949,8 @@ async function ensureBundledProgramBridgeServers(targetPath: string) {
     port: number;
     program: string;
     notes: string;
+    launchCommand?: string;
+    workingDirectory?: string;
   }> = [
     {
       id: "cad-default",
@@ -1972,10 +1965,12 @@ async function ensureBundledProgramBridgeServers(targetPath: string) {
       id: "revit-default",
       name: "Revit MCP Bridge",
       target: "revit",
-      url: "http://localhost:5001/mcp",
-      port: 5001,
+      url: "http://localhost:5101/mcp",
+      port: 5101,
       program: "Revit",
-      notes: "Local Revit MCP bridge. The process can be detected by AI Program; real Revit API/add-in commands are the next integration step."
+      launchCommand: "",
+      workingDirectory: "",
+      notes: "Local Revit MCP add-in bridge. Revit starts this bridge from the Add-Ins tab; AI Program only checks the HTTP endpoint."
     },
     {
       id: "excel-default",
@@ -1991,7 +1986,10 @@ async function ensureBundledProgramBridgeServers(targetPath: string) {
   let changed = false;
   const servers = [...registry.servers];
   for (const definition of definitions) {
-    const launchCommand = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${bridgeScript}" -Program "${definition.program}" -Target "${definition.target}" -Port ${definition.port}`;
+    const launchCommand =
+      definition.launchCommand ??
+      `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${bridgeScript}" -Program "${definition.program}" -Target "${definition.target}" -Port ${definition.port}`;
+    const workingDirectory = definition.workingDirectory ?? bridgeWorkingDirectory;
     const existingIndex = servers.findIndex(
       (server) => server.id === definition.id || server.url === definition.url
     );
@@ -2003,7 +2001,7 @@ async function ensureBundledProgramBridgeServers(targetPath: string) {
       url: definition.url,
       port: definition.port,
       launchCommand,
-      workingDirectory: bridgeWorkingDirectory,
+      workingDirectory,
       environment: {},
       status: "unknown",
       notes: definition.notes,

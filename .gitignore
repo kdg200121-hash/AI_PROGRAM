@@ -33,5 +33,7 @@ build/
 out/
 release/
 .vite/
+tools/**/bin/
+tools/**/obj/
 .DS_Store
 Thumbs.db

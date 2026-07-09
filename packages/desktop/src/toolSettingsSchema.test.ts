@@ -5,6 +5,7 @@ import {
   flowPortTypeFromToolType,
   parseToolRuntimeSchema
 } from "./toolSettingsSchema";
+import { validateToolRuntimeSchema } from "./toolRuntimeValidation";
 
 describe("toolSettingsSchema", () => {
   it("parses common settings fields from AI Program tool frontmatter", () => {
@@ -310,6 +311,57 @@ executionSteps:
       scope: "settings.title_block_detection_scope",
       blockName: "settings.title_block_name"
     });
+  });
+
+  it("parses CAD selected text renumber tool as a safe preview/apply workflow", () => {
+    const markdown = readFileSync(
+      new URL("../../../tools/CAD_선택_문자_순번_변경_1.0.0.md", import.meta.url),
+      "utf8"
+    );
+    const schema = parseToolRuntimeSchema(markdown);
+
+    expect(schema.requiredServers).toEqual(["cad"]);
+    expect(schema.settings.map((field) => field.id)).toEqual(["prefix", "suffix", "start_number", "padding"]);
+    expect(schema.actions.map((action) => ({
+      id: action.id,
+      runtimeAction: action.runtimeAction,
+      requiresPreview: action.requiresPreview,
+      confirm: action.confirm
+    }))).toEqual([
+      { id: "preview", runtimeAction: "preview", requiresPreview: false, confirm: false },
+      { id: "apply", runtimeAction: "apply", requiresPreview: true, confirm: true }
+    ]);
+    expect(schema.mcpCommands.map((command) => ({
+      command: command.command,
+      runtimeAction: command.runtimeAction,
+      params: command.params
+    }))).toEqual([
+      {
+        command: "cad.renumber_selected_text",
+        runtimeAction: "preview",
+        params: {
+          prefix: "settings.prefix",
+          suffix: "settings.suffix",
+          startNumber: "settings.start_number",
+          padding: "settings.padding",
+          apply: "false",
+          confirmApply: "false"
+        }
+      },
+      {
+        command: "cad.renumber_selected_text",
+        runtimeAction: "apply",
+        params: {
+          prefix: "settings.prefix",
+          suffix: "settings.suffix",
+          startNumber: "settings.start_number",
+          padding: "settings.padding",
+          apply: "true",
+          confirmApply: "true"
+        }
+      }
+    ]);
+    expect(validateToolRuntimeSchema(schema).filter((issue) => issue.severity === "error")).toEqual([]);
   });
 
   it("ignores learningLog metadata when building runtime schema", () => {

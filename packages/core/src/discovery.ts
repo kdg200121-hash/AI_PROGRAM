@@ -7,7 +7,7 @@ export const defaultMcpDiscoveryPorts = [
   3333,
   4200,
   5000,
-  5001,
+  5101,
   5100,
   5101,
   5173,
