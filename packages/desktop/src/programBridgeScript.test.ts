@@ -59,6 +59,7 @@ describe("program MCP bridge scaffold", () => {
 
     expect(content).toContain("Get-WindowSelectionRecords");
     expect(content).toContain("Parse-CadWindowPointText");
+    expect(content).toContain("return ,([double[]]@(");
     expect(content).toContain("windowRequired");
     expect(content).toContain('$scope -eq "window"');
     expect(content).toContain('$scope -eq "range"');

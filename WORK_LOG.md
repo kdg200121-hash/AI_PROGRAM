@@ -2292,3 +2292,12 @@
 - 임시 AutoCAD 도면에서 TEXT 2개를 만들고 핸들 `7F`, `80`으로 미리보기/적용을 호출해 `OLD_A`, `OLD_B`가 저장 없이 `T-05`, `T-06`으로 바뀌는 것을 확인했다.
 - Custom Flow의 `CAD 선택 문자 순번 변경` 노드는 이전 CAD 읽기 노드 결과의 `rows[].handle` 값을 자동 추출해 `handles` 파라미터로 넘긴다.
 - 이로써 `CAD 객체 읽기`에서 읽은 결과를 다음 순번 변경 노드가 안정적으로 받아 실행할 수 있다.
+
+## 2026-07-09 추가 265
+
+- `cad.read_objects`의 `scope=window/range`가 AutoCAD COM `SelectionSet.Select`에서 `Invalid argument Point1 in Select` 또는 0개 결과를 반환하는 원인을 재검토했다.
+- 원인은 PowerShell 함수가 `[double[]]` 좌표 배열을 반환할 때 배열을 파이프라인에 풀어 `System.Object[]`처럼 전달하는 것이었다.
+- `Parse-CadWindowPointText`와 `Get-CadWindowPoint`의 좌표 반환을 `return ,([double[]]@(...))`로 고정해 AutoCAD COM에 실제 `double[]`가 들어가도록 수정했다.
+- 회귀 테스트를 추가해 브리지 스크립트에 같은 배열 반환 보호가 없으면 실패하도록 했다.
+- 실제 AutoCAD 임시 도면에서 `cad.read_objects(scope=window)`가 TEXT 2개와 handle 2개를 읽고, 그 handle을 `cad.renumber_selected_text`에 넘겨 미리보기는 도면을 바꾸지 않고 적용 시 `CF-01`, `CF-02`로 변경되는 것을 확인했다.
+- `pnpm test`, `pnpm typecheck`, `pnpm --filter @mcp-registry/desktop package:win`을 통과했고 새 exe에도 수정된 브리지 스크립트가 포함된 것을 확인했다.

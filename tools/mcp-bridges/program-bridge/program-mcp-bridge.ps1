@@ -910,7 +910,7 @@ function Parse-CadWindowPointText {
 
   try {
     $z = if ($parts.Count -ge 3) { [double]$parts[2] } else { 0 }
-    return [double[]]@([double]$parts[0], [double]$parts[1], $z)
+    return ,([double[]]@([double]$parts[0], [double]$parts[1], $z))
   } catch {
     return $null
   }
@@ -936,14 +936,14 @@ function Get-CadWindowPoint {
     $y = Safe-Value $value "y"
     $z = Safe-Value $value "z" 0
     if ($null -ne $x -and $null -ne $y) {
-      return [double[]]@([double]$x, [double]$y, [double]$z)
+      return ,([double[]]@([double]$x, [double]$y, [double]$z))
     }
   } catch {}
 
   try {
     if ($value.Count -ge 2) {
       $z = if ($value.Count -ge 3) { [double]$value[2] } else { 0 }
-      return [double[]]@([double]$value[0], [double]$value[1], $z)
+      return ,([double[]]@([double]$value[0], [double]$value[1], $z))
     }
   } catch {}
 
