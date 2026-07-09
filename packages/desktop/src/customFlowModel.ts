@@ -522,6 +522,7 @@ export const flowToolPalette: FlowTool[] = [
           status: "available",
           runtimeAction: "preview",
           params: {
+            handles: "previous.cad-source",
             prefix: "settings.prefix",
             suffix: "settings.suffix",
             startNumber: "settings.start_number",
@@ -536,6 +537,7 @@ export const flowToolPalette: FlowTool[] = [
           status: "available",
           runtimeAction: "apply",
           params: {
+            handles: "previous.cad-source",
             prefix: "settings.prefix",
             suffix: "settings.suffix",
             startNumber: "settings.start_number",

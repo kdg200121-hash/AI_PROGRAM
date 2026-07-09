@@ -2284,3 +2284,11 @@
 - 따라서 `cad.renumber_selected_text` 실사용 검증은 AutoCAD 화면에서 사용자가 TEXT/MTEXT를 직접 선택한 상태로 미리보기를 실행해 확인해야 한다.
 - Revit 브리지는 실제 모델 `평택통복하수처리장_교대반응조_AR_Donggeon.rvt`에 연결됐고 `revit.list_levels`로 레벨 3개를 읽었다.
 - Revit 레벨 3개를 Excel 브리지 `excel.write_table`에 전달해 `C:\Users\Public\Documents\ESTsoft\CreatorTemp\ai_program_revit_levels_20260709_154059.xlsx` 파일로 3행/3열 저장을 확인했다.
+
+## 2026-07-09 추가 264
+
+- AutoCAD 선택 상태가 자동화 프로세스 간에 안정적으로 공유되지 않는 문제를 줄이기 위해 `cad.renumber_selected_text`에 `handles` 입력을 추가했다.
+- `handles`가 들어오면 현재 선택 상태 대신 `Document.HandleToObject()`로 해당 객체를 직접 찾아 TEXT/MTEXT만 순번 변경 대상으로 삼는다.
+- 임시 AutoCAD 도면에서 TEXT 2개를 만들고 핸들 `7F`, `80`으로 미리보기/적용을 호출해 `OLD_A`, `OLD_B`가 저장 없이 `T-05`, `T-06`으로 바뀌는 것을 확인했다.
+- Custom Flow의 `CAD 선택 문자 순번 변경` 노드는 이전 CAD 읽기 노드 결과의 `rows[].handle` 값을 자동 추출해 `handles` 파라미터로 넘긴다.
+- 이로써 `CAD 객체 읽기`에서 읽은 결과를 다음 순번 변경 노드가 안정적으로 받아 실행할 수 있다.

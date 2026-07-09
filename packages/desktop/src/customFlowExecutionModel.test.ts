@@ -103,6 +103,7 @@ describe("customFlowExecutionModel", () => {
       status: "available",
       runtimeAction: "preview",
       params: {
+        handles: "",
         prefix: "A-",
         suffix: "",
         startNumber: 1,
@@ -139,6 +140,7 @@ describe("customFlowExecutionModel", () => {
           command: "cad.renumber_selected_text",
           status: "available",
           params: {
+            handles: "",
             prefix: "A-",
             suffix: "",
             startNumber: 1,
@@ -149,6 +151,38 @@ describe("customFlowExecutionModel", () => {
         }
       ]
     });
+  });
+
+  it("passes CAD object handles from the previous node into renumber commands", () => {
+    const tool = flowToolPalette.find((item) => item.id === "cad-renumber-selected-text");
+    expect(tool).toBeDefined();
+
+    const request = buildFlowNodeExecutionRequest({
+      node: {
+        ...tool!,
+        nodeId: "node-cad-renumber",
+        x: 0,
+        y: 0,
+        settingsValues: {
+          prefix: "A-",
+          suffix: "",
+          start_number: 1,
+          padding: 3
+        }
+      },
+      menuName: "Custom Flow",
+      runtimeAction: "preview",
+      inputResults: {
+        "cad-source": {
+          rows: [
+            { handle: "7F", layer: "0" },
+            { handle: "80", layer: "0" }
+          ]
+        }
+      }
+    });
+
+    expect(request?.commands[0].params.handles).toEqual(["7F", "80"]);
   });
 
   it("normalizes MCP results so downstream nodes receive the real payload", () => {

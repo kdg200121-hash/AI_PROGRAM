@@ -117,6 +117,9 @@ describe("program MCP bridge scaffold", () => {
     expect(content).toContain("cad.renumber_selected_text");
     expect(content).toContain("Invoke-CadRenumberSelectedText");
     expect(content).toContain("Get-CurrentSelectionEntities");
+    expect(content).toContain("Get-HandleSelectionEntities");
+    expect(content).toContain("HandleToObject");
+    expect(content).toContain('Get-PayloadParam -Payload $Payload -Name "handles"');
     expect(content).toContain("confirmApply");
     expect(content).toContain("previewOnly");
     expect(content).toContain("TextString");

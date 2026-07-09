@@ -88,6 +88,7 @@ describe("customFlowModel", () => {
           runtimeAction: "preview",
           status: "available",
           params: expect.objectContaining({
+            handles: "previous.cad-source",
             prefix: "settings.prefix",
             suffix: "settings.suffix",
             startNumber: "settings.start_number",
@@ -102,6 +103,7 @@ describe("customFlowModel", () => {
           runtimeAction: "apply",
           status: "available",
           params: expect.objectContaining({
+            handles: "previous.cad-source",
             apply: "true",
             confirmApply: "true"
           })

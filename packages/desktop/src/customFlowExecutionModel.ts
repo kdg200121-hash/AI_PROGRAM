@@ -28,6 +28,35 @@ function replacePreviousResultReference(value: unknown, inputResults: Record<str
   return value;
 }
 
+function handlesFromRows(value: unknown): string[] {
+  const record = asRecord(value);
+  const nestedResult = asRecord(record?.result);
+  const rows: unknown[] = Array.isArray(value)
+    ? value
+    : Array.isArray(record?.rows)
+      ? record.rows
+      : Array.isArray(nestedResult?.rows)
+        ? nestedResult.rows
+        : [];
+
+  return rows
+    .map((row) => asRecord(row)?.handle)
+    .filter((handle): handle is string => typeof handle === "string" && handle.length > 0);
+}
+
+function replaceCommandParamReference(
+  key: string,
+  value: unknown,
+  inputResults: Record<string, unknown>
+) {
+  const resolved = replacePreviousResultReference(value, inputResults);
+  if (key === "handles") {
+    const handles = handlesFromRows(resolved);
+    return handles.length > 0 ? handles : resolved;
+  }
+  return resolved;
+}
+
 export function buildFlowNodeExecutionRequest({
   node,
   menuName,
@@ -53,7 +82,7 @@ export function buildFlowNodeExecutionRequest({
       params: Object.fromEntries(
         Object.entries(command.params).map(([key, value]) => [
           key,
-          replacePreviousResultReference(value, inputResults)
+          replaceCommandParamReference(key, value, inputResults)
         ])
       )
     }))

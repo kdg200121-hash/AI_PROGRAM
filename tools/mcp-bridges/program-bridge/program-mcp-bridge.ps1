@@ -721,6 +721,65 @@ function Get-CurrentSelectionEntities {
   }
 }
 
+function Get-HandleSelectionEntities {
+  param(
+    $Doc,
+    $Handles,
+    [int]$MaxItems = 200
+  )
+
+  if ($null -eq $Handles) {
+    return $null
+  }
+
+  $handleList = @()
+  if ($Handles -is [string]) {
+    $handleList = @($Handles -split "[,\s]+" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  } elseif ($Handles -is [System.Collections.IEnumerable]) {
+    foreach ($handle in $Handles) {
+      $text = Safe-String $handle
+      if (-not [string]::IsNullOrWhiteSpace($text)) {
+        $handleList += $text
+      }
+    }
+  } else {
+    $text = Safe-String $Handles
+    if (-not [string]::IsNullOrWhiteSpace($text)) {
+      $handleList = @($text)
+    }
+  }
+
+  if ($handleList.Count -eq 0) {
+    return $null
+  }
+
+  $entities = @()
+  $limit = [Math]::Min($handleList.Count, $MaxItems)
+  for ($index = 0; $index -lt $limit; $index += 1) {
+    try {
+      $entity = $Doc.HandleToObject($handleList[$index])
+      $record = Get-EntityRecord -Entity $entity
+      $objectName = (Safe-String (Safe-Value $record "objectName")).ToLowerInvariant()
+      if ($objectName.Contains("text")) {
+        $entities += @{
+          entity = $entity
+          record = $record
+        }
+      }
+    } catch {}
+  }
+
+  return @{
+    ok = $entities.Count -gt 0
+    code = if ($entities.Count -gt 0) { "" } else { "textSelectionRequired" }
+    entities = $entities
+    count = $entities.Count
+    total = $handleList.Count
+    truncated = $handleList.Count -gt $MaxItems
+    message = if ($entities.Count -gt 0) { "" } else { "Provided handles do not include AutoCAD TEXT or MTEXT." }
+  }
+}
+
 function Set-CadTextValue {
   param(
     $Entity,
@@ -751,7 +810,11 @@ function Invoke-CadRenumberSelectedText {
     return New-ProgramNotAttachedResponse -Command $Command
   }
 
-  $selectionResult = Get-CurrentSelectionEntities -Doc $doc -MaxItems 200
+  $handles = Get-PayloadParam -Payload $Payload -Name "handles"
+  $selectionResult = Get-HandleSelectionEntities -Doc $doc -Handles $handles -MaxItems 200
+  if ($null -eq $selectionResult) {
+    $selectionResult = Get-CurrentSelectionEntities -Doc $doc -MaxItems 200
+  }
   if (-not $selectionResult.ok) {
     return @{
       ok = $false
