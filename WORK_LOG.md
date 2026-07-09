@@ -2275,3 +2275,12 @@
 - 이 때문에 새로 추가한 CAD MD 툴이 exe 패키지 안에 들어가지 않았다.
 - 패키징 스크립트에 `copyToolMarkdownFiles`를 추가해 `tools` 루트의 `.md` 파일을 `resources/app/tools`로 복사하도록 수정했다.
 - `packageWinScript.test.ts`를 추가해 이 누락이 다시 생기면 테스트가 실패하도록 했다.
+
+## 2026-07-09 추가 263
+
+- 최신 release exe 실행 후 AutoCAD/Revit/Excel 브리지 상태를 다시 확인했다.
+- AutoCAD 브리지는 실제 DWG에 연결됐고 `cad.renumber_selected_text` 명령이 `/commands`에 `available`로 노출되는 것을 확인했다.
+- AutoCAD 임시 새 도면에서 COM으로 만든 named selection/Pickfirst selection은 별도 MCP 브리지 프로세스의 `PickfirstSelectionSet`/`ActiveSelectionSet`으로 전달되지 않았다. 이 경우 명령은 `selectionRequired`로 안전하게 실패하며 도면을 수정하지 않는다.
+- 따라서 `cad.renumber_selected_text` 실사용 검증은 AutoCAD 화면에서 사용자가 TEXT/MTEXT를 직접 선택한 상태로 미리보기를 실행해 확인해야 한다.
+- Revit 브리지는 실제 모델 `평택통복하수처리장_교대반응조_AR_Donggeon.rvt`에 연결됐고 `revit.list_levels`로 레벨 3개를 읽었다.
+- Revit 레벨 3개를 Excel 브리지 `excel.write_table`에 전달해 `C:\Users\Public\Documents\ESTsoft\CreatorTemp\ai_program_revit_levels_20260709_154059.xlsx` 파일로 3행/3열 저장을 확인했다.

@@ -239,6 +239,8 @@ logs
 - `cad.renumber_selected_text`는 AutoCAD에서 사용자가 미리 선택한 TEXT/MTEXT만 순번 변경 대상으로 삼는 첫 안전 수정 명령입니다. 기본은 미리보기이며, 실제 변경은 `apply=true`와 `confirmApply=true`가 함께 들어올 때만 수행합니다. 도면 전체 ModelSpace 순회와 `$doc.Save()` 자동 저장은 금지입니다.
 - Custom Flow 도구 팔레트의 `CAD 선택 문자 순번 변경` 노드는 `cad.renumber_selected_text`를 호출합니다. 기본 설정은 미리보기이며, 실제 수정은 노드 설정에서 `실제 도면에 적용`과 `적용 확인`을 모두 켠 경우에만 브리지로 전달됩니다. 결과 미리보기는 `기존 문자`, `변경 문자`, `적용 여부` 표로 표시됩니다.
 - CAD 툴 페이지용 MD 파일 `tools/CAD_선택_문자_순번_변경_1.0.0.md`도 같은 명령을 사용합니다. 이 툴은 `미리보기`/`적용` action을 분리하며, 적용은 미리보기 이후 확인을 요구합니다.
+- AutoCAD 자동 검증에서 외부 PowerShell이 만든 named/Pickfirst selection은 별도 MCP 브리지 프로세스의 현재 선택으로 전달되지 않았습니다. 이 경우 `selectionRequired`로 안전하게 실패합니다. 실제 `cad.renumber_selected_text` 적용 검증은 AutoCAD 화면에서 사용자가 TEXT/MTEXT를 직접 선택한 뒤 미리보기부터 실행해야 합니다.
+- 최신 release exe 기준 Revit `revit.list_levels` -> Excel `excel.write_table` 흐름은 실제 모델 레벨 3개를 새 xlsx 3행/3열로 저장하는 것까지 확인했습니다.
 - AI Program 앱 실행 기준은 MCP bridge 직접 호출입니다. Codex CLI 연결은 `/등록` 자동화나 Codex 채팅에서 MCP를 직접 쓰는 보조 경로로 유지하고, 앱 버튼 실행의 필수 조건으로 보지 않습니다.
 - AutoCAD가 실행 중이 아니거나 COM 연결이 불가능하면 브리지는 가짜 성공을 반환하지 않고 `ok:false`, `connectedToProgram:false`로 실패를 반환합니다. 이 실패는 툴 실행 단계 완료로 처리하면 안 됩니다.
 - 브리지 HTTP 파서는 JSON-RPC `tools/call` POST body를 `Content-Length` 기준으로 끝까지 읽어야 합니다. 이 처리가 빠지면 `/tools/{command}`는 동작하지만 `/mcp` JSON-RPC 호출에서 command가 빈 값으로 들어가는 문제가 재발합니다.
