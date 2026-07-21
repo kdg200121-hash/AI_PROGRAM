@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "accountPolicy": {
+    "signupMode": "approval",
+    "licenseMode": "licensed",
+    "toolRegistrationMode": "open"
+  },
+  "accountUsers": [
+    {
+      "githubId": "kdg200121-hash",
+      "nickname": "김동건",
+      "role": "admin",
+      "license": true,
+      "status": "active",
+      "joinedAt": "2026-07-05T04:42:46.455Z"
+    }
+  ],
+  "tombstones": [
+    {
+      "kind": "tool",
+      "path": "github:kdg200121-hash/AI_PROGRAM/tools/cad-drawing-number-batch-renumber_1.0.0.md",
+      "deletedByGithubId": "kdg200121-hash",
+      "deletedAt": "2026-07-21T11:51:38.586Z",
+      "reason": "Removed from AI Program tool list"
+    },
+    {
+      "kind": "tool",
+      "path": "github:kdg200121-hash/AI_PROGRAM/tools/cad-drawing-number-batch-renumber_1.0.0.md",
+      "deletedByGithubId": "kdg200121-hash",
+      "deletedAt": "2026-07-21T11:51:38.586Z",
+      "reason": "Removed from AI Program tool list"
+    },
+    {
+      "kind": "tool",
+      "path": "github:kdg200121-hash/AI_PROGRAM/tools/CAD_선택_문자_순번_변경_1.0.0.md",
+      "deletedByGithubId": "kdg200121-hash",
+      "deletedAt": "2026-07-21T11:51:38.586Z",
+      "reason": "Removed from AI Program tool list"
+    },
+    {
+      "kind": "tool",
+      "path": "github:kdg200121-hash/AI_PROGRAM/tools/CAD_선택_문자_순번_변경_1.0.0.md",
+      "deletedByGithubId": "kdg200121-hash",
+      "deletedAt": "2026-07-21T11:51:38.586Z",
+      "reason": "Removed from AI Program tool list"
+    }
+  ],
+  "updatedAt": "2026-07-21T11:51:38.586Z"
+}
