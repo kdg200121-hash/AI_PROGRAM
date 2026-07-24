@@ -18,32 +18,18 @@
   "tombstones": [
     {
       "kind": "tool",
-      "path": "github:kdg200121-hash/AI_PROGRAM/tools/cad-drawing-number-batch-renumber_1.0.0.md",
-      "deletedByGithubId": "kdg200121-hash",
-      "deletedAt": "2026-07-21T11:51:38.586Z",
-      "reason": "Removed from AI Program tool list"
-    },
-    {
-      "kind": "tool",
-      "path": "github:kdg200121-hash/AI_PROGRAM/tools/cad-drawing-number-batch-renumber_1.0.0.md",
-      "deletedByGithubId": "kdg200121-hash",
-      "deletedAt": "2026-07-21T11:51:38.586Z",
-      "reason": "Removed from AI Program tool list"
-    },
-    {
-      "kind": "tool",
       "path": "github:kdg200121-hash/AI_PROGRAM/tools/CAD_선택_문자_순번_변경_1.0.0.md",
       "deletedByGithubId": "kdg200121-hash",
-      "deletedAt": "2026-07-21T11:51:38.586Z",
+      "deletedAt": "2026-07-24T19:47:45.667Z",
       "reason": "Removed from AI Program tool list"
     },
     {
       "kind": "tool",
-      "path": "github:kdg200121-hash/AI_PROGRAM/tools/CAD_선택_문자_순번_변경_1.0.0.md",
+      "path": "github:kdg200121-hash/AI_PROGRAM/tools/cad-drawing-number-batch-renumber_1.0.0.md",
       "deletedByGithubId": "kdg200121-hash",
-      "deletedAt": "2026-07-21T11:51:38.586Z",
+      "deletedAt": "2026-07-24T19:47:45.667Z",
       "reason": "Removed from AI Program tool list"
     }
   ],
-  "updatedAt": "2026-07-21T11:51:38.586Z"
+  "updatedAt": "2026-07-24T19:47:45.667Z"
 }
